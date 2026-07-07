@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0B1F1E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="台帳">
+<title>収支台帳</title>
+<style>
+  :root{
+    --bg:#0B1F1E; --surface:#12302E; --surface2:#1A3E3B; --line:#24504C;
+    --amber:#F2B33D; --teal:#2DD4BF; --red:#E57373; --text:#E8F0EF; --muted:#8FAAA7;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{margin:0; background:var(--bg); color:var(--text);
+    font-family:'Hiragino Sans','Noto Sans JP',sans-serif; font-size:14px;}
+  #app{max-width:560px; margin:0 auto; padding:16px 16px 96px;}
+  .mono{font-family:ui-monospace,'SF Mono',Menlo,monospace; font-variant-numeric:tabular-nums;}
+  .muted{color:var(--muted);}
+  .teal{color:var(--teal);} .red{color:var(--red);} .amber{color:var(--amber);}
+  .band{display:flex; align-items:center; gap:8px; margin:20px 0 10px;}
+  .band .tick{width:4px; height:14px; background:var(--amber); border-radius:2px;}
+  .band .label{font-size:12px; letter-spacing:.12em; color:var(--muted); font-weight:600;}
+  .band .rule{flex:1; height:1px; background:var(--line);}
+  .card{background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:14px 16px;}
+  .card2{background:var(--surface2); border-radius:8px; padding:8px 10px;}
+  .row{display:flex; align-items:center;}
+  .between{justify-content:space-between;}
+  .input, select.input, textarea.input{background:var(--surface2); border:1px solid var(--line); border-radius:8px;
+    color:var(--text); padding:10px 12px; font-size:14px; outline:none; width:100%;}
+  .input.sm{padding:6px 8px; font-size:13px;}
+  .input.r{text-align:right;}
+  .btn{border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--muted);
+    font-size:13px; padding:9px 12px; cursor:pointer; font-family:inherit;}
+  .btn.primary{background:var(--amber); color:#1a1508; border:none; font-weight:700;}
+  .btn.danger{border-color:var(--red); color:var(--red);}
+  .btn.tealb{border-color:var(--teal); color:var(--teal);}
+  .btn.sel{border-color:var(--amber); color:var(--amber); background:rgba(242,179,61,.12); font-weight:600;}
+  .btn.dash{border-style:dashed; font-size:12px;}
+  .btn.full{width:100%;}
+  .chip{padding:4px 10px; border-radius:12px; font-size:11px; border:1px solid var(--line);
+    background:transparent; color:var(--muted); cursor:pointer; font-family:inherit;}
+  .chip.sel{border-color:var(--teal); color:var(--teal); background:rgba(45,212,191,.12);}
+  .grid2{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
+  .tag{font-size:10px; padding:1px 6px; border-radius:4px;}
+  .fab{position:fixed; right:20px; bottom:76px; width:54px; height:54px; border-radius:27px;
+    background:var(--amber); color:#1a1508; font-size:28px; border:none; cursor:pointer;
+    box-shadow:0 4px 16px rgba(0,0,0,.4); line-height:0; z-index:5;}
+  .tabs{position:fixed; bottom:0; left:0; right:0; background:var(--surface);
+    border-top:1px solid var(--line); display:flex; z-index:10;}
+  .tabs button{flex:1; padding:13px 0 calc(13px + env(safe-area-inset-bottom)); background:none; border:none;
+    cursor:pointer; font-size:13px; color:var(--muted); border-top:2px solid transparent; font-family:inherit;}
+  .tabs button.on{color:var(--amber); font-weight:700; border-top-color:var(--amber);}
+  .toast{position:fixed; bottom:88px; left:50%; transform:translateX(-50%); background:var(--surface2);
+    border:1px solid var(--teal); color:var(--teal); font-size:12px; padding:6px 16px; border-radius:16px;
+    z-index:60; opacity:0; transition:opacity .25s; pointer-events:none;}
+  .toast.show{opacity:1;}
+  .hdr{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .navbtn{background:none; border:none; color:var(--muted); font-size:14px; cursor:pointer; padding:4px; font-family:inherit;}
+  h1{font-size:15px; font-weight:700; letter-spacing:.06em; margin:0 0 4px;}
+  h1 small{color:var(--muted); font-weight:400; font-size:11px;}
+  .listitem{background:var(--surface); border:1px solid var(--line); border-radius:10px;
+    padding:11px 14px; margin-bottom:8px; display:flex; align-items:center; cursor:pointer;}
+  .ellip{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .bar{height:5px; background:var(--surface2); border-radius:3px;}
+  .bar>div{height:5px; border-radius:3px; opacity:.85;}
+  .xbtn{background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:0 2px;}
+  .signbtn{width:38px; height:38px; border-radius:6px; font-size:18px; font-weight:700; cursor:pointer;
+    flex-shrink:0; line-height:1; background:transparent; font-family:inherit;}
+  .amberpanel{background:rgba(242,179,61,.08); border:1px solid rgba(242,179,61,.35); border-radius:8px; padding:9px 10px;}
+  textarea.input{height:120px; resize:vertical; font-size:11px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast">保存しました</div>
+<script>
+"use strict";
+/* ============================================================
+   収支台帳 スタンドアロン版 v8 (localStorage保存・完全オフライン)
+   ============================================================ */
+const KEY = "kakeibo:v1";
+const EXPENSE_CATS = ["食費","日用品","交通費","趣味・娯楽","交際費","医療・健康","住居・光熱","通信","遊技","その他"];
+const INCOME_CATS = ["給与","賞与","遊技収支","その他収入"];
+const UNIT_LABEL = {medal:"枚", ball:"玉", yen:"円"};
+const WD = ["日","月","火","水","木","金","土"];
+
+/* ---------- helpers ---------- */
+const num = v => { const n = parseInt(v,10); return isNaN(n)?0:n; };
+const fnum = v => { const n = parseFloat(v); return isNaN(n)?0:n; };
+const yen = n => "¥" + Math.abs(n).toLocaleString("ja-JP");
+const signYen = n => (n>=0?"+":"−") + yen(n);
+const clsPM = n => n>=0 ? "teal" : "red";
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const todayStr = () => { const d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const uid = () => Date.now() + Math.floor(Math.random()*1000);
+
+/* ---------- state ---------- */
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[] };
+let UI = {
+  tab:"slot", screen:"main",           // main | session | mdb | backup | entry
+  y:new Date().getFullYear(), m:new Date().getMonth()+1,
+  draft:null, isNewSess:false,         // セッションドラフト
+  entryForm:null, editEntryId:null,    // 家計簿ドラフト
+  mdbForm:null,                        // 機種マスタドラフト
+  msg:""                               // backup画面メッセージ
+};
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw){
+      const d = JSON.parse(raw);
+      S.entries = d.entries||[];
+      S.sessions = (d.sessions||[]).map(migrateSession);
+      S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
+      S.mdb = d.mdb||[];
+      S.mjSessions = d.mjSessions||[];
+    }
+  }catch(e){ /* 壊れていたら初期状態 */ }
+}
+function save(){
+  try{
+    localStorage.setItem(KEY, JSON.stringify(S));
+    toast("保存しました");
+  }catch(e){
+    alert("保存に失敗しました: " + e.message + "\nバックアップからエクスポートしてください。");
+  }
+}
+let toastTimer = null;
+function toast(t){
+  const el = document.getElementById("toast");
+  el.textContent = t; el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove("show"), 1200);
+}
+
+/* ---------- 計算(セッション) ---------- */
+const migrateSession = s => {
+  /* 旧構造からの移行: 全台に貯玉方式フィールドを補完 */
+  const machines = (s.machines||[]).map(m => {
+    const nm = Object.assign({who:"me"}, m);
+    if(nm.startStock===undefined) nm.startStock="";
+    if(nm.endStock===undefined) nm.endStock="";
+    if(nm.holdBalls===undefined) nm.holdBalls="";
+    if(!nm.cash) nm.cash=[];
+    if(nm.kind==="slot"){ delete nm.rsegs; delete nm.hits; } /* 旧判別ログ破棄 */
+    return nm;
+  });
+  const out = Object.assign({}, s, {machines});
+  if(out.exchange===undefined) out.exchange="";
+  if(out.pExchange===undefined) out.pExchange="";
+  if(out.pushPayout===undefined) out.pushPayout="";
+  if(out.pushDraw===undefined) out.pushDraw="";
+  /* 旧区間の pushes/pp フィールドは残っていても新計算では無視される */
+  delete out.results; delete out.own; delete out.partner;
+  return out;
+};
+/* ---------- 計算(貯玉方式・台ごと) ----------
+   差枚 = 終了貯玉 − 開始貯玉 + 持ち玉
+   収支(円) = 差枚 ÷ 交換枚数 × 1000 − 現金投資合計 */
+const machCash = m => (m.cash||[]).reduce((a,c)=>a+num(c.amount),0);
+const machSabai = m => num(m.endStock) - num(m.startStock) + num(m.holdBalls);
+const machYen = (m, exch) => {
+  const ex = num(exch);
+  const gross = ex>0 ? Math.round(machSabai(m)/ex*1000) : 0;
+  return gross - machCash(m);
+};
+const machHasData = m => m.startStock!=="" || m.endStock!=="" || m.holdBalls!=="" || machCash(m)>0;
+/* 台の換算レート: スロット=交換枚数, パチンコ=換金玉数 */
+const machExch = (m, s) => m.kind==="pachi" ? s.pExchange : s.exchange;
+const machYenS = (m, s) => machYen(m, machExch(m, s));
+/* 収支対象台(スロット+貯玉入力のあるパチンコ) */
+const incomeMachines = (s, who) => (s.machines||[]).filter(m =>
+  (m.kind==="slot" || (m.kind==="pachi" && machHasData(m))) && (!who || (m.who||"me")===who));
+const slotMachines = (s, who) => (s.machines||[]).filter(m => m.kind==="slot" && (!who || (m.who||"me")===who));
+const personSlotYen = (s, who) => incomeMachines(s, who).reduce((a,m)=>a+machYenS(m, s), 0);
+const poolTotal = s => personSlotYen(s,"me") + personSlotYen(s,"partner");
+const expTotal = s => (s.expenses||[]).reduce((a,e)=>a+num(e.amount),0);
+/* 乗り打ちの折半調整: myShareが入力されていればそれを自分の取り分に使う(なければ折半) */
+const halfSplit = s => Math.round(poolTotal(s)/2);
+const myShare = s => (s.myShare!==undefined && s.myShare!=="") ? num(s.myShare) : halfSplit(s);
+const partnerShare = s => poolTotal(s) - myShare(s);
+/* 家計簿へ流れる自分の生収支(経費前) */
+const grossOwn = s => s.mode==="dai" ? num(s.fee)
+                    : s.mode==="nori" ? myShare(s)
+                    : personSlotYen(s,"me");
+const finalOwn = s => grossOwn(s) - expTotal(s);
+/* 代打ちの台勝敗(報告用・家計簿非反映) */
+const daiResult = s => incomeMachines(s).reduce((a,m)=>a+machYenS(m, s), 0);
+
+/* ---------- 計算(麻雀) ---------- */
+const mjRankCount = m => m.rule==="3" ? 3 : 4;
+const mjRanks = m => { const rc=mjRankCount(m); return (m.ranks||[]).map(x=>num(x)).map((v,i)=> i<rc?v:0); };
+const mjHanchan = m => mjRanks(m).reduce((a,b)=>a+b,0);
+const mjGameFee = m => m.category==="free"
+  ? num(m.baseFee)*mjHanchan(m) + num(m.topBonus)*num((m.ranks||[])[0]) + num(m.drinkFee)
+  : num(m.setFee);
+const mjScoreYen = m => Math.round(fnum(m.score)*fnum(m.scoreRate));
+const mjChipYen = m => Math.round(fnum(m.chips)*fnum(m.chipRate));
+const mjRaw = m => mjScoreYen(m) + mjChipYen(m);          // ゲーム代抜き(麻雀のみの収支)
+const mjFinal = m => mjRaw(m) - mjGameFee(m);             // ゲーム代込み(家計簿へ)
+const mjAvgRank = m => {
+  const h = mjHanchan(m); if(!h) return null;
+  const r = mjRanks(m);
+  let s=0; for(let i=0;i<r.length;i++) s += (i+1)*r[i];
+  return s/h;
+};
+const modeLabel = m => m==="nori" ? "乗り打ち" : m==="dai" ? "代打ち" : "単独";
+const modeShort = m => m==="nori" ? "乗り" : m==="dai" ? "代打ち" : "単独";
+
+/* ---------- 計算(パチンコ区間) ----------
+   貯玉プッシュ: プッシュ数 = 開始残プッシュ − 終了残プッシュ
+   台に入った玉(回転率用) = プッシュ数×払出玉 + 開始残玉 − 当たり時残玉
+   引き落とし玉(コスト用) = プッシュ数×引き落とし玉 + 開始残玉 − 当たり時残玉 */
+const segPushes = g => Math.max(0, num(g.rpStart) - num(g.rpEnd));
+const segUsed = (g, s) => { s=s||UI.draft; return g.kind==="push"
+  ? Math.max(0, segPushes(g)*num((s&&s.pushPayout)||230) + num(g.sb) - num(g.eb))
+  : Math.max(0, num(g.sb) - num(g.eb)); };
+const segCost = (g, s) => { s=s||UI.draft; return g.kind==="push"
+  ? Math.max(0, segPushes(g)*num((s&&s.pushDraw)||245) + num(g.sb) - num(g.eb))
+  : segUsed(g, s); };
+const segSpins = g => Math.max(0, num(g.es) - num(g.ss));
+const segDone = g => g.kind==="push"
+  ? (g.rpStart!=="" && g.rpEnd!=="" && g.ss!=="" && g.es!=="")
+  : (g.sb!=="" && g.eb!=="" && g.ss!=="" && g.es!=="");
+function machineTotals(m, s){
+  s = s||UI.draft;
+  const segs = (m.segments||[]).filter(segDone);
+  const balls = segs.reduce((a,g)=>a+segUsed(g, s),0);
+  const spins = segs.reduce((a,g)=>a+segSpins(g),0);
+  const costBalls = segs.reduce((a,g)=>a+segCost(g, s),0);
+  const payouts = [];
+  for(let i=0;i<segs.length-1;i++){
+    if(segs[i].eb!=="" && segs[i+1].sb!==""){
+      const p = num(segs[i+1].sb) - num(segs[i].eb);
+      if(p>0) payouts.push(p);
+    }
+  }
+  const avgTY = payouts.length ? payouts.reduce((a,b)=>a+b,0)/payouts.length : null;
+  return { balls, spins, payouts, avgTY,
+    rate250: balls>0 ? spins/(balls/250) : null,
+    costRate250: costBalls>0 ? spins/(costBalls/250) : null };
+}
+const findMaster = m => S.mdb.find(x => x.kind==="pachi" && (x.name||"").trim()
+  && (x.name||"").trim() === (m.name||"").trim());
+
+/* ---------- 月データ ---------- */
+const monthKey = () => UI.y + "-" + String(UI.m).padStart(2,"0");
+function moveMonth(d){ UI.m += d;
+  if(UI.m<1){UI.m=12;UI.y--;} if(UI.m>12){UI.m=1;UI.y++;}
+  render(); }
+</script>
+<script>
+/* ============================================================
+   レンダリング
+   ============================================================ */
+function render(){
+  const app = document.getElementById("app");
+  if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
+  if(UI.screen==="mahjong-edit"){ app.innerHTML = viewMj(); bindMj(); return; }
+  if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
+  if(UI.screen==="backup"){ app.innerHTML = viewBackup(); bindBackup(); return; }
+  if(UI.screen==="entry"){ app.innerHTML = viewEntry(); bindEntry(); return; }
+  app.innerHTML = viewMain(); bindMain();
+}
+
+/* ---------- 共通部品 ---------- */
+const band = t => '<div class="band"><div class="tick"></div><div class="label">'+esc(t)+'</div><div class="rule"></div></div>';
+const monthNav = () =>
+  '<div class="row" style="justify-content:center;margin-top:8px">'+
+  '<button class="navbtn" style="font-size:22px;padding:0 12px" data-a="mprev">‹</button>'+
+  '<div style="font-size:14px;font-weight:600;letter-spacing:.08em;width:120px;text-align:center">'+UI.y+'年 '+UI.m+'月</div>'+
+  '<button class="navbtn" style="font-size:22px;padding:0 12px" data-a="mnext">›</button></div>';
+
+/* ---------- メイン画面 ---------- */
+function viewMain(){
+  let h = '<div class="row between" style="align-items:baseline">'+
+    '<h1>収支台帳 <small>LEDGER</small></h1><div class="row" style="gap:6px">';
+  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="csv">CSV出力</button>';
+  if(UI.tab==="slot") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="mdb">機種データ</button>';
+  h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="backup">backup</button></div></div>';
+
+  h += monthNav();
+  if(UI.tab==="ledger") h += viewLedger();
+  if(UI.tab==="slot") h += viewSlot();
+  if(UI.tab==="mahjong") h += viewMahjong();
+
+  h += '<button class="fab" data-a="add">＋</button>';
+  h += '<div class="tabs">'+
+    [["ledger","家計簿"],["mahjong","麻雀"],["slot","スロット"]].map(([v,l])=>
+      '<button class="'+(UI.tab===v?"on":"")+'" data-a="tab" data-v="'+v+'">'+l+'</button>').join("")+
+    '</div>';
+  return h;
+}
+
+function viewLedger(){
+  const mk = monthKey();
+  const me = S.entries.filter(e=>e.date.startsWith(mk))
+    .sort((a,b)=> a.date<b.date?1 : a.date>b.date?-1 : (String(b.id)>String(a.id)?1:-1));
+  const income = me.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);
+  const expense = me.filter(e=>e.type==="expense").reduce((s,e)=>s+e.amount,0);
+  const bal = income-expense;
+  let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
+    '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月収支</div>'+
+    '<div class="mono '+clsPM(bal)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(bal)+'</div></div>'+
+    '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
+    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">収入</div><div class="mono teal" style="font-size:16px">'+yen(income)+'</div></div>'+
+    '<div style="width:1px;background:var(--line)"></div>'+
+    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">支出</div><div class="mono red" style="font-size:16px">'+yen(expense)+'</div></div></div></div>';
+
+  const cats = {};
+  me.filter(e=>e.type==="expense").forEach(e=>cats[e.category]=(cats[e.category]||0)+e.amount);
+  const ct = Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  if(ct.length){
+    h += band("支出内訳") + '<div class="card">' + ct.map(([c,a])=>
+      '<div style="margin:8px 0"><div class="row between" style="font-size:12px;margin-bottom:3px">'+
+      '<span>'+esc(c)+'</span><span class="mono muted">'+yen(a)+' <span style="font-size:10px">('+Math.round(a/expense*100)+'%)</span></span></div>'+
+      '<div class="bar"><div style="width:'+(a/expense*100)+'%;background:'+(c==="遊技"?"var(--amber)":"var(--teal)")+'"></div></div></div>'
+    ).join("") + '</div>';
+  }
+
+  h += band("明細");
+  if(!me.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の記録はまだありません。右下の「＋」から追加できます。</div>';
+  const byDate = {};
+  me.forEach(e=>{ (byDate[e.date]=byDate[e.date]||[]).push(e); });
+  Object.entries(byDate).sort((a,b)=>a[0]<b[0]?1:-1).forEach(([d,list])=>{
+    h += '<div style="margin-bottom:12px"><div class="mono muted" style="font-size:11px;margin:0 4px 4px">'+
+      d.slice(5).replace("-","/")+' ('+WD[new Date(d+"T00:00:00").getDay()]+')</div>'+
+      '<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
+      list.map((e,i)=>
+        '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="eedit" data-v="'+e.id+'">'+
+        '<div style="flex:1;min-width:0"><div style="font-size:13px">'+esc(e.category)+
+        (e.src==="slot"?' <span class="tag amber" style="border:1px solid var(--amber);font-size:9px">連携</span>':'')+'</div>'+
+        (e.memo?'<div class="muted ellip" style="font-size:11px">'+esc(e.memo)+'</div>':'')+'</div>'+
+        '<div class="mono" style="font-size:14px;'+(e.type==="income"?"color:var(--teal)":"")+'">'+
+        (e.type==="income"?"+":"")+yen(e.amount)+'</div></div>'
+      ).join("")+'</div></div>';
+  });
+  return h;
+}
+
+function viewSlot(){
+  const mk = monthKey();
+  const ms = S.sessions.filter(s=>s.date.startsWith(mk)).sort((a,b)=>a.date<b.date?1:-1);
+  const total = ms.reduce((a,s)=>a+finalOwn(s),0);
+  const exps = ms.reduce((a,s)=>a+expTotal(s),0);
+  let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
+    '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月遊技収支(経費控除後)</div>'+
+    '<div class="mono '+clsPM(total)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(total)+'</div></div>'+
+    '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
+    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">稼働日数</div><div class="mono" style="font-size:16px">'+ms.length+'日</div></div>'+
+    '<div style="width:1px;background:var(--line)"></div>'+
+    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">経費計</div><div class="mono red" style="font-size:16px">'+yen(exps)+'</div></div></div></div>';
+  h += band("セッション");
+  if(!ms.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の稼働記録はありません。右下の「＋」から追加できます。</div>';
+  ms.forEach(s=>{
+    const fin = finalOwn(s);
+    const bc = s.mode==="nori"?"var(--teal)":s.mode==="dai"?"var(--amber)":"var(--muted)";
+    h += '<div class="listitem" data-a="sedit" data-v="'+s.id+'">'+
+      '<div style="flex:1;min-width:0"><div class="row" style="font-size:13px;gap:6px">'+
+      '<span class="mono muted" style="font-size:11px">'+s.date.slice(5).replace("-","/")+'</span>'+
+      '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span>'+
+      '<span class="ellip">'+esc(s.store||"店名未入力")+'</span></div>'+
+      '<div class="muted" style="font-size:11px;margin-top:2px">'+
+      ((s.partnerName||"").trim()? esc((s.mode==="nori"?"相方":"依頼主")+": "+s.partnerName.trim())+" / " : "")+
+      (s.machines||[]).length+'台'+(expTotal(s)>0?' / 経費'+yen(expTotal(s)):'')+'</div></div>'+
+      '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700">'+signYen(fin)+'</div></div>';
+  });
+  return h;
+}
+
+function viewMahjong(){
+  const mk = monthKey();
+  const ms = (S.mjSessions||[]).filter(s=>s.date.startsWith(mk)).sort((a,b)=>a.date<b.date?1:-1);
+  const total = ms.reduce((a,s)=>a+mjFinal(s),0);
+  const hanchans = ms.reduce((a,s)=>a+mjHanchan(s),0);
+  let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
+    '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月麻雀収支(ゲーム代込)</div>'+
+    '<div class="mono '+clsPM(total)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(total)+'</div></div>'+
+    '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
+    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">半荘数</div><div class="mono" style="font-size:16px">'+hanchans+'</div></div>'+
+    '<div style="width:1px;background:var(--line)"></div>'+
+    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">日数</div><div class="mono" style="font-size:16px">'+ms.length+'日</div></div></div></div>';
+
+  /* ルール別集計(全期間) */
+  h += band("ルール別 成績(全期間)");
+  h += viewMjStats();
+
+  /* 当月セッション一覧 */
+  h += band("セッション");
+  if(!ms.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の記録はありません。右下の「＋」から追加できます。</div>';
+  ms.forEach(s=>{
+    const fin = mjFinal(s);
+    const av = mjAvgRank(s);
+    const catC = s.category==="free"?"var(--teal)":"var(--amber)";
+    h += '<div class="listitem" data-a="mjedit" data-v="'+s.id+'">'+
+      '<div style="flex:1;min-width:0"><div class="row" style="font-size:13px;gap:6px">'+
+      '<span class="mono muted" style="font-size:11px">'+s.date.slice(5).replace("-","/")+'</span>'+
+      '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span>'+
+      '<span class="tag" style="background:var(--surface2)">'+s.rule+'麻</span>'+
+      '<span class="ellip">'+esc(s.store||"")+'</span></div>'+
+      '<div class="muted" style="font-size:11px;margin-top:2px">'+mjHanchan(s)+'半荘'+(av!==null?' / 平均'+av.toFixed(2)+'着':'')+'</div></div>'+
+      '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700">'+signYen(fin)+'</div></div>';
+  });
+  return h;
+}
+
+function viewMjStats(){
+  /* ルール別(3麻/4麻)×全期間で集計 */
+  const groups = {"3":[], "4":[]};
+  (S.mjSessions||[]).forEach(s=>{ if(groups[s.rule]) groups[s.rule].push(s); });
+  let h = "";
+  let any = false;
+  ["4","3"].forEach(rule=>{
+    const list = groups[rule];
+    if(!list.length) return;
+    any = true;
+    const H = list.reduce((a,s)=>a+mjHanchan(s),0);
+    if(!H) return;
+    const rc = mjRankCount({rule});
+    const rankSums = [0,0,0,0];
+    list.forEach(s=>{ const r=mjRanks(s); for(let i=0;i<4;i++) rankSums[i]+=(r[i]||0); });
+    let rankWeighted=0; for(let i=0;i<4;i++) rankWeighted += (i+1)*rankSums[i];
+    const avgRank = rankWeighted/H;
+    const sumFinal = list.reduce((a,s)=>a+mjFinal(s),0);
+    const sumRaw = list.reduce((a,s)=>a+mjRaw(s),0);
+    const sumFee = list.reduce((a,s)=>a+mjGameFee(s),0);
+    const sumScore = list.reduce((a,s)=>a+fnum(s.score),0);
+    const sumChips = list.reduce((a,s)=>a+fnum(s.chips),0);
+    h += '<div class="card" style="margin-bottom:8px">'+
+      '<div class="row between" style="margin-bottom:8px"><span style="font-weight:700;font-size:13px">'+rule+'麻</span>'+
+      '<span class="muted" style="font-size:11px">'+H+'半荘 / '+list.length+'日</span></div>'+
+      '<div class="row between" style="align-items:baseline;margin-bottom:8px"><span class="muted" style="font-size:12px">平均着順</span>'+
+      '<span class="mono amber" style="font-size:18px;font-weight:700">'+avgRank.toFixed(3)+'</span></div>'+
+      /* 着順分布 */
+      '<div class="row" style="gap:4px;margin-bottom:10px">'+
+      Array.from({length:rc}).map((_,i)=>{
+        const pct = H>0 ? Math.round(rankSums[i]/H*100) : 0;
+        return '<div style="flex:1;text-align:center;background:var(--surface2);border-radius:6px;padding:5px 0">'+
+          '<div class="muted" style="font-size:9px">'+(i+1)+'着</div>'+
+          '<div class="mono" style="font-size:13px;font-weight:700">'+rankSums[i]+'</div>'+
+          '<div class="muted mono" style="font-size:9px">'+pct+'%</div></div>';
+      }).join("")+'</div>'+
+      /* 1半荘平均 */
+      '<div style="border-top:1px solid var(--line);padding-top:8px">'+
+      mjStatRow("平均収支(ゲーム代込)", Math.round(sumFinal/H), true)+
+      mjStatRow("平均収支(ゲーム代抜)", Math.round(sumRaw/H), true)+
+      mjStatRow("平均ゲーム代", Math.round(sumFee/H), false)+
+      mjStatRow("平均スコア", (sumScore/H), false, true)+
+      mjStatRow("平均チップ", (sumChips/H), false, true)+
+      '</div></div>';
+  });
+  if(!any) h = '<div style="text-align:center;padding:16px 0;font-size:12px;line-height:1.7" class="muted">まだ記録がありません。記録が貯まるとルール別の平均着順や収支が出ます。</div>';
+  return h;
+}
+function mjStatRow(label, val, isYen, raw){
+  let disp;
+  if(raw) disp = (val>=0?"+":"")+val.toFixed(1);
+  else if(isYen) disp = signYen(val);
+  else disp = "¥"+Math.abs(val).toLocaleString("ja-JP");
+  const col = isYen ? clsPM(val) : "";
+  return '<div class="row between" style="font-size:12px;margin:3px 0"><span class="muted">'+label+'</span>'+
+    '<span class="mono '+col+'">'+disp+'</span></div>';
+}
+
+function viewMj(){
+  const m = UI.mjDraft;
+  const isFree = m.category==="free";
+  const rc = mjRankCount(m);
+  let h = '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
+    '<div style="font-size:14px;font-weight:700">'+(UI.mjIsNew?"麻雀を記録":"麻雀を編集")+'</div><div style="width:44px"></div></div>';
+  h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+    '<input class="input" type="date" id="mj-date" value="'+esc(m.date)+'" style="flex:1">'+
+    '<input class="input" id="mj-store" placeholder="ルール名(例:4麻赤有)" value="'+esc(m.store)+'" style="flex:1.4"></div>';
+  h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+    [["free","フリー"],["set","セット"]].map(([v,l])=>
+      '<button class="btn '+(m.category===v?"sel":"")+'" style="flex:1" data-a="mjcat" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
+  h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
+    [["4","4麻"],["3","3麻"]].map(([v,l])=>
+      '<button class="btn '+(m.rule===v?"sel":"")+'" style="flex:1" data-a="mjrule" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
+
+  h += band("スコア・チップ");
+  h += mjSignedRow("トータルスコア", m.score, "score", "1スコア単価(円)", m.scoreRate, "scoreRate", true);
+  h += mjSignedRow("トータルチップ"+(isFree?"(任意)":""), m.chips, "chips", "チップ1枚単価(円)", m.chipRate, "chipRate", false);
+
+  h += band("着順(回数)");
+  h += '<div class="row" style="gap:6px;margin-bottom:6px">';
+  for(let i=0;i<rc;i++){
+    h += '<div style="flex:1;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 6px;text-align:center">'+
+      '<div class="muted" style="font-size:10px;font-weight:700;margin-bottom:4px">'+(i+1)+'着</div>'+
+      '<input class="input sm mono" type="number" inputmode="numeric" value="'+esc((m.ranks||[])[i]||"")+'" style="text-align:center;padding:6px 2px" data-in="mjrank" data-v="'+i+'">'+
+      '<div class="row" style="gap:4px;margin-top:5px">'+
+      '<button class="btn" style="flex:1;padding:4px 0;font-size:14px" data-a="rankdn" data-v="'+i+'">−</button>'+
+      '<button class="btn" style="flex:1;padding:4px 0;font-size:14px" data-a="rankup" data-v="'+i+'">＋</button></div></div>';
+  }
+  h += '</div>';
+  h += '<div class="muted mono" style="font-size:11px;text-align:right" id="mj-hanchan">半荘数 '+mjHanchan(m)+(mjAvgRank(m)!==null?' / 平均着順 '+mjAvgRank(m).toFixed(2):'')+'</div>';
+
+  if(isFree){
+    h += band("ゲーム代(フリー・自動計算)");
+    h += '<div class="grid2" style="margin-bottom:6px">'+
+      '<div><div class="muted" style="font-size:9px;margin-bottom:2px">基本ゲーム代(1半荘)</div>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.baseFee)+'" data-in="mjf" data-v="baseFee"></div>'+
+      '<div><div class="muted" style="font-size:9px;margin-bottom:2px">トップ賞(1着毎)</div>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.topBonus)+'" data-in="mjf" data-v="topBonus"></div>'+
+      '<div><div class="muted" style="font-size:9px;margin-bottom:2px">ドリンク/入場(1回)</div>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.drinkFee)+'" data-in="mjf" data-v="drinkFee"></div>'+
+      '<div><div class="muted" style="font-size:9px;margin-bottom:2px">ゲーム代(自動)</div>'+
+      '<div class="input sm mono r" id="mj-feeauto" style="border-style:dashed">'+"¥"+mjGameFee(m).toLocaleString("ja-JP")+'</div></div></div>';
+    h += '<div class="muted mono" style="font-size:10px" id="mj-feeformula">'+mjFeeFormula(m)+'</div>';
+  } else {
+    h += band("ゲーム代(セット・手入力)");
+    h += '<div><div class="muted" style="font-size:9px;margin-bottom:2px">ゲーム代 合計(場代・トップ賞・奢り込み)</div>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="まとめて入力" value="'+esc(m.setFee)+'" data-in="mjf" data-v="setFee"></div>';
+  }
+
+  h += band("この日の結果");
+  h += '<div class="card" id="mj-summary">'+mjSummary(m)+'</div>';
+  h += '<input class="input" placeholder="メモ(任意)" value="'+esc(m.memo||"")+'" style="margin:14px 0" data-in="mjf" data-v="memo">';
+  h += '<div class="row" style="gap:8px">'+
+    (!UI.mjIsNew?'<button class="btn danger" data-a="mjdel">削除</button>':'')+
+    '<button class="btn primary" style="flex:1;padding:12px 0" data-a="mjsave">保存する</button></div>';
+  return h;
+}
+
+function mjSignedRow(label, val, field, rateLabel, rateVal, rateField, rateDecimal){
+  const neg = String(val||"").startsWith("-");
+  return '<div style="margin-bottom:8px">'+
+    '<div class="muted" style="font-size:9px;margin-bottom:2px">'+label+'</div>'+
+    '<div class="row" style="gap:6px;align-items:center">'+
+    '<button class="signbtn" style="width:34px;height:34px;border:1.5px solid '+(neg?"var(--red)":"var(--teal)")+';color:'+(neg?"var(--red)":"var(--teal)")+
+    ';background:'+(neg?"rgba(229,115,115,.1)":"rgba(45,212,191,.1)")+'" data-a="mjsign" data-v="'+field+'">'+(neg?"−":"＋")+'</button>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="0" value="'+esc(String(val||"").replace("-",""))+'" style="flex:1.3;min-width:0" data-in="mjabs" data-v="'+field+'">'+
+    '<span class="muted" style="font-size:10px;flex-shrink:0">'+rateLabel+'</span>'+
+    '<input class="input sm mono r" type="number" inputmode="'+(rateDecimal?"decimal":"numeric")+'"'+(rateDecimal?' step="0.1"':'')+' value="'+esc(rateVal)+'" style="flex:1;min-width:0" data-in="mjf" data-v="'+rateField+'"></div></div>';
+}
+function mjFeeFormula(m){
+  if(m.category!=="free" || !mjHanchan(m)) return "";
+  const h=mjHanchan(m), t=num((m.ranks||[])[0]);
+  const parts=[];
+  if(num(m.baseFee)) parts.push("基本"+num(m.baseFee)+"×"+h);
+  if(num(m.topBonus)&&t) parts.push("トップ賞"+num(m.topBonus)+"×"+t);
+  if(num(m.drinkFee)) parts.push("ドリンク"+num(m.drinkFee));
+  return parts.length ? parts.join(" + ")+" = ¥"+mjGameFee(m).toLocaleString("ja-JP") : "";
+}
+function mjSummary(m){
+  const srow=(l,v,big)=>'<div class="row between" style="'+(big?"align-items:baseline":"font-size:13px;margin:4px 0")+'">'+
+    '<span '+(big?'style="font-size:12px;font-weight:700"':'class="muted"')+'>'+l+'</span>'+
+    '<span class="mono '+clsPM(v)+'" style="'+(big?"font-size:20px;font-weight:700":"")+'">'+signYen(v)+'</span></div>';
+  let h = srow("スコア収支", mjScoreYen(m));
+  if(num(m.chips)||fnum(m.chipRate)) h += srow("チップ収支", mjChipYen(m));
+  h += '<div class="row between" style="font-size:13px;margin:4px 0"><span class="muted">麻雀のみ収支(ゲーム代抜)</span>'+
+    '<span class="mono '+clsPM(mjRaw(m))+'" style="font-weight:700">'+signYen(mjRaw(m))+'</span></div>';
+  h += srow("ゲーム代", -mjGameFee(m));
+  h += '<div style="height:1px;background:var(--line);margin:8px 0"></div>';
+  h += srow("最終収支(家計簿へ連携)", mjFinal(m), true);
+  return h;
+}
+
+function bindMj(){
+  const m = UI.mjDraft;
+  document.getElementById("mj-date").oninput = e=>m.date=e.target.value;
+  document.getElementById("mj-store").oninput = e=>m.store=e.target.value;
+  document.querySelectorAll("[data-in]").forEach(el=>{
+    const kind=el.dataset.in, v=el.dataset.v;
+    el.oninput = ()=>{
+      if(kind==="mjf"){ m[v]=el.value; refreshMj(); }
+      else if(kind==="mjabs"){
+        const neg = String(m[v]||"").startsWith("-");
+        m[v] = (neg?"-":"") + el.value.replace(/-/g,"");
+        refreshMj();
+      }
+      else if(kind==="mjrank"){ (m.ranks=m.ranks||["","","",""])[num(v)]=el.value; refreshMj(); }
+    };
+  });
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    el.onclick = ()=>{
+      const a=el.dataset.a, v=el.dataset.v;
+      if(a==="back"){ UI.screen="main"; UI.mjDraft=null; render(); }
+      else if(a==="mjcat"){ m.category=v; render(); }
+      else if(a==="mjrule"){ m.rule=v; render(); }
+      else if(a==="mjsign"){
+        const cur=String(m[v]||"");
+        m[v] = cur.startsWith("-") ? cur.slice(1) : "-"+cur;
+        render();
+      }
+      else if(a==="rankup"||a==="rankdn"){
+        const i=num(v); m.ranks=m.ranks||["","","",""];
+        let cur=num(m.ranks[i]); cur += (a==="rankup"?1:-1); if(cur<0) cur=0;
+        m.ranks[i]=String(cur); render();
+      }
+      else if(a==="mjdel"){
+        if(!confirm("この麻雀記録を削除しますか?")) return;
+        S.entries = S.entries.filter(e=>e.id!=="mj-"+m.id);
+        S.mjSessions = (S.mjSessions||[]).filter(x=>x.id!==m.id);
+        save(); UI.screen="main"; UI.mjDraft=null; render();
+      }
+      else if(a==="mjsave") saveMj();
+    };
+  });
+}
+
+function refreshMj(){
+  const m = UI.mjDraft;
+  const su=document.getElementById("mj-summary"); if(su) su.innerHTML=mjSummary(m);
+  const hn=document.getElementById("mj-hanchan"); if(hn) hn.textContent="半荘数 "+mjHanchan(m)+(mjAvgRank(m)!==null?" / 平均着順 "+mjAvgRank(m).toFixed(2):"");
+  const ff=document.getElementById("mj-feeformula"); if(ff) ff.textContent=mjFeeFormula(m);
+  const fa=document.getElementById("mj-feeauto"); if(fa) fa.textContent="¥"+mjGameFee(m).toLocaleString("ja-JP");
+}
+
+function saveMj(){
+  const m = UI.mjDraft;
+  if(!m.date) return;
+  const cleaned = Object.assign({}, m);
+  const rc = mjRankCount(cleaned);
+  cleaned.ranks = (cleaned.ranks||["","","",""]).slice(0,4).map((x,i)=> i<rc ? x : "");
+  if(UI.mjIsNew) S.mjSessions.push(cleaned);
+  else S.mjSessions = S.mjSessions.map(x=>x.id===m.id?cleaned:x);
+  if(fnum(cleaned.scoreRate)) S.rates.mjScore = cleaned.scoreRate;
+  if(fnum(cleaned.chipRate)) S.rates.mjChip = cleaned.chipRate;
+  if(num(cleaned.baseFee)) S.rates.mjBase = cleaned.baseFee;
+  if(num(cleaned.topBonus)) S.rates.mjTop = cleaned.topBonus;
+  if(num(cleaned.drinkFee)) S.rates.mjDrink = cleaned.drinkFee;
+  const linkId = "mj-"+m.id;
+  const fin = mjFinal(cleaned);
+  S.entries = S.entries.filter(e=>e.id!==linkId);
+  if(fin!==0){
+    S.entries.push({id:linkId, date:cleaned.date, src:"mahjong",
+      type: fin>0?"income":"expense",
+      category: fin>0?"遊技収支":"遊技",
+      amount: Math.abs(fin),
+      memo: "麻雀"+(cleaned.category==="free"?"(フリー":"(セット")+"・"+cleaned.rule+"麻)"+(cleaned.store?" @"+cleaned.store:"")});
+  }
+  save(); UI.screen="main"; UI.mjDraft=null; render();
+}
+
+function bindMain(){
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    el.onclick = () => {
+      const a = el.dataset.a, v = el.dataset.v;
+      if(a==="tab"){ UI.tab=v; render(); }
+      else if(a==="mprev") moveMonth(-1);
+      else if(a==="mnext") moveMonth(1);
+      else if(a==="csv") exportCsv();
+      else if(a==="mdb"){ UI.screen="mdb"; UI.mdbForm=null; render(); }
+      else if(a==="backup"){ UI.screen="backup"; UI.msg=""; render(); }
+      else if(a==="add"){
+        if(UI.tab==="ledger"){ UI.editEntryId=null;
+          UI.entryForm={date:todayStr(),type:"expense",category:"食費",amount:"",memo:""};
+          UI.screen="entry"; render();
+        } else if(UI.tab==="mahjong"){
+          UI.mjDraft={id:uid(),date:todayStr(),store:"",category:"free",rule:"4",
+            score:S.rates.mjScore!==undefined?"":"", chips:"",
+            scoreRate:S.rates.mjScore||"", chipRate:S.rates.mjChip||"",
+            ranks:["","","",""], baseFee:S.rates.mjBase||"", topBonus:S.rates.mjTop||"", drinkFee:S.rates.mjDrink||"",
+            setFee:"", memo:""};
+          UI.mjIsNew=true; UI.screen="mahjong-edit"; render();
+        } else {
+          UI.draft={id:uid(),date:todayStr(),store:"",mode:"nori",partnerName:"",fee:"",
+            exchange:S.rates.exchange||"",pExchange:S.rates.pExchange||"",pushPayout:S.rates.pushPayout||"",pushDraw:S.rates.pushDraw||"",machines:[],expenses:[],memo:""};
+          UI.whoTab="me";
+          UI.isNewSess=true; UI.screen="session"; render();
+        }
+      }
+      else if(a==="mjedit"){
+        const s = (S.mjSessions||[]).find(x=>String(x.id)===String(v));
+        if(!s) return;
+        UI.mjDraft=JSON.parse(JSON.stringify(s)); UI.mjIsNew=false; UI.screen="mahjong-edit"; render();
+      }
+      else if(a==="eedit"){
+        const e = S.entries.find(x=>String(x.id)===String(v));
+        if(!e) return;
+        if(e.src==="slot"){
+          const s = S.sessions.find(x=>"slot-"+x.id===e.id);
+          if(s){ UI.draft=JSON.parse(JSON.stringify(s)); UI.isNewSess=false; UI.tab="slot"; UI.screen="session"; render(); return; }
+        }
+        if(e.src==="mahjong"){
+          const s = (S.mjSessions||[]).find(x=>"mj-"+x.id===e.id);
+          if(s){ UI.mjDraft=JSON.parse(JSON.stringify(s)); UI.mjIsNew=false; UI.tab="mahjong"; UI.screen="mahjong-edit"; render(); return; }
+        }
+        UI.editEntryId=e.id;
+        UI.entryForm={date:e.date,type:e.type,category:e.category,amount:String(e.amount),memo:e.memo||""};
+        UI.screen="entry"; render();
+      }
+      else if(a==="sedit"){
+        const s = S.sessions.find(x=>String(x.id)===String(v));
+        if(!s) return;
+        UI.draft=JSON.parse(JSON.stringify(s)); UI.isNewSess=false; UI.screen="session"; render();
+      }
+    };
+  });
+}
+
+function exportCsv(){
+  const rows = [["日付","区分","カテゴリ","金額","メモ"]];
+  S.entries.slice().sort((a,b)=>a.date>b.date?1:-1).forEach(e=>
+    rows.push([e.date, e.type==="income"?"収入":"支出", e.category, e.amount, (e.memo||"").replace(/,/g,"、")]));
+  dl("\uFEFF"+rows.map(r=>r.join(",")).join("\n"), "kakeibo.csv", "text/csv");
+}
+function dl(content, name, type){
+  const blob = new Blob([content],{type});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+}
+</script>
+<script>
+/* ============================================================
+   家計簿 入力画面
+   ============================================================ */
+function viewEntry(){
+  const f = UI.entryForm;
+  const cats = f.type==="expense" ? EXPENSE_CATS : INCOME_CATS;
+  return '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
+    '<div style="font-size:14px;font-weight:700">'+(UI.editEntryId!==null?"記録を編集":"記録を追加")+'</div><div style="width:44px"></div></div>'+
+    '<div class="row" style="gap:8px;margin-bottom:12px">'+
+    [["expense","支出"],["income","収入"]].map(([v,l])=>
+      '<button class="btn '+(f.type===v?"sel":"")+'" style="flex:1" data-a="etype" data-v="'+v+'">'+l+'</button>').join("")+'</div>'+
+    '<div class="row" style="gap:8px;margin-bottom:12px">'+
+    '<input class="input" type="date" id="e-date" value="'+esc(f.date)+'" style="flex:1">'+
+    '<input class="input mono r" type="number" inputmode="numeric" id="e-amount" placeholder="金額" value="'+esc(f.amount)+'" style="flex:1"></div>'+
+    '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
+    cats.map(c=>'<button class="chip '+(f.category===c?"sel":"")+'" data-a="ecat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>'+
+    '<input class="input" id="e-memo" placeholder="メモ(任意)" value="'+esc(f.memo)+'" style="margin-bottom:14px">'+
+    '<div class="row" style="gap:8px">'+
+    (UI.editEntryId!==null?'<button class="btn danger" data-a="edel">削除</button>':'')+
+    '<button class="btn primary" style="flex:1" data-a="esave">'+(UI.editEntryId!==null?"更新する":"追加する")+'</button></div>';
+}
+function bindEntry(){
+  const f = UI.entryForm;
+  document.getElementById("e-date").oninput = e=>f.date=e.target.value;
+  document.getElementById("e-amount").oninput = e=>f.amount=e.target.value;
+  document.getElementById("e-memo").oninput = e=>f.memo=e.target.value;
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    el.onclick = ()=>{
+      const a=el.dataset.a, v=el.dataset.v;
+      if(a==="back"){ UI.screen="main"; render(); }
+      else if(a==="etype"){ f.type=v; f.category = v==="expense"?"食費":"給与"; render(); }
+      else if(a==="ecat"){ f.category=v; render(); }
+      else if(a==="edel"){
+        if(!confirm("この記録を削除しますか?")) return;
+        S.entries = S.entries.filter(x=>x.id!==UI.editEntryId);
+        save(); UI.screen="main"; render();
+      }
+      else if(a==="esave"){
+        const amt = num(f.amount);
+        if(!f.date || amt<=0) return;
+        if(UI.editEntryId!==null){
+          S.entries = S.entries.map(x=>x.id===UI.editEntryId ?
+            Object.assign({},x,{date:f.date,type:f.type,category:f.category,amount:amt,memo:f.memo}) : x);
+        } else {
+          S.entries.push({id:uid(),date:f.date,type:f.type,category:f.category,amount:amt,memo:f.memo});
+        }
+        save(); UI.screen="main"; render();
+      }
+    };
+  });
+}
+</script>
+<script>
+/* ============================================================
+   セッション編集画面
+   ============================================================ */
+function nameHints(){
+  const seen=[];
+  S.sessions.slice().sort((a,b)=>a.date<b.date?1:-1).forEach(s=>{
+    const n=(s.partnerName||"").trim();
+    if(n && !seen.includes(n)) seen.push(n);
+  });
+  return seen.slice(0,5);
+}
+
+function viewSession(){
+  const s = UI.draft;
+  let h = '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
+    '<div style="font-size:14px;font-weight:700">'+(UI.isNewSess?"稼働を記録":"稼働を編集")+'</div><div style="width:44px"></div></div>';
+  h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+    '<input class="input" type="date" id="s-date" value="'+esc(s.date)+'" style="flex:1">'+
+    '<input class="input" id="s-store" placeholder="店名" value="'+esc(s.store)+'" style="flex:1.4"></div>';
+  h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+    [["nori","乗り打ち"],["dai","代打ち"],["solo","単独"]].map(([v,l])=>
+      '<button class="btn '+(s.mode===v?"sel":"")+'" style="flex:1" data-a="mode" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
+
+  if(s.mode!=="solo"){
+    const hints = nameHints().filter(n=>n!==(s.partnerName||"").trim());
+    h += '<div style="margin-bottom:12px"><input class="input" id="s-pname" placeholder="'+
+      (s.mode==="nori"?"相方の名前":"依頼主の名前")+'" value="'+esc(s.partnerName||"")+'">'+
+      (hints.length?'<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:6px">'+
+        hints.map(n=>'<button class="chip" data-a="pname" data-v="'+esc(n)+'">'+esc(n)+'</button>').join("")+'</div>':'')+'</div>';
+  }
+
+  /* ----- 交換設定(セッション共通) ----- */
+  h += band("交換設定");
+  h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
+    '<span class="muted" style="font-size:12px;width:74px">スロット</span>'+
+    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 50" value="'+esc(s.exchange||"")+'" style="flex:1" data-in="exchange">'+
+    '<span class="muted" style="font-size:12px">枚=1000円</span></div>'+
+    '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
+    '<span class="muted" style="font-size:12px;width:74px">パチンコ</span>'+
+    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 250" value="'+esc(s.pExchange||"")+'" style="flex:1" data-in="pexchange">'+
+    '<span class="muted" style="font-size:12px">玉=1000円</span></div>'+
+    '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
+    '<span class="muted" style="font-size:11px;width:74px">貯玉プッシュ</span>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="払出230" value="'+esc(s.pushPayout||"")+'" style="flex:1" data-in="pushpayout">'+
+    '<span class="muted" style="font-size:11px">/</span>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="引落245" value="'+esc(s.pushDraw||"")+'" style="flex:1" data-in="pushdraw">'+
+    '<span class="muted" style="font-size:10px">玉/回</span></div>'+
+    '<div class="muted" style="font-size:10px">使う方だけ入力。前回値を記憶します。</div>';
+
+  /* ----- 代打ち: 報酬 ----- */
+  if(s.mode==="dai"){
+    h += band("報酬(家計簿に反映)");
+    h += '<div><div class="muted" style="font-size:11px;margin:0 2px 4px">受取報酬(円)</div>'+
+      '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 15000" value="'+esc(s.fee)+'" data-in="fee"></div>';
+  }
+
+  /* ----- 台データ(貯玉方式) ----- */
+  if(s.mode==="nori"){
+    /* 乗り打ち: 自分/相方タブ */
+    const who = UI.whoTab || "me";
+    const pn = (s.partnerName||"").trim()||"相方";
+    h += band("打った台");
+    h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+      [["me","自分"],["partner",pn]].map(([v,l])=>
+        '<button class="btn '+(who===v?"sel":"")+'" style="flex:1" data-a="whotab" data-v="'+v+'">'+esc(l)+
+        ' <span class="mono" style="font-size:11px">'+signYen(personSlotYen(s,v))+'</span></button>').join("")+'</div>';
+    slotMachines(s, who).forEach(m=>{ h += viewSlotMachine(m, s); });
+    (s.machines||[]).filter(m=>m.kind==="pachi" && (m.who||"me")===who).forEach(m=>{ h += viewMachine(m, s); });
+    h += '<div class="row" style="gap:8px">'+
+      '<button class="btn dash" style="flex:1" data-a="maddw" data-v="slot|'+who+'">＋ スロット台</button>'+
+      '<button class="btn dash" style="flex:1" data-a="maddw" data-v="pachi|'+who+'">＋ パチンコ台</button></div>';
+  } else {
+    h += band(s.mode==="dai" ? "打った台(客の玉・報告用)" : "打った台");
+    slotMachines(s).forEach(m=>{ h += viewSlotMachine(m, s); });
+    (s.machines||[]).filter(m=>m.kind==="pachi").forEach(m=>{ h += viewMachine(m, s); });
+    h += '<div class="row" style="gap:8px">'+
+      '<button class="btn dash" style="flex:1" data-a="madd" data-v="slot">＋ スロット台</button>'+
+      '<button class="btn dash" style="flex:1" data-a="madd" data-v="pachi">＋ パチンコ台</button></div>';
+  }
+
+  /* ----- 経費 ----- */
+  h += band("経費(飲食など)");
+  (s.expenses||[]).forEach(x=>{
+    h += '<div class="row" style="gap:6px;margin-bottom:6px">'+
+      '<input class="input sm" placeholder="内容" value="'+esc(x.label)+'" style="flex:1.5" data-in="xlabel" data-v="'+x.id+'">'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="金額" value="'+esc(x.amount)+'" style="flex:1" data-in="xamount" data-v="'+x.id+'">'+
+      '<button class="xbtn" data-a="xdel" data-v="'+x.id+'">×</button></div>';
+  });
+  h += '<button class="btn dash full" data-a="xadd">＋ 経費を追加</button>';
+
+  /* ----- サマリー ----- */
+  h += band("このセッションの結果");
+  h += '<div class="card" id="ssummary">'+sessionSummary(s)+'</div>';
+  h += '<input class="input" placeholder="セッションメモ(任意)" value="'+esc(s.memo||"")+'" style="margin:14px 0" data-in="smemo">';
+  h += '<div class="row" style="gap:8px">'+
+    (!UI.isNewSess?'<button class="btn danger" data-a="sdel">削除</button>':'')+
+    '<button class="btn primary" style="flex:1;padding:12px 0" data-a="ssave">保存する</button></div>';
+  return h;
+}
+
+function sessionSummary(s){
+  const srow = (l,v) => '<div class="row between" style="font-size:13px;margin:4px 0"><span class="muted">'+l+'</span><span class="mono '+clsPM(v)+'">'+signYen(v)+'</span></div>';
+  let h = "";
+  if(s.mode==="dai"){
+    /* 代打ち: 報酬が家計簿へ。台勝敗は報告用 */
+    const dai = daiResult(s);
+    if(slotMachines(s).some(machHasData)){
+      h += '<div class="card2" style="margin-bottom:10px"><div class="row between" style="align-items:baseline">'+
+        '<span style="font-size:11px;font-weight:700">客の玉での勝敗(報告用)</span>'+
+        '<span class="mono '+clsPM(dai)+'" style="font-size:16px;font-weight:700">'+signYen(dai)+'</span></div>'+
+        '<div class="muted" style="font-size:10px;margin-top:4px">この金額は家計簿には反映されません</div></div>';
+    }
+    h += srow("報酬", num(s.fee));
+    h += srow("経費(自分負担分)", -expTotal(s));
+    const fin = finalOwn(s);
+    h += '<div style="height:1px;background:var(--line);margin:8px 0"></div>'+
+      '<div class="row between" style="align-items:baseline"><span style="font-size:12px;font-weight:700">最終収支(家計簿へ連携)</span>'+
+      '<span class="mono '+clsPM(fin)+'" style="font-size:20px;font-weight:700">'+signYen(fin)+'</span></div>';
+    return h;
+  }
+  if(s.mode==="nori"){
+    const me = personSlotYen(s,"me"), pt = personSlotYen(s,"partner"), pn = esc((s.partnerName||"").trim()||"相方");
+    h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+      '<div class="card2" style="flex:1;text-align:center"><div class="muted" style="font-size:10px">自分</div>'+
+      '<div class="mono '+clsPM(me)+'" style="font-size:15px;font-weight:700">'+signYen(me)+'</div></div>'+
+      '<div class="card2" style="flex:1;text-align:center"><div class="muted ellip" style="font-size:10px">'+pn+'</div>'+
+      '<div class="mono '+clsPM(pt)+'" style="font-size:15px;font-weight:700">'+signYen(pt)+'</div></div></div>';
+    h += srow("2人合計", poolTotal(s));
+    /* 折半調整: 自分の取り分を編集可、相方は残りを自動 */
+    const half = halfSplit(s), mine = myShare(s), theirs = partnerShare(s);
+    const adjusted = (s.myShare!==undefined && s.myShare!=="" && num(s.myShare)!==half);
+    h += '<div class="row between" style="align-items:center;font-size:13px;margin:8px 0 4px">'+
+      '<span class="muted">自分の取り分</span>'+
+      '<div class="row" style="align-items:center;gap:6px">'+
+      '<span class="mono muted" style="font-size:12px">¥</span>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="'+half+'" value="'+esc(s.myShare!==undefined?s.myShare:"")+'" style="width:100px" data-in="myshare">'+
+      '</div></div>';
+    h += '<div class="row between" style="font-size:12px;margin:2px 0 4px"><span class="muted">'+esc((s.partnerName||"").trim()||"相方")+'の取り分(自動)</span>'+
+      '<span class="mono '+clsPM(theirs)+'">'+signYen(theirs)+'</span></div>';
+    if(adjusted) h += '<div class="muted" style="font-size:10px;margin-bottom:2px">折半'+signYen(half)+'から調整済み(差'+signYen(mine-half)+')</div>';
+  }
+  if(s.mode==="nori"){
+    h += srow("経費(自分負担分)", -expTotal(s));
+    const fin = finalOwn(s);
+    h += '<div style="height:1px;background:var(--line);margin:8px 0"></div>'+
+      '<div class="row between" style="align-items:baseline"><span style="font-size:12px;font-weight:700">最終収支(家計簿へ連携)</span>'+
+      '<span class="mono '+clsPM(fin)+'" style="font-size:20px;font-weight:700">'+signYen(fin)+'</span></div>';
+    return h;
+  }
+  h += srow("自分の収支", grossOwn(s));
+  h += srow("経費(自分負担分)", -expTotal(s));
+  const fin = finalOwn(s);
+  h += '<div style="height:1px;background:var(--line);margin:8px 0"></div>'+
+    '<div class="row between" style="align-items:baseline"><span style="font-size:12px;font-weight:700">最終収支(家計簿へ連携)</span>'+
+    '<span class="mono '+clsPM(fin)+'" style="font-size:20px;font-weight:700">'+signYen(fin)+'</span></div>';
+  return h;
+}
+</script>
+<script>
+/* ---------- 台カード ---------- */
+function viewSlotMachine(m, s){
+  const q = (m.name||"").trim();
+  const hits = S.mdb.filter(x=>x.kind==="slot" && (x.name||"").trim() && x.name.includes(q) && x.name.trim()!==q).slice(0,4);
+  const sabai = machSabai(m);
+  const yenv = machYen(m, s.exchange);
+  let h = '<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+
+    '<div class="row" style="gap:8px;margin-bottom:8px">'+
+    '<span class="tag" style="background:var(--surface2);font-weight:700;color:var(--teal)">スロット</span>'+
+    '<input class="input sm" placeholder="機種名" value="'+esc(m.name)+'" style="flex:1" data-in="mname" data-v="'+m.id+'">'+
+    '<button class="xbtn" data-a="mdel" data-v="'+m.id+'">×</button></div>'+
+    '<div id="msug-'+m.id+'">'+(hits.length?'<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">'+
+      hits.map(x=>'<button class="chip" data-a="msug" data-v="'+m.id+'|'+esc(x.name)+'">'+esc(x.name)+'</button>').join("")+'</div>':'')+'</div>';
+
+  /* 貯玉方式の4項目 */
+  h += '<div class="grid2" style="margin-bottom:8px">'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">開始貯玉(枚)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.startStock||"")+'" data-in="mstock" data-v="'+m.id+'|startStock"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">終了貯玉(枚)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.endStock||"")+'" data-in="mstock" data-v="'+m.id+'|endStock"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">終了時の持ち玉(枚)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.holdBalls||"")+'" data-in="mstock" data-v="'+m.id+'|holdBalls"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">差枚(自動)</div>'+
+    '<div id="sabai-'+m.id+'" class="input sm mono r '+clsPM(sabai)+'" style="border-style:dashed">'+(sabai>=0?"+":"")+sabai+'</div></div></div>';
+
+  /* 現金投資(複数行) */
+  h += '<div class="muted" style="font-size:9px;margin-bottom:3px">現金投資(円)</div>';
+  (m.cash||[]).forEach(c=>{
+    h += '<div class="row" style="gap:6px;margin-bottom:5px">'+
+      '<input class="input sm" placeholder="メモ(任意)" value="'+esc(c.label||"")+'" style="flex:1.3" data-in="mcash" data-v="'+m.id+'|'+c.id+'|label">'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="金額" value="'+esc(c.amount||"")+'" style="flex:1" data-in="mcash" data-v="'+m.id+'|'+c.id+'|amount">'+
+      '<button class="xbtn" data-a="mcashdel" data-v="'+m.id+'|'+c.id+'">×</button></div>';
+  });
+  h += '<button class="btn dash full" style="font-size:11px;margin-bottom:8px" data-a="mcashadd" data-v="'+m.id+'">＋ 現金投資</button>';
+
+  /* 台収支 */
+  if(machHasData(m)){
+    h += '<div class="row between" style="align-items:baseline;border-top:1px solid var(--line);padding-top:8px">'+
+      '<span style="font-size:11px;font-weight:700">台収支</span>'+
+      '<span class="mono '+clsPM(yenv)+'" style="font-size:16px;font-weight:700">'+signYen(yenv)+'</span></div>'+
+      (num(s.exchange)<=0?'<div class="red" style="font-size:10px;margin-top:4px">交換枚数を入力すると円換算されます</div>':'');
+  }
+  h += '<input class="input sm" placeholder="メモ(任意)" value="'+esc(m.memo||"")+'" data-in="mmemo" data-v="'+m.id+'" style="margin-top:8px"></div>';
+  return h;
+}
+
+function viewMachine(m, s){
+  const q = (m.name||"").trim();
+  const hits = S.mdb.filter(x=>x.kind===m.kind && (x.name||"").trim() && x.name.includes(q) && x.name.trim()!==q).slice(0,4);
+  let h = '<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:8px">'+
+    '<div class="row" style="gap:8px;margin-bottom:8px">'+
+    '<span class="tag" style="background:var(--surface2);font-weight:700;color:'+(m.kind==="slot"?"var(--teal)":"var(--amber)")+'">'+
+    (m.kind==="slot"?"スロット":"パチンコ")+'</span>'+
+    '<input class="input sm" placeholder="機種名" value="'+esc(m.name)+'" style="flex:1" data-in="mname" data-v="'+m.id+'">'+
+    '<button class="xbtn" data-a="mdel" data-v="'+m.id+'">×</button></div>'+
+    '<div id="msug-'+m.id+'">'+(hits.length?'<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">'+
+      hits.map(x=>'<button class="chip" data-a="msug" data-v="'+m.id+'|'+esc(x.name)+'">'+esc(x.name)+'</button>').join("")+'</div>':'')+'</div>';
+
+  if(m.kind==="pachi"){
+    h += '<div style="margin-bottom:8px">';
+    (m.segments||[]).forEach((g,gi)=>{
+      const isPush = g.kind==="push";
+      const fields = isPush
+        ? [["rpStart","開始 残プッシュ"],["rpEnd","終了 残プッシュ"],["sb","開始 残玉(通常0)"],["eb","当たり時 残玉"],["ss","開始 回転数"],["es","当たり時 回転数"]]
+        : [["sb","開始 玉数"],["ss","開始 回転数"],["eb","終了 玉数(当たり時)"],["es","終了 回転数(当たり時)"]];
+      h += '<div class="card2" style="margin-bottom:6px"><div class="row between" style="margin-bottom:6px">'+
+        '<div class="row" style="gap:6px"><span class="muted" style="font-size:10px;font-weight:700">通常時 区間'+(gi+1)+'</span>'+
+        '<button class="chip" style="font-weight:700;border-color:'+(isPush?"var(--amber)":"var(--teal)")+';color:'+(isPush?"var(--amber)":"var(--teal)")+'" '+
+        'data-a="gkind" data-v="'+m.id+'|'+g.id+'">'+(isPush?"貯玉プッシュ":"持ち玉(玉数)")+'</button></div>'+
+        '<div class="row" style="gap:8px"><span class="mono muted" style="font-size:10px" id="gstat-'+g.id+'">'+segStat(g)+'</span>'+
+        '<button class="xbtn" style="font-size:14px" data-a="gdel" data-v="'+m.id+'|'+g.id+'">×</button></div></div>'+
+        '<div class="grid2">'+fields.map(([k,label])=>
+          '<div><div class="muted" style="font-size:9px;margin-bottom:2px">'+label+'</div>'+
+          '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(g[k]||"")+'"'+
+          (k==="sb"&&isPush?' placeholder="0"':'')+' data-in="gseg" data-v="'+m.id+'|'+g.id+'|'+k+'"></div>').join("")+'</div>'+
+        '<div class="mono muted" style="font-size:10px;margin-top:5px" id="gform-'+g.id+'">'+segFormula(g)+'</div></div>';
+    });
+    h += '<button class="btn dash full" style="margin-bottom:6px" data-a="gadd" data-v="'+m.id+'">＋ 通常時区間(着席時/当たり後の再開時/現金追加時)</button>';
+    h += '<div id="mpanel-'+m.id+'">'+borderPanel(m)+'</div></div>';
+  }
+
+  /* 収支(貯玉方式・任意) */
+  h += '<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">'+
+    '<div class="muted" style="font-size:10px;font-weight:700;margin-bottom:6px">収支(貯玉・任意)</div>'+
+    '<div class="grid2" style="margin-bottom:6px">'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">開始貯玉(玉)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.startStock||"")+'" data-in="mstock" data-v="'+m.id+'|startStock"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">終了貯玉(玉)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.endStock||"")+'" data-in="mstock" data-v="'+m.id+'|endStock"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">終了時の持ち玉(玉)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.holdBalls||"")+'" data-in="mstock" data-v="'+m.id+'|holdBalls"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">差玉(自動)</div>'+
+    '<div class="input sm mono r '+clsPM(machSabai(m))+'" style="border-style:dashed">'+(machSabai(m)>=0?"+":"")+machSabai(m)+'</div></div></div>';
+  h += '<div class="muted" style="font-size:9px;margin-bottom:3px">現金投資(円)</div>';
+  (m.cash||[]).forEach(c=>{
+    h += '<div class="row" style="gap:6px;margin-bottom:5px">'+
+      '<input class="input sm" placeholder="メモ(任意)" value="'+esc(c.label||"")+'" style="flex:1.3" data-in="mcash" data-v="'+m.id+'|'+c.id+'|label">'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="金額" value="'+esc(c.amount||"")+'" style="flex:1" data-in="mcash" data-v="'+m.id+'|'+c.id+'|amount">'+
+      '<button class="xbtn" data-a="mcashdel" data-v="'+m.id+'|'+c.id+'">×</button></div>';
+  });
+  h += '<button class="btn dash full" style="font-size:11px" data-a="mcashadd" data-v="'+m.id+'">＋ 現金投資</button>';
+  if(machHasData(m)){
+    const yv = machYenS(m, s);
+    h += '<div class="row between" style="align-items:baseline;margin-top:8px">'+
+      '<span style="font-size:11px;font-weight:700">台収支</span>'+
+      '<span class="mono '+clsPM(yv)+'" style="font-size:16px;font-weight:700">'+signYen(yv)+'</span></div>'+
+      (num(s.pExchange)<=0?'<div class="red" style="font-size:10px;margin-top:4px">換金玉数(パチンコ)を入力すると円換算されます</div>':'');
+  }
+  h += '</div>';
+
+  h += '<input class="input sm" placeholder="メモ(据え/挙動/やめ時など)" value="'+esc(m.memo)+'" data-in="mmemo" data-v="'+m.id+'" style="margin-top:8px"></div>';
+  return h;
+}
+const segStat = g => segDone(g) ? segUsed(g)+"発 / "+segSpins(g)+"回転" : "";
+const segFormula = g => (g.kind==="push" && segDone(g))
+  ? "台入球 = "+segPushes(g)+"プッシュ×"+num((UI.draft&&UI.draft.pushPayout)||230)+(num(g.sb)?" + 残"+num(g.sb):"")+" − "+num(g.eb)+" = "+segUsed(g)+"発" : "";
+
+function borderPanel(m){
+  const t = machineTotals(m);
+  if(t.rate250===null) return "";
+  const master = findMaster(m);
+  const denom = master ? fnum(master.denom) : 0;
+  const bTheory = denom>0 && master && fnum(master.ty)>0 ? denom*250/fnum(master.ty) : null;
+  const bEff = denom>0 && t.avgTY>0 ? denom*250/t.avgTY : null;
+  let ab = null;
+  if(denom>0) ab = bEff!==null ? bEff : bTheory;
+  else {
+    const b = fnum(m.border);
+    if(b){ const ty=fnum(m.ty); ab = (ty>0 && t.avgTY>0) ? b*(ty/t.avgTY) : b; }
+  }
+  const dev = ab && t.costRate250!==null ? (t.costRate250/ab-1)*100 : null;
+
+  let h = '<div class="amberpanel"><div class="row between" style="align-items:baseline;margin-bottom:6px">'+
+    '<span class="mono muted" style="font-size:11px">累計 '+t.balls+'発 / '+t.spins+'回転</span>'+
+    '<span class="mono amber" style="font-size:15px;font-weight:700">≒ '+t.rate250.toFixed(2)+' 回/250発</span></div>';
+  if(t.costRate250!==null && Math.abs(t.costRate250-t.rate250)>0.005)
+    h += '<div class="row between" style="font-size:11px;margin-bottom:6px"><span class="muted">コスト補正(貯玉手数料込)</span>'+
+      '<span class="mono">'+t.costRate250.toFixed(2)+' 回/250発</span></div>';
+  if(t.avgTY!==null)
+    h += '<div class="row between" style="font-size:11px;margin-bottom:6px"><span class="muted">実測平均出玉('+t.payouts.length+'回)</span>'+
+      '<span class="mono">'+Math.round(t.avgTY)+'発</span></div>';
+  if(denom>0){
+    h += '<div class="row between" style="font-size:11px;margin-bottom:4px"><span class="muted">機種データ: 1/'+fnum(master.denom)+
+      (fnum(master.ty)>0?' / 理論TY '+fnum(master.ty)+'発':'')+'</span>'+
+      (bTheory!==null?'<span class="mono">理論B '+bTheory.toFixed(2)+'</span>':'')+'</div>';
+    if(bEff!==null)
+      h += '<div class="row between" style="font-size:11px;margin-bottom:4px"><span class="muted">実効ボーダー(実測TY '+t.payouts.length+'回)</span>'+
+        '<span class="mono" style="font-weight:700">'+bEff.toFixed(2)+' 回/250発</span></div>';
+  } else {
+    h += '<div class="grid2" style="margin:4px 0 6px">'+
+      '<div><div class="muted" style="font-size:9px;margin-bottom:2px">ボーダー(回/千円)</div>'+
+      '<input class="input sm mono r" type="number" inputmode="decimal" step="0.1" value="'+esc(m.border||"")+'" data-in="mborder" data-v="'+m.id+'"></div>'+
+      '<div><div class="muted" style="font-size:9px;margin-bottom:2px">理論平均出玉(任意)</div>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.ty||"")+'" data-in="mty" data-v="'+m.id+'"></div></div>';
+    if(fnum(m.border)>0 && fnum(m.ty)>0 && t.avgTY>0)
+      h += '<div class="row between" style="font-size:11px;margin-bottom:4px"><span class="muted">補正ボーダー(削れ反映)</span>'+
+        '<span class="mono">'+(fnum(m.border)*fnum(m.ty)/t.avgTY).toFixed(2)+' 回/250発</span></div>';
+  }
+  if(dev!==null && ab)
+    h += '<div class="row between" style="align-items:baseline;border-top:1px solid rgba(242,179,61,.3);padding-top:6px;margin-top:2px">'+
+      '<span style="font-size:11px;font-weight:700">ボーダー乖離</span>'+
+      '<span class="mono '+clsPM(dev)+'" style="font-size:15px;font-weight:700">'+(dev>=0?"+":"−")+Math.abs(dev).toFixed(1)+'%'+
+      '<span class="muted" style="font-size:10px;font-weight:400"> ('+(t.costRate250>=ab?"+":"−")+Math.abs(t.costRate250-ab).toFixed(2)+'回)</span></span></div>';
+  return h+'</div>';
+}
+</script>
+<script>
+/* ---------- セッション画面のバインド ---------- */
+function bindSession(){
+  const s = UI.draft;
+  const fm = (id)=>s.machines.find(x=>String(x.id)===String(id));
+
+  /* 入力(再描画なし・計算表示のみ更新) */
+  document.querySelectorAll("[data-in]").forEach(el=>{
+    const kind = el.dataset.in, v = el.dataset.v;
+    el.oninput = ()=>{
+      if(kind==="fee"){ s.fee=el.value; refreshSummary(); }
+      else if(kind==="smemo"){ s.memo=el.value; }
+      else if(kind==="exchange"){ s.exchange=el.value; refreshSlot(); }
+      else if(kind==="pexchange"){ s.pExchange=el.value; refreshSlot(); }
+      else if(kind==="pushpayout"){ s.pushPayout=el.value; refreshSlot(); }
+      else if(kind==="pushdraw"){ s.pushDraw=el.value; refreshSlot(); }
+      else if(kind==="myshare"){ s.myShare=el.value; refreshSlot(); }
+      else if(kind==="xlabel"||kind==="xamount"){
+        const x = s.expenses.find(e=>String(e.id)===String(v));
+        if(!x) return;
+        if(kind==="xlabel") x.label=el.value; else x.amount=el.value;
+        refreshSummary();
+      }
+      else if(kind==="mname"){
+        const m=fm(v); if(!m) return;
+        m.name=el.value;
+        const sug=document.getElementById("msug-"+m.id);
+        if(sug){
+          const q=(m.name||"").trim();
+          const hits=S.mdb.filter(x=>x.kind===m.kind&&(x.name||"").trim()&&x.name.includes(q)&&x.name.trim()!==q).slice(0,4);
+          sug.innerHTML = hits.length?'<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">'+
+            hits.map(x=>'<button class="chip" data-a="msug" data-v="'+m.id+'|'+esc(x.name)+'">'+esc(x.name)+'</button>').join("")+'</div>':'';
+          bindSessionActions();
+        }
+        if(m.kind==="pachi") refreshPanel(m);
+      }
+      else if(kind==="mmemo"){ const m=fm(v); if(m) m.memo=el.value; }
+      else if(kind==="mstock"){
+        const [mid,k]=v.split("|");
+        const m=fm(mid); if(m){ m[k]=el.value; refreshSlot(); }
+      }
+      else if(kind==="mcash"){
+        const [mid,cid,k]=v.split("|");
+        const m=fm(mid); if(!m) return;
+        const c=(m.cash||[]).find(x=>String(x.id)===String(cid)); if(c){ c[k]=el.value; refreshSlot(); }
+      }
+      else if(kind==="mborder"||kind==="mty"){
+        const m=fm(v); if(!m) return;
+        if(kind==="mborder") m.border=el.value; else m.ty=el.value;
+        refreshPanel(m, true);
+      }
+      else if(kind==="gseg"){
+        const [mid,gid,k]=v.split("|");
+        const m=fm(mid); if(!m) return;
+        const g=(m.segments||[]).find(x=>String(x.id)===String(gid)); if(!g) return;
+        g[k]=el.value;
+        const st=document.getElementById("gstat-"+g.id); if(st) st.textContent=segStat(g);
+        const fo=document.getElementById("gform-"+g.id); if(fo) fo.textContent=segFormula(g);
+        refreshPanel(m);
+      }
+    };
+  });
+  document.getElementById("s-date").oninput = e=>s.date=e.target.value;
+  document.getElementById("s-store").oninput = e=>s.store=e.target.value;
+  const pn = document.getElementById("s-pname");
+  if(pn) pn.oninput = e=>s.partnerName=e.target.value;
+
+  bindSessionActions();
+}
+
+function refreshSlot(){
+  /* 貯玉方式は台収支・人合計・サマリー全てが連動するため、フォーカス保持で全再描画 */
+  const f = document.activeElement;
+  const fv = f && f.dataset && f.dataset.in
+    ? {in:f.dataset.in, v:(f.dataset.v!==undefined?f.dataset.v:null)} : null;
+  render();
+  if(fv){
+    const sel = fv.v!==null
+      ? '[data-in="'+fv.in+'"][data-v="'+fv.v+'"]'
+      : '[data-in="'+fv.in+'"]:not([data-v])';
+    const nel = document.querySelector(sel);
+    if(nel){ nel.focus(); /* number入力はカーソル末尾で問題ないため位置復元しない */ }
+  }
+}
+function refreshSummary(){
+  const el = document.getElementById("ssummary");
+  if(el) el.innerHTML = sessionSummary(UI.draft);
+}
+function refreshPanel(m, keepInputs){
+  const el = document.getElementById("mpanel-"+m.id);
+  if(!el) return;
+  if(keepInputs){
+    /* 手入力欄フォーカス保持のため、乖離部分だけ作り直すのは煩雑なので全体更新+値復元 */
+    const focused = document.activeElement;
+    const fv = focused && focused.dataset ? {in:focused.dataset.in, v:focused.dataset.v, val:focused.value, ss:focused.selectionStart} : null;
+    el.innerHTML = borderPanel(m);
+    bindSessionActions(); rebindPanelInputs(m);
+    if(fv && fv.in){
+      const nel = el.querySelector('[data-in="'+fv.in+'"][data-v="'+fv.v+'"]');
+      if(nel){ nel.value=fv.val; nel.focus(); try{nel.selectionStart=nel.selectionEnd=fv.ss;}catch(e){} }
+    }
+  } else {
+    el.innerHTML = borderPanel(m);
+    bindSessionActions(); rebindPanelInputs(m);
+  }
+}
+function rebindPanelInputs(m){
+  const el = document.getElementById("mpanel-"+m.id);
+  if(!el) return;
+  el.querySelectorAll("[data-in]").forEach(inp=>{
+    inp.oninput = ()=>{
+      if(inp.dataset.in==="mborder") m.border=inp.value;
+      else if(inp.dataset.in==="mty") m.ty=inp.value;
+      refreshPanel(m, true);
+    };
+  });
+}
+
+function bindSessionActions(){
+  const s = UI.draft;
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    el.onclick = ()=>{
+      const a=el.dataset.a, v=el.dataset.v;
+      if(a==="back"){ UI.screen="main"; UI.draft=null; render(); }
+      else if(a==="mode"){ s.mode=v; render(); }
+      else if(a==="pname"){ s.partnerName=v; render(); }
+      else if(a==="whotab"){ UI.whoTab=v; render(); }
+      else if(a==="madd"){
+        const nm = {id:uid(),kind:v,name:"",memo:"",who:"me",startStock:"",endStock:"",holdBalls:"",cash:[]};
+        if(v==="pachi") nm.segments=[];
+        s.machines.push(nm); render();
+      }
+      else if(a==="maddw"){
+        const [k,who]=v.split("|");
+        const nm = {id:uid(),kind:k,name:"",memo:"",who,startStock:"",endStock:"",holdBalls:"",cash:[]};
+        if(k==="pachi") nm.segments=[];
+        s.machines.push(nm); render();
+      }
+      else if(a==="mdel"){ if(confirm("この台を削除しますか?")){ s.machines=s.machines.filter(x=>String(x.id)!==String(v)); render(); } }
+      else if(a==="msug"){
+        const [mid,name]=v.split("|");
+        const m=s.machines.find(x=>String(x.id)===String(mid));
+        if(m){ m.name=name; render(); }
+      }
+      else if(a==="mcashadd"){
+        const m=s.machines.find(x=>String(x.id)===String(v));
+        if(m){ (m.cash=m.cash||[]).push({id:uid(),label:"",amount:""}); render(); }
+      }
+      else if(a==="mcashdel"){
+        const [mid,cid]=v.split("|");
+        const m=s.machines.find(x=>String(x.id)===String(mid));
+        if(m){ m.cash=(m.cash||[]).filter(x=>String(x.id)!==String(cid)); render(); }
+      }
+      else if(a==="gadd"){
+        const m=s.machines.find(x=>String(x.id)===String(v));
+        if(m){ (m.segments=m.segments||[]).push({id:uid(),kind:"ball",sb:"",ss:"",eb:"",es:"",rpStart:"",rpEnd:""}); render(); }
+      }
+      else if(a==="gkind"){
+        const [mid,gid]=v.split("|");
+        const m=s.machines.find(x=>String(x.id)===String(mid));
+        const g=m&&(m.segments||[]).find(x=>String(x.id)===String(gid));
+        if(g){ g.kind = g.kind==="push"?"ball":"push"; render(); }
+      }
+      else if(a==="gdel"){
+        const [mid,gid]=v.split("|");
+        const m=s.machines.find(x=>String(x.id)===String(mid));
+        if(m){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(gid)); render(); }
+      }
+      else if(a==="xadd"){ s.expenses.push({id:uid(),label:"",amount:""}); render(); }
+      else if(a==="xdel"){ s.expenses=s.expenses.filter(x=>String(x.id)!==String(v)); render(); }
+      else if(a==="sdel"){
+        if(!confirm("この稼働記録を削除しますか?(家計簿の連携分も消えます)")) return;
+        S.entries = S.entries.filter(e=>e.id!=="slot-"+s.id);
+        S.sessions = S.sessions.filter(x=>x.id!==s.id);
+        save(); UI.screen="main"; UI.draft=null; render();
+      }
+      else if(a==="ssave") saveSession();
+    };
+  });
+}
+
+function saveSession(){
+  const s = UI.draft;
+  if(!s.date) return;
+  const cleaned = Object.assign({}, s, {
+    fee: String(num(s.fee))
+  });
+  delete cleaned.own; delete cleaned.partner; delete cleaned.results;
+  if(UI.isNewSess) S.sessions.push(cleaned);
+  else S.sessions = S.sessions.map(x=>x.id===s.id?cleaned:x);
+  /* レート記憶 */
+  if(num(cleaned.exchange)>0) S.rates.exchange = cleaned.exchange;
+  if(num(cleaned.pExchange)>0) S.rates.pExchange = cleaned.pExchange;
+  if(num(cleaned.pushPayout)>0) S.rates.pushPayout = cleaned.pushPayout;
+  if(num(cleaned.pushDraw)>0) S.rates.pushDraw = cleaned.pushDraw;
+  /* 家計簿連携 */
+  const linkId = "slot-"+s.id;
+  const fin = finalOwn(cleaned);
+  S.entries = S.entries.filter(e=>e.id!==linkId);
+  if(fin!==0){
+    S.entries.push({id:linkId, date:cleaned.date, src:"slot",
+      type: fin>0?"income":"expense",
+      category: fin>0?"遊技収支":"遊技",
+      amount: Math.abs(fin),
+      memo: modeLabel(cleaned.mode)+(cleaned.store?" @"+cleaned.store:"")});
+  }
+  save(); UI.screen="main"; UI.draft=null; render();
+}
+</script>
+<script>
+/* ============================================================
+   機種マスタ画面
+   ============================================================ */
+function viewMdb(){
+  let h = '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
+    '<div style="font-size:14px;font-weight:700">機種データ</div><div style="width:44px"></div></div>';
+  const f = UI.mdbForm;
+  if(f){
+    h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+      [["pachi","パチンコ"],["slot","スロット"]].map(([v,l])=>
+        '<button class="btn '+(f.kind===v?"sel":"")+'" style="flex:1" data-a="fkind" data-v="'+v+'">'+l+'</button>').join("")+'</div>'+
+      '<input class="input" id="f-name" placeholder="機種名" value="'+esc(f.name)+'" style="margin-bottom:10px">';
+    if(f.kind==="pachi"){
+      h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+        '<div style="flex:1"><div class="muted" style="font-size:10px;margin-bottom:3px">大当たり確率 分母(低確率)</div>'+
+        '<input class="input mono r" type="number" inputmode="decimal" step="0.1" id="f-denom" placeholder="例: 319.7" value="'+esc(f.denom)+'"></div>'+
+        '<div style="flex:1"><div class="muted" style="font-size:10px;margin-bottom:3px">理論TY(増加玉・連チャン込)</div>'+
+        '<input class="input mono r" type="number" inputmode="numeric" id="f-ty" placeholder="例: 4500" value="'+esc(f.ty)+'"></div></div>'+
+        '<div class="mono amber" style="font-size:12px;margin-bottom:10px" id="f-border">'+mdbBorderLine(f)+'</div>';
+    }
+    h += '<input class="input" id="f-memo" placeholder="メモ(スペック補足など)" value="'+esc(f.memo)+'" style="margin-bottom:14px">'+
+      '<div class="row" style="gap:8px">'+
+      (S.mdb.some(x=>x.id===f.id)?'<button class="btn danger" data-a="fdel">削除</button>':'')+
+      '<button class="btn" data-a="fcancel">戻る</button>'+
+      '<button class="btn primary" style="flex:1" data-a="fsave">保存する</button></div>';
+  } else {
+    h += '<button class="btn dash full" style="margin-bottom:12px" data-a="fnew">＋ 機種を登録</button>';
+    if(!S.mdb.length)
+      h += '<div style="text-align:center;padding:24px 0;font-size:13px;line-height:1.8" class="muted">'+
+        'まだ登録がありません。パチンコは確率分母と理論TYを登録すると、セッションの台に機種名を入れるだけでボーダー分析が自動適用されます。</div>';
+    S.mdb.slice().sort((a,b)=>a.name>b.name?1:-1).forEach(x=>{
+      h += '<div class="listitem" data-a="fedit" data-v="'+x.id+'">'+
+        '<div style="flex:1;min-width:0"><div class="row" style="font-size:13px;gap:6px">'+
+        '<span class="tag" style="background:var(--surface2);font-weight:700;color:'+(x.kind==="slot"?"var(--teal)":"var(--amber)")+'">'+
+        (x.kind==="slot"?"スロ":"パチ")+'</span><span class="ellip">'+esc(x.name)+'</span></div>'+
+        (x.kind==="pachi"&&fnum(x.denom)>0?'<div class="mono muted" style="font-size:11px;margin-top:2px">1/'+fnum(x.denom)+
+          (fnum(x.ty)>0?' / TY'+fnum(x.ty)+' / B'+(fnum(x.denom)*250/fnum(x.ty)).toFixed(1):'')+'</div>':'')+
+        '</div><span class="muted" style="font-size:14px">›</span></div>';
+    });
+  }
+  return h;
+}
+const mdbBorderLine = f => (fnum(f.denom)>0 && fnum(f.ty)>0)
+  ? "理論ボーダー ≒ "+(fnum(f.denom)*250/fnum(f.ty)).toFixed(2)+" 回/250発(等価)" : "";
+
+function bindMdb(){
+  const f = UI.mdbForm;
+  if(f){
+    document.getElementById("f-name").oninput = e=>f.name=e.target.value;
+    document.getElementById("f-memo").oninput = e=>f.memo=e.target.value;
+    const d=document.getElementById("f-denom"), t=document.getElementById("f-ty");
+    const upB = ()=>{ const el=document.getElementById("f-border"); if(el) el.textContent=mdbBorderLine(f); };
+    if(d) d.oninput = e=>{ f.denom=e.target.value; upB(); };
+    if(t) t.oninput = e=>{ f.ty=e.target.value; upB(); };
+  }
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    el.onclick = ()=>{
+      const a=el.dataset.a, v=el.dataset.v;
+      if(a==="back"){ UI.screen="main"; UI.mdbForm=null; render(); }
+      else if(a==="fnew"){ UI.mdbForm={id:uid(),kind:"pachi",name:"",denom:"",ty:"",memo:""}; render(); }
+      else if(a==="fedit"){ const x=S.mdb.find(z=>String(z.id)===String(v)); if(x){ UI.mdbForm=Object.assign({},x); render(); } }
+      else if(a==="fkind"){ UI.mdbForm.kind=v; render(); }
+      else if(a==="fcancel"){ UI.mdbForm=null; render(); }
+      else if(a==="fdel"){
+        if(!confirm("この機種データを削除しますか?")) return;
+        S.mdb = S.mdb.filter(x=>x.id!==UI.mdbForm.id);
+        save(); UI.mdbForm=null; render();
+      }
+      else if(a==="fsave"){
+        if(!(UI.mdbForm.name||"").trim()) return;
+        if(S.mdb.some(x=>x.id===UI.mdbForm.id)) S.mdb = S.mdb.map(x=>x.id===UI.mdbForm.id?UI.mdbForm:x);
+        else S.mdb.push(UI.mdbForm);
+        save(); UI.mdbForm=null; render();
+      }
+    };
+  });
+}
+</script>
+<script>
+/* ============================================================
+   バックアップ画面
+   ============================================================ */
+function viewBackup(){
+  return '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
+    '<div style="font-size:14px;font-weight:700">バックアップ</div><div style="width:44px"></div></div>'+
+    band("エクスポート(全データ)")+
+    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
+    '家計簿・稼働記録・機種データ・レート設定の全てをJSONファイルとして書き出します。データはこの端末のブラウザ内に保存されているため、ブラウザのデータ消去で消えます。定期的に書き出してください。</div>'+
+    '<div class="row" style="gap:8px;margin-bottom:8px">'+
+    '<button class="btn primary" style="flex:1;padding:11px 0" data-a="bexport">ファイルに書き出す</button>'+
+    '<button class="btn" style="flex:1;padding:11px 0;color:var(--text)" data-a="bcopy">コピー</button></div>'+
+    band("インポート(復元)")+
+    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
+    'バックアップJSONの中身を下に貼り付けて取り込みます。<span class="red">現在のデータは貼り付けた内容で完全に置き換わります。</span></div>'+
+    '<textarea class="input mono" id="b-import" placeholder=\'{"entries":[...],"sessions":[...]}\'></textarea>'+
+    '<button class="btn danger full" style="margin-top:8px;font-weight:700;padding:11px 0" data-a="bimport">このデータで置き換えて復元する</button>'+
+    band("保存の診断")+
+    '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="btest">保存テストを実行</button>'+
+    (UI.msg?'<div class="mono teal" style="font-size:11px;margin-top:10px;line-height:1.8;white-space:pre-wrap">'+esc(UI.msg)+'</div>':'');
+}
+function bindBackup(){
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    el.onclick = ()=>{
+      const a=el.dataset.a;
+      if(a==="back"){ UI.screen="main"; render(); }
+      else if(a==="bexport"){
+        dl(JSON.stringify(Object.assign({exportedAt:new Date().toISOString()},S), null, 1),
+          "kakeibo_backup_"+todayStr()+".json", "application/json");
+        UI.msg = "書き出しました(記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件 / 機種"+S.mdb.length+"件)";
+        render();
+      }
+      else if(a==="bcopy"){
+        const txt = JSON.stringify(Object.assign({exportedAt:new Date().toISOString()},S));
+        const ta = document.createElement("textarea");
+        ta.value=txt; document.body.appendChild(ta); ta.select();
+        let ok=false; try{ ok=document.execCommand("copy"); }catch(e){}
+        document.body.removeChild(ta);
+        if(!ok && navigator.clipboard) navigator.clipboard.writeText(txt).then(()=>{});
+        UI.msg = "クリップボードにコピーしました。メモアプリ等に貼り付けて保存してください。";
+        render();
+      }
+      else if(a==="bimport"){
+        const txt = document.getElementById("b-import").value;
+        try{
+          const d = JSON.parse(txt);
+          if(!Array.isArray(d.entries)||!Array.isArray(d.sessions)) throw new Error("形式不正");
+          if(!confirm("現在のデータを完全に置き換えます。よろしいですか?")) return;
+          S.entries = d.entries;
+          S.sessions = d.sessions.map(migrateSession);
+          S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
+          S.mdb = Array.isArray(d.mdb)?d.mdb:[];
+          S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
+          save();
+          UI.msg = "復元しました(記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件 / 機種"+S.mdb.length+"件)";
+          render();
+        }catch(e){
+          UI.msg = "取り込めませんでした。JSON全体(先頭の{から末尾の}まで)を貼り付けているか確認してください。";
+          render();
+        }
+      }
+      else if(a==="btest"){
+        const log=[];
+        try{ localStorage.setItem("diag:test", JSON.stringify({t:Date.now()})); log.push("1. テスト書込: OK"); }
+        catch(e){ log.push("1. テスト書込: エラー "+e.message); }
+        try{ const r=localStorage.getItem("diag:test"); log.push(r?"2. テスト読出: OK":"2. テスト読出: 失敗(値なし)"); }
+        catch(e){ log.push("2. テスト読出: エラー "+e.message); }
+        try{
+          const m=localStorage.getItem(KEY);
+          if(m){ const d=JSON.parse(m);
+            log.push("3. 本体データ読出: OK(記録"+(d.entries||[]).length+"件 / 稼働"+(d.sessions||[]).length+"件 / 機種"+(d.mdb||[]).length+"件)");
+          } else log.push("3. 本体データ読出: 値なし(未保存)");
+        }catch(e){ log.push("3. 本体データ読出: エラー "+e.message); }
+        log.push("4. 画面上の現在値: 記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件 / 機種"+S.mdb.length+"件");
+        UI.msg = log.join("\n");
+        render();
+      }
+    };
+  });
+}
+
+/* ---------- 起動 ---------- */
+load();
+render();
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("./sw.js").catch(()=>{ /* 未対応環境でも本体は動く */ });
+}
+</script>
+</body>
+</html>
