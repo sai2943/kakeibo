@@ -53,6 +53,19 @@
   .syncbadge.syncing{border-color:var(--amber); color:var(--amber);}
   .syncbadge.error{border-color:var(--red); color:var(--red);}
   .syncbadge.offline,.syncbadge.off,.syncbadge.nokey{border-color:var(--line); color:var(--muted);}
+  table.mjt{border-collapse:collapse;width:100%;min-width:280px;}
+  table.mjt th,table.mjt td{border:1px solid var(--line);text-align:center;padding:0;}
+  table.mjt th{background:var(--surface2);font-size:12px;font-weight:700;padding:6px 2px;}
+  .mjt-name{width:100%;background:transparent;border:none;color:var(--text);text-align:center;font-size:13px;font-weight:700;padding:6px 2px;}
+  .mjt-no{background:var(--surface2);font-size:11px;font-weight:700;color:var(--muted);padding:8px 2px;}
+  .mjt-cell{font-size:15px;font-family:ui-monospace,monospace;padding:12px 4px;cursor:pointer;min-width:52px;}
+  .mjt-cell.sel{background:rgba(242,179,61,.22);outline:2px solid var(--amber);}
+  .mjt-cell.red{color:var(--red);}
+  .mjt-ph{color:var(--line);}
+  .mjt-x{color:var(--red);font-size:14px;padding:8px 6px;cursor:pointer;width:22px;}
+  .mjt-pad{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);padding:10px 0;border-top:1px solid var(--line);}
+  .mjt-key{padding:16px 0;font-size:18px;font-weight:700;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--text);}
+  .mjt-key.done{background:var(--amber);color:#000;border-color:var(--amber);}
   .fab{position:fixed; right:20px; bottom:76px; width:54px; height:54px; border-radius:27px;
     background:var(--amber); color:#1a1508; font-size:28px; border:none; cursor:pointer;
     box-shadow:0 4px 16px rgba(0,0,0,.4); line-height:0; z-index:5;}
@@ -87,7 +100,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v23 (localStorage保存・完全オフライン)
+   収支台帳 v24 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -183,7 +196,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -208,6 +221,7 @@ function applyData(d){
   S.mdb = Array.isArray(d.mdb)?d.mdb:[];
   S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
   S.fixed = Array.isArray(d.fixed)?d.fixed:[];
+  S.mjTables = Array.isArray(d.mjTables)?d.mjTables:[];
   S.updatedAt = d.updatedAt || 0;
 }
 function load(){
@@ -362,6 +376,7 @@ function render(){
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
   if(UI.screen==="mahjong-edit"){ app.innerHTML = viewMj(); bindMj(); return; }
   if(UI.screen==="fixed"){ app.innerHTML = viewFixed(); bindFixed(); return; }
+  if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
   if(UI.screen==="backup"){ app.innerHTML = viewBackup(); bindBackup(); return; }
   if(UI.screen==="entry"){ app.innerHTML = viewEntry(); bindEntry(); return; }
@@ -385,6 +400,15 @@ function viewMain(){
   h += '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>';
   h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="backup">backup</button></div></div>';
 
+  if(UI.tab==="tool"){
+    h += viewTool();
+    h += '<div class="tabs">'+
+      [["ledger","家計簿"],["mahjong","麻雀"],["slot","パチスロ"],["tool","ツール"]].map(([v,l])=>
+        '<button class="'+(UI.tab===v?"on":"")+'" data-a="tab" data-v="'+v+'">'+l+'</button>').join("")+
+      '</div>';
+    return h;
+  }
+
   h += monthNav();
   if(UI.tab==="ledger") h += viewLedger();
   if(UI.tab==="slot") h += viewSlot();
@@ -392,7 +416,7 @@ function viewMain(){
 
   h += '<button class="fab" data-a="add">＋</button>';
   h += '<div class="tabs">'+
-    [["ledger","家計簿"],["mahjong","麻雀"],["slot","スロット"]].map(([v,l])=>
+    [["ledger","家計簿"],["mahjong","麻雀"],["slot","パチスロ"],["tool","ツール"]].map(([v,l])=>
       '<button class="'+(UI.tab===v?"on":"")+'" data-a="tab" data-v="'+v+'">'+l+'</button>').join("")+
     '</div>';
   return h;
@@ -633,6 +657,169 @@ function mjStatRow(label, val, isYen, raw){
   const col = isYen ? clsPM(val) : (raw ? (val>=0?"blue":"red") : "");
   return '<div class="row between" style="font-size:12px;margin:3px 0"><span class="muted">'+label+'</span>'+
     '<span class="mono '+col+'">'+disp+'</span></div>';
+}
+
+/* ========================= ツール ========================= */
+/* カテゴリ別ツールの受け皿。将来 投資 のツールもここに追加する。 */
+function viewTool(){
+  if(UI.screen==="mjtable") return "";  // 別画面で描画
+  let h = '<div class="row between" style="align-items:baseline;margin-top:4px">'+
+    '<h1>ツール <small>TOOLS</small></h1></div>';
+  h += '<div class="muted" style="font-size:12px;line-height:1.7;margin:8px 2px 14px">'+
+    '各遊技を打つための補助ツールです(収支の記録とは別)。</div>';
+  /* 麻雀 */
+  h += band("麻雀 — 点数表");
+  h += '<div class="muted" style="font-size:11px;margin:0 2px 8px">当日のセットの半荘ごとのスコアを記録・集計します。</div>';
+  (S.mjTables||[]).slice().sort((a,b)=>a.date<b.date?1:-1).forEach(t=>{
+    const names = t.players.join("・");
+    const rounds = (t.rows||[]).filter(r=>r.some(x=>x!=="")).length;
+    h += '<button class="btn full" style="padding:12px 14px;text-align:left;display:block;margin-bottom:8px" data-a="mjtopen" data-v="'+t.id+'">'+
+      '<div class="row between"><span style="font-weight:700;font-size:13px" class="ellip">'+esc(names)+'</span>'+
+      '<span class="muted mono" style="font-size:11px;flex-shrink:0">'+t.date.slice(5).replace("-","/")+'</span></div>'+
+      '<div class="muted" style="font-size:11px;margin-top:2px">'+rounds+'半荘</div></button>';
+  });
+  h += '<button class="btn dash full" style="padding:13px 0" data-a="mjtnew">＋ 新しい点数表</button>';
+  /* パチスロ */
+  h += band("パチスロ");
+  h += '<div class="card" style="opacity:.6"><div style="font-size:13px">回転数記録</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:2px">今はパチスロタブのセッション内にあります</div></div>';
+  /* 投資 */
+  h += band("投資");
+  h += '<div class="card" style="opacity:.6"><div style="font-size:13px">準備中</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:2px">ポートフォリオ管理は今後追加予定</div></div>';
+  return h;
+}
+
+/* 点数表の計算: プレイヤーごとの 合計/チップ/収支 */
+function mjtCalc(t, pi){
+  const sum = (t.rows||[]).reduce((a,r)=> a + (num(r[pi])||0), 0);
+  const chips = num((t.chips||[])[pi])||0;
+  const sr = num(t.scoreRate)||0, cr = num(t.chipRate)||0, fee = num(t.fee)||0;
+  return { sum, chips, net: Math.round(sum*sr + chips*cr - fee) };
+}
+function newMjTable(){
+  return { id:uid(), date:todayStr(), players:["A","B","C"], rows:[["","",""]],
+    chips:["","",""], scoreRate:"100", chipRate:"0", fee:"" };
+}
+
+function viewMjTable(){
+  const t = UI.mjt;
+  const np = t.players.length;
+  let h = '<div class="hdr"><button class="navbtn" data-mt="back">‹ 戻る</button>'+
+    '<div style="font-size:14px;font-weight:700">点数表</div>'+
+    '<button class="navbtn" data-mt="del" style="color:var(--red)">削除</button></div>';
+
+  /* プレイヤー人数 */
+  h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+    [3,4].map(n=>'<button class="btn '+(np===n?"sel":"")+'" style="flex:1" data-mt="np" data-v="'+n+'">'+n+'人打ち</button>').join("")+'</div>';
+
+  /* 表 */
+  h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:12px">'+
+    '<table class="mjt"><thead><tr><th style="width:34px">No</th>'+
+    t.players.map((p,i)=>'<th><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前"></th>').join("")+
+    '</tr></thead><tbody>';
+  (t.rows||[]).forEach((r,ri)=>{
+    const rowSum = r.reduce((a,x)=>a+(num(x)||0),0);
+    h += '<tr><td class="mjt-no">'+(ri+1)+'</td>'+
+      r.map((x,ci)=>{
+        const sel = UI.mjtCell && UI.mjtCell.k==="s" && UI.mjtCell.r===ri && UI.mjtCell.c===ci;
+        const v = x==="" ? "" : x;
+        const col = (num(x)||0)<0 ? "red" : "";
+        return '<td class="mjt-cell '+(sel?"sel":"")+' '+col+'" data-mt="cell" data-r="'+ri+'" data-c="'+ci+'">'+(v===""?'<span class="mjt-ph">·</span>':esc(String(v)))+'</td>';
+      }).join("")+
+      '<td class="mjt-x" data-mt="rowdel" data-v="'+ri+'">×</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<button class="btn dash full" style="padding:10px 0;margin-bottom:14px" data-mt="addrow">＋ 半荘を追加</button>';
+
+  /* チップ・レート・場代 */
+  h += band("チップ(±枚数)");
+  h += '<div style="overflow-x:auto;margin-bottom:12px"><table class="mjt"><tbody><tr>'+
+    '<td class="mjt-no" style="width:34px">Chip</td>'+
+    t.players.map((p,ci)=>{
+      const sel = UI.mjtCell && UI.mjtCell.k==="c" && UI.mjtCell.c===ci;
+      const x=(t.chips||[])[ci]||""; const col=(num(x)||0)<0?"red":"";
+      return '<td class="mjt-cell '+(sel?"sel":"")+' '+col+'" data-mt="chip" data-c="'+ci+'">'+(x===""?'<span class="mjt-ph">·</span>':esc(String(x)))+'</td>';
+    }).join("")+'</tr></tbody></table></div>';
+
+  h += '<div class="card" style="margin-bottom:12px">'+
+    '<div class="row" style="gap:8px;margin-bottom:8px">'+
+    '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">点数レート(1点=)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(t.scoreRate)+'" data-mt="rate" data-v="scoreRate"></div>'+
+    '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">チップレート(1枚=)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(t.chipRate)+'" data-mt="rate" data-v="chipRate"></div></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">場代等(1人あたり)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc(t.fee)+'" data-mt="rate" data-v="fee"></div></div>';
+
+  /* 収支結果 */
+  h += band("収支");
+  h += '<div style="overflow-x:auto"><table class="mjt"><tbody>'+
+    '<tr><td class="mjt-no" style="width:34px">合計</td>'+
+    t.players.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell '+(c.sum<0?"red":"")+'">'+c.sum.toFixed(1)+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no">収支</td>'+
+    t.players.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" style="font-weight:700;color:'+(c.net>=0?"var(--teal)":"var(--red)")+'">'+signYen(c.net)+'</td>'; }).join("")+'</tr>'+
+    '</tbody></table></div>';
+
+  /* キーパッド(セル選択時) */
+  if(UI.mjtCell){
+    h += '<div class="mjt-pad">'+
+      ["1","2","3","4","5","6","7","8","9","±","0","⌫"].map(k=>
+        '<button class="mjt-key" data-mt="key" data-v="'+k+'">'+k+'</button>').join("")+
+      '<button class="mjt-key done" data-mt="keydone" style="grid-column:span 3">完了</button></div>';
+  }
+  h += '<div style="height:40px"></div>';
+  return h;
+}
+
+function bindMjTable(){
+  const t = UI.mjt;
+  // 名前・レート入力
+  document.querySelectorAll("[data-mt='pname']").forEach(el=>{ el.oninput=e=>{ t.players[num(el.dataset.v)]=e.target.value; saveMjt(false); }; });
+  document.querySelectorAll("[data-mt='rate']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; renderMjtResultOnly(); }; });
+
+  document.querySelectorAll("[data-mt]").forEach(el=>{
+    const a=el.dataset.mt;
+    if(["pname","rate"].includes(a)) return;
+    el.onclick=()=>{
+      if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
+      else if(a==="del"){ if(confirm("この点数表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); } }
+      else if(a==="np"){ setPlayers(num(el.dataset.v)); }
+      else if(a==="addrow"){ t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
+      else if(a==="rowdel"){ t.rows.splice(num(el.dataset.v),1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
+      else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; render(); }
+      else if(a==="chip"){ UI.mjtCell={k:"c",c:num(el.dataset.c)}; render(); }
+      else if(a==="key"){ padInput(el.dataset.v); }
+      else if(a==="keydone"){ UI.mjtCell=null; saveMjt(false); render(); }
+    };
+  });
+}
+function setPlayers(n){
+  const t=UI.mjt; const cur=t.players.length;
+  if(n===cur) return;
+  if(n>cur){ for(let i=cur;i<n;i++){ t.players.push(String.fromCharCode(65+i)); t.rows.forEach(r=>r.push("")); t.chips.push(""); } }
+  else { t.players=t.players.slice(0,n); t.rows=t.rows.map(r=>r.slice(0,n)); t.chips=t.chips.slice(0,n); }
+  UI.mjtCell=null; saveMjt(false); render();
+}
+function padInput(k){
+  const t=UI.mjt, c=UI.mjtCell; if(!c) return;
+  const get=()=> c.k==="s" ? String(t.rows[c.r][c.c]||"") : String((t.chips[c.c]||""));
+  const set=(v)=>{ if(c.k==="s") t.rows[c.r][c.c]=v; else t.chips[c.c]=v; };
+  let cur=get();
+  if(k==="⌫") cur=cur.slice(0,-1);
+  else if(k==="±"){ cur = cur.startsWith("-") ? cur.slice(1) : ("-"+cur); }
+  else cur = (cur==="0"?k : cur+k);
+  if(cur==="-0") cur="-";
+  set(cur);
+  saveMjt(false); renderMjtResultOnly();
+  // 選択セルの表示だけ更新するため軽く再描画
+  render();
+}
+function renderMjtResultOnly(){ /* 簡易: フル再描画に委譲 */ }
+function saveMjt(persist){
+  const t=UI.mjt; if(!t) return;
+  const i=(S.mjTables||[]).findIndex(x=>String(x.id)===String(t.id));
+  if(i>=0) S.mjTables[i]=t; else (S.mjTables=S.mjTables||[]).push(t);
+  if(persist) save(); else saveLocal();
 }
 
 function viewFixed(){
@@ -940,6 +1127,8 @@ function bindMain(){
       else if(a==="mnext") moveMonth(1);
       else if(a==="csv") exportCsv();
       else if(a==="fixed"){ UI.screen="fixed"; UI.fixForm=null; render(); }
+      else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
+      else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
       else if(a==="mdb"){ UI.screen="mdb"; UI.mdbForm=null; render(); }
       else if(a==="backup"){ UI.screen="backup"; UI.msg=""; render(); }
       else if(a==="add"){
