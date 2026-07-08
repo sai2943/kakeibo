@@ -66,8 +66,7 @@
   .mjt-pad{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);padding:10px 0;border-top:1px solid var(--line);}
   .mjt-key{padding:16px 0;font-size:18px;font-weight:700;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--text);}
   .mjt-key.done{background:var(--amber);color:#000;border-color:var(--amber);}
-  .mjt-sticky{background:var(--bg);padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--line);}
-  table.mjt.score thead th{position:sticky;top:0;z-index:4;background:var(--surface2);}
+  .mjt-sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--line);}
   .mjt-umasign{font-size:8px;text-align:center;margin-top:2px;padding:2px 0;border:1px solid var(--line);border-radius:5px;cursor:pointer;color:var(--muted);}
   table.mjt.sum td,table.mjt.sum th{border-color:var(--line);}
   .mjt-mini{font-size:10px;font-family:ui-monospace,monospace;color:var(--muted);padding:4px 3px;white-space:nowrap;}
@@ -114,7 +113,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v28 (localStorage保存・完全オフライン)
+   収支台帳 v29 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -820,7 +819,9 @@ function viewMjTable(){
       '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="0" value="'+esc(t[k]||"")+'" data-mt="rd" data-v="'+k+'">'+
       '<div class="mjt-umasign" data-mt="umasign" data-v="'+k+'">'+((num(t[k])||0)<0?"− マイナス":"＋ プラス")+'</div></div>').join("")+'</div>'+
     '<label class="row" style="gap:8px;align-items:center;font-size:12px;cursor:pointer"><input type="checkbox" data-mt="hako" '+(t.hakoshita?"checked":"")+'><span>箱下あり(マイナス続行)</span></label>'+
-    (mjtHasTobi(t)?'<div class="muted" style="font-size:10px;margin-top:6px">飛び時スコア = <span class="mono" style="color:var(--amber)">'+mjtTobiScore(t)+'</span> (キーパッドの「飛」で入力)</div>':'')+
+    (mjtHasTobi(t)
+      ? '<div class="muted" style="font-size:10px;margin-top:6px">✓ 飛び時スコア = <span class="mono" style="color:var(--amber);font-weight:700">'+mjtTobiScore(t)+'</span> … スコアのセルを選ぶとキーパッドに「飛び」が出ます</div>'
+      : '<div style="font-size:10px;margin-top:6px;color:var(--red)">※「飛び」ボタンを出すには、返し点を入力し、箱下ありのチェックを外してください</div>')+
     '</div>';
 
   /* 自分の指定 */
@@ -837,8 +838,12 @@ function viewMjTable(){
     P.map((p,ci)=>{ const rc=mjtRankCounts(t,ci); return '<td class="mjt-mini">'+rc.slice(0,mjtSeats(t)).map((n,k)=>'<div>'+(k+1)+'着 '+n+'</div>').join("")+'</td>'; }).join("")+'</tr>'+
     '<tr><td class="mjt-no">合計</td>'+
     P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-sum-'+ci+'" style="font-size:13px;color:'+(c.sum<0?"var(--red)":c.sum>0?"var(--blue)":"inherit")+'">'+c.sum.toFixed(1)+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no" style="font-size:10px">ゲーム代</td>'+
+    P.map((p,ci)=>{ const f=num((t.fees||[])[ci])||0; return '<td class="mjt-cell muted" id="mjt-fee-'+ci+'" style="font-size:11px">'+(f?"−¥"+f.toLocaleString("ja-JP"):"–")+'</td>'; }).join("")+'</tr>'+
     '<tr><td class="mjt-no">収支</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-net-'+ci+'" style="font-weight:700;font-size:13px;color:'+(c.net>=0?"var(--blue)":"var(--red)")+'">'+signYen(c.net)+'</td>'; }).join("")+'</tr>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-net-'+ci+'" style="font-weight:700;font-size:14px;color:'+(c.net>=0?"var(--blue)":"var(--red)")+'">'+signYen(c.net)+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no" style="font-size:10px;color:var(--amber)">支払</td>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-pay-'+ci+'" style="font-size:12px;font-weight:700;color:'+(c.net<0?"var(--amber)":"var(--muted)")+'">'+(c.net<0?"¥"+Math.abs(c.net).toLocaleString("ja-JP"):(c.net>0?"受取":"±0"))+'</td>'; }).join("")+'</tr>'+
     '</tbody></table></div>'+
     (t.meIdx!=null ? '<button class="btn primary full" style="margin-top:8px;padding:11px 0;font-weight:700" data-mt="tokakei">★ '+esc(t.players[t.meIdx]||"自分")+'の成績を家計簿に反映</button>' : '')+
     '</div>';
@@ -942,7 +947,7 @@ function bindMjTable(){
   const t = UI.mjt;
   document.querySelectorAll("[data-mt='pname']").forEach(el=>{ el.oninput=e=>{ t.players[num(el.dataset.v)]=e.target.value; saveMjt(false); }; });
   const rn=document.querySelector("[data-mt='rname']"); if(rn) rn.oninput=e=>{ t.ruleName=e.target.value; saveMjt(false); };
-  document.querySelectorAll("[data-mt='rd']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; });
+  document.querySelectorAll("[data-mt='rd']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; el.onchange=()=>{ render(); }; });
   document.querySelectorAll("[data-mt='umasign']").forEach(el=>{ el.onclick=()=>{ const k=el.dataset.v; let cur=String(t[k]||""); if(cur===""||cur==="0"){ t[k]="-0"; } else if(cur.startsWith("-")){ t[k]=cur.slice(1); } else { t[k]="-"+cur; } saveMjt(false); render(); }; });
   const ft=document.querySelector("[data-mt='ftotal']"); if(ft) ft.oninput=e=>{ t.feeTotal=e.target.value; saveMjt(false); };
   document.querySelectorAll("[data-mt='rate']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); updateMjtSummary(); }; });
@@ -985,6 +990,8 @@ function updateMjtSummary(){
     const c=mjtCalc(t,ci);
     const se=document.getElementById("mjt-sum-"+ci); if(se) se.textContent=c.sum.toFixed(1);
     const ne=document.getElementById("mjt-net-"+ci); if(ne){ ne.textContent=signYen(c.net); ne.style.color=(c.net>=0?"var(--blue)":"var(--red)"); }
+    const fe=document.getElementById("mjt-fee-"+ci); const f=num((t.fees||[])[ci])||0; if(fe) fe.textContent=(f?"−¥"+f.toLocaleString("ja-JP"):"–");
+    const pe=document.getElementById("mjt-pay-"+ci); if(pe){ pe.textContent=(c.net<0?"¥"+Math.abs(c.net).toLocaleString("ja-JP"):(c.net>0?"受取":"±0")); pe.style.color=(c.net<0?"var(--amber)":"var(--muted)"); }
   });
 }
 /* スコア表の「自分」の成績を麻雀の収支記録(→家計簿)に反映 */
