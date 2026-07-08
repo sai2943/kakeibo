@@ -113,7 +113,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v31 (localStorage保存・完全オフライン)
+   収支台帳 v32 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -817,12 +817,13 @@ function viewMjTable(){
     '<div class="row" style="gap:8px;margin-bottom:8px">'+
     '<div style="flex:1"><div class="muted" style="font-size:9px">持ち点(配給原点)</div><input class="input sm mono r" type="number" inputmode="numeric" placeholder="例 25000" value="'+esc(t.mochi||"")+'" data-mt="rd" data-v="mochi"></div>'+
     '<div style="flex:1"><div class="muted" style="font-size:9px">返し点(基準点)</div><input class="input sm mono r" type="number" inputmode="numeric" placeholder="例 30000" value="'+esc(t.kaeshi||"")+'" data-mt="rd" data-v="kaeshi"></div></div>'+
-    '<div class="muted" style="font-size:9px;margin-bottom:2px">ウマ(着順ごと・タップして入力)</div><div class="row" style="gap:6px;margin-bottom:8px">'+
+    '<div class="muted" style="font-size:9px;margin-bottom:2px">ウマ(着順ごと・±ボタンで符号)</div><div class="row" style="gap:6px;margin-bottom:8px">'+
     [["uma1","1着"],["uma2","2着"],["uma3","3着"]].concat(mjtSeats(t)===4?[["uma4","4着"]]:[]).map(([k,l])=>{
-      const sel = UI.mjtCell && UI.mjtCell.k==="uma" && UI.mjtCell.key===k;
-      const val = t[k]||""; const neg=(num(val)||0)<0;
-      return '<div style="flex:1"><div class="muted" style="font-size:8px;text-align:center">'+l+'</div>'+
-        '<div class="mjt-cell '+(sel?"sel ":"")+(neg?"red":"")+'" style="min-width:0" data-mt="umacell" data-v="'+k+'">'+(val===""?'<span class="mjt-ph">0</span>':esc(String(val)))+'</div></div>';
+      const neg=String(t[k]||"").startsWith("-");
+      return '<div style="flex:1;min-width:0"><div class="muted" style="font-size:8px;text-align:center;margin-bottom:2px">'+l+'</div>'+
+        '<div class="row" style="gap:3px;align-items:center">'+
+        '<button class="signbtn" style="width:28px;height:32px;border:1.5px solid '+(neg?"var(--red)":"var(--teal)")+';color:'+(neg?"var(--red)":"var(--teal)")+';background:'+(neg?"rgba(229,115,115,.1)":"rgba(45,212,191,.1)")+'" data-mt="umasign" data-v="'+k+'">'+(neg?"−":"＋")+'</button>'+
+        '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="0" value="'+esc(String(t[k]||"").replace("-",""))+'" data-mt="umaabs" data-v="'+k+'" style="flex:1;min-width:0"></div></div>';
     }).join("")+'</div>'+
     '<label class="row" style="gap:8px;align-items:center;font-size:12px;cursor:pointer"><input type="checkbox" data-mt="hako" '+(t.hakoshita?"checked":"")+'><span>箱下あり(マイナス続行)</span></label>'+
     (mjtHasTobi(t)
@@ -958,6 +959,7 @@ function bindMjTable(){
   document.querySelectorAll("[data-mt='pname']").forEach(el=>{ el.oninput=e=>{ t.players[num(el.dataset.v)]=e.target.value; saveMjt(false); }; });
   const rn=document.querySelector("[data-mt='rname']"); if(rn) rn.oninput=e=>{ t.ruleName=e.target.value; saveMjt(false); };
   document.querySelectorAll("[data-mt='rd']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; el.onchange=()=>{ render(); }; });
+  document.querySelectorAll("[data-mt='umaabs']").forEach(el=>{ el.oninput=e=>{ const f=el.dataset.v; const neg=String(t[f]||"").startsWith("-"); t[f]=(neg?"-":"")+e.target.value.replace(/-/g,""); saveMjt(false); }; el.onchange=()=>render(); });
   const ft=document.querySelector("[data-mt='ftotal']"); if(ft) ft.oninput=e=>{ t.feeTotal=e.target.value; saveMjt(false); };
   document.querySelectorAll("[data-mt='rate']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; el.onchange=()=>render(); });
   document.querySelectorAll("[data-mt='fee']").forEach(el=>{ el.oninput=e=>{ (t.fees=t.fees||[])[num(el.dataset.c)]=e.target.value; saveMjt(false); }; el.onchange=()=>render(); });
@@ -965,10 +967,10 @@ function bindMjTable(){
 
   document.querySelectorAll("[data-mt]").forEach(el=>{
     const a=el.dataset.mt;
-    if(["pname","rate","fee","rname","rd","ftotal"].includes(a)) return;
+    if(["pname","rate","fee","rname","rd","ftotal","umaabs"].includes(a)) return;
     if(a==="hako"){ el.onchange=()=>{ t.hakoshita=el.checked; saveMjt(false); render(); }; return; }
     el.onclick=()=>{
-      if(a==="umacell"){ UI.mjtCell={k:"uma",key:el.dataset.v}; render(); return; }
+      if(a==="umasign"){ const f=el.dataset.v; const cur=String(t[f]||""); t[f]=cur.startsWith("-")?cur.slice(1):"-"+cur; saveMjt(false); render(); return; }
       if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
       else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); } }
       else if(a==="rule"){ t.rule=el.dataset.v; UI.mjtCell=null; saveMjt(false); render(); }
