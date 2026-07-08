@@ -63,8 +63,8 @@
   .mjt-cell.red{color:var(--red);}
   .mjt-ph{color:var(--line);}
   .mjt-x{color:var(--red);font-size:14px;padding:8px 6px;cursor:pointer;width:22px;}
-  .mjt-pad{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--bg);padding:10px 0;border-top:1px solid var(--line);}
-  .mjt-key{padding:16px 0;font-size:18px;font-weight:700;background:var(--surface2);border:1px solid var(--line);border-radius:10px;color:var(--text);}
+  .mjt-pad{position:sticky;bottom:0;display:grid;grid-template-columns:repeat(3,1fr);gap:5px;background:var(--bg);padding:6px 0;border-top:1px solid var(--line);}
+  .mjt-key{padding:9px 0;font-size:17px;font-weight:700;background:var(--surface2);border:1px solid var(--line);border-radius:9px;color:var(--text);}
   .mjt-key.done{background:var(--amber);color:#000;border-color:var(--amber);}
   .mjt-sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--line);}
   table.mjt.sum .mjt-no{white-space:nowrap;}
@@ -114,7 +114,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v33 (localStorage保存・完全オフライン)
+   収支台帳 v34 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -940,8 +940,28 @@ function viewMjTable(){
     let disp = curVal==="x" ? "抜番" : (curVal===""||curVal==null ? "0" : curVal);
     const dispCol = (curVal==="x") ? "var(--amber)" : (num(curVal)<0 ? "var(--red)" : num(curVal)>0 ? "var(--blue)" : "var(--text)");
     const showTobi = isScore && mjtHasTobi(t);
-    h += '<div class="mjt-pad-wrap"><div class="mjt-pad-head"><span class="muted" style="font-size:12px">入力中: <b style="color:var(--text)">'+esc(who)+'</b> · '+ctx+'</span>'+
-      '<span class="mono" style="font-size:20px;font-weight:700;color:'+dispCol+'">'+esc(String(disp))+'</span></div>'+
+    let headHtml;
+    if(isScore){
+      headHtml = '<div style="padding:2px 2px 7px"><div class="muted" style="font-size:10px;margin-bottom:4px">半荘'+(cell.r+1)+' <span style="color:var(--amber)">← 入力中の行</span></div>'+
+        '<div class="row" style="gap:4px">'+
+        P.map((p,ci)=>{
+          const selp = ci===cell.c;
+          let d, col;
+          if(mjtAbsent(t,cell.r,ci)){ d="抜"; col="var(--muted)"; }
+          else { const raw=mjtRawScore(t,cell.r,ci);
+            if(raw!==null){ d=String(t.rows[cell.r][ci]); col=raw<0?"var(--red)":raw>0?"var(--blue)":"var(--text)"; }
+            else if(mjtAutoIdx(t,cell.r)===ci){ const s=mjtScore(t,cell.r,ci); d=String(s); col="var(--amber)"; }
+            else { d="·"; col="var(--line)"; }
+          }
+          return '<div style="flex:1;min-width:0;text-align:center;padding:3px 2px;border-radius:6px;'+(selp?"background:rgba(242,179,61,.18);outline:1.5px solid var(--amber)":"background:var(--surface2)")+'">'+
+            '<div class="ellip" style="font-size:9px;color:'+(selp?"var(--amber)":"var(--muted)")+'">'+esc(p||("P"+(ci+1)))+'</div>'+
+            '<div class="mono" style="font-size:16px;font-weight:700;color:'+col+'">'+esc(d)+'</div></div>';
+        }).join("")+'</div></div>';
+    } else {
+      headHtml = '<div class="mjt-pad-head"><span class="muted" style="font-size:12px">入力中: <b style="color:var(--text)">'+esc(who)+'</b> · '+ctx+'</span>'+
+        '<span class="mono" style="font-size:20px;font-weight:700;color:'+dispCol+'">'+esc(String(disp))+'</span></div>';
+    }
+    h += '<div class="mjt-pad-wrap">'+headHtml+
       '<div class="mjt-pad">'+
       ["1","2","3","4","5","6","7","8","9"].map(k=>'<button class="mjt-key" data-mt="key" data-v="'+k+'">'+k+'</button>').join("")+
       '<button class="mjt-key" data-mt="key" data-v="±">±</button>'+
