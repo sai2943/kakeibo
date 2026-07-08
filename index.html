@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#0B1F1E">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -47,6 +48,11 @@
   .chip.sel{border-color:var(--teal); color:var(--teal); background:rgba(45,212,191,.12);}
   .grid2{display:grid; grid-template-columns:1fr 1fr; gap:6px;}
   .tag{font-size:10px; padding:1px 6px; border-radius:4px; white-space:nowrap;}
+  .syncbadge{font-size:10px; padding:3px 9px; border-radius:20px; font-weight:700; white-space:nowrap; border:1px solid var(--line); color:var(--muted);}
+  .syncbadge.ready{border-color:var(--teal); color:var(--teal);}
+  .syncbadge.syncing{border-color:var(--amber); color:var(--amber);}
+  .syncbadge.error{border-color:var(--red); color:var(--red);}
+  .syncbadge.offline,.syncbadge.off,.syncbadge.nokey{border-color:var(--line); color:var(--muted);}
   .fab{position:fixed; right:20px; bottom:76px; width:54px; height:54px; border-radius:27px;
     background:var(--amber); color:#1a1508; font-size:28px; border:none; cursor:pointer;
     box-shadow:0 4px 16px rgba(0,0,0,.4); line-height:0; z-index:5;}
@@ -81,7 +87,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 スタンドアロン版 v16(新アイコン) (localStorage保存・完全オフライン)
+   収支台帳 v17(クラウド同期) (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["食費","日用品","交通費","趣味・娯楽","交際費","医療・健康","住居・光熱","通信","遊技","その他"];
@@ -101,7 +107,7 @@ const todayStr = () => { const d=new Date();
 const uid = () => Date.now() + Math.floor(Math.random()*1000);
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[] };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -111,30 +117,37 @@ let UI = {
   msg:""                               // backup画面メッセージ
 };
 
+function migrateEntry(e){
+  let ne = e;
+  if((e.src==="slot"||e.src==="mahjong") && e.category==="遊技収支")
+    ne = Object.assign({}, ne, {category:"遊技"});
+  if(e.src==="slot" && typeof e.memo==="string" && (e.memo.includes("乗り打ち")||e.memo.includes("代打ち")))
+    ne = Object.assign({}, ne, {memo: e.memo.replace("乗り打ち","乗打").replace("代打ち","代打")});
+  return ne;
+}
+function applyData(d){
+  S.entries = (d.entries||[]).map(migrateEntry);
+  S.sessions = (d.sessions||[]).map(migrateSession);
+  S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
+  S.mdb = Array.isArray(d.mdb)?d.mdb:[];
+  S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
+  S.updatedAt = d.updatedAt || 0;
+}
 function load(){
   try{
     const raw = localStorage.getItem(KEY);
-    if(raw){
-      const d = JSON.parse(raw);
-      S.entries = (d.entries||[]).map(e=>{
-        let ne = e;
-        if((e.src==="slot"||e.src==="mahjong") && e.category==="遊技収支")
-          ne = Object.assign({}, ne, {category:"遊技"});
-        if(e.src==="slot" && typeof e.memo==="string" && (e.memo.includes("乗り打ち")||e.memo.includes("代打ち")))
-          ne = Object.assign({}, ne, {memo: e.memo.replace("乗り打ち","乗打").replace("代打ち","代打")});
-        return ne;
-      });
-      S.sessions = (d.sessions||[]).map(migrateSession);
-      S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
-      S.mdb = d.mdb||[];
-      S.mjSessions = d.mjSessions||[];
-    }
+    if(raw) applyData(JSON.parse(raw));
   }catch(e){ /* 壊れていたら初期状態 */ }
+}
+function saveLocal(){
+  localStorage.setItem(KEY, JSON.stringify(S));
 }
 function save(){
   try{
-    localStorage.setItem(KEY, JSON.stringify(S));
+    S.updatedAt = Date.now();
+    saveLocal();
     toast("保存しました");
+    schedulePush();
   }catch(e){
     alert("保存に失敗しました: " + e.message + "\nバックアップからエクスポートしてください。");
   }
@@ -291,6 +304,7 @@ function viewMain(){
     '<h1>収支台帳 <small>LEDGER</small></h1><div class="row" style="gap:6px">';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="csv">CSV出力</button>';
   if(UI.tab==="slot") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="mdb">機種データ</button>';
+  h += '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>';
   h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="backup">backup</button></div></div>';
 
   h += monthNav();
@@ -1452,6 +1466,8 @@ function bindMdb(){
 function viewBackup(){
   return '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
     '<div style="font-size:14px;font-weight:700">バックアップ</div><div style="width:44px"></div></div>'+
+    band("クラウド同期")+
+    '<div id="syncbox">'+syncBoxHtml()+'</div>'+
     band("エクスポート(全データ)")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
     '家計簿・稼働記録・機種データ・レート設定の全てをJSONファイルとして書き出します。データはこの端末のブラウザ内に保存されているため、ブラウザのデータ消去で消えます。定期的に書き出してください。</div>'+
@@ -1468,6 +1484,7 @@ function viewBackup(){
     (UI.msg?'<div class="mono teal" style="font-size:11px;margin-top:10px;line-height:1.8;white-space:pre-wrap">'+esc(UI.msg)+'</div>':'');
 }
 function bindBackup(){
+  bindSyncBox();
   document.querySelectorAll("[data-a]").forEach(el=>{
     el.onclick = ()=>{
       const a=el.dataset.a;
@@ -1527,12 +1544,174 @@ function bindBackup(){
   });
 }
 
+/* ============================================================
+   クラウド同期(Supabase)
+   ローカルファースト: localStorageが作業コピー。
+   起動時とオンライン復帰時に、タイムスタンプで新しい方を採用(案ア)。
+   ============================================================ */
+const SB_URL = "https://uxvihnyrchaczwghykot.supabase.co";
+const SB_KEY = "sb_publishable_qjSW1MlyG6fr-GSMj9mGTQ_9c73lmsx";
+let sb = null;            // Supabaseクライアント
+let sbSession = null;     // ログインセッション
+let syncState = "off";    // off | ready | syncing | error | offline | nokey
+let pushTimer = null;
+
+function initSb(){
+  if(sb) return sb;
+  if(window.supabase){
+    try{ sb = window.supabase.createClient(SB_URL, SB_KEY, {auth:{persistSession:true, autoRefreshToken:true}}); }
+    catch(e){ sb = null; }
+  }
+  return sb;
+}
+function setSync(s){ syncState = s; updateSyncUi(); }
+function syncLabel(){
+  return ({off:"未ログイン", ready:"同期済み", syncing:"同期中…", error:"同期エラー", offline:"オフライン", nokey:"読込中"})[syncState] || "";
+}
+function updateSyncUi(){
+  const b = document.getElementById("syncbadge");
+  if(b){ b.textContent = syncLabel(); b.className = "syncbadge " + syncState; }
+  if(UI.screen==="backup"){
+    const box = document.getElementById("syncbox");
+    if(box){ box.innerHTML = syncBoxHtml(); bindSyncBox(); }
+  }
+}
+
+async function pushCloud(){
+  if(!sb || !sbSession) return;
+  try{
+    setSync("syncing");
+    const { error } = await sb.from("app_data").upsert({
+      user_id: sbSession.user.id,
+      data: S,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "user_id" });
+    if(error) throw error;
+    setSync("ready");
+  }catch(e){ setSync("error"); }
+}
+function schedulePush(){
+  if(!sb || !sbSession) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(pushCloud, 1200);
+}
+async function fetchCloud(){
+  if(!sb || !sbSession) return null;
+  const { data, error } = await sb.from("app_data")
+    .select("data").eq("user_id", sbSession.user.id).maybeSingle();
+  if(error) throw error;
+  return data ? data.data : null;
+}
+async function cloudSync(){
+  if(!sb || !sbSession) return;
+  try{
+    setSync("syncing");
+    const cloud = await fetchCloud();
+    const localTs = S.updatedAt || 0;
+    const cloudTs = cloud ? (cloud.updatedAt || 0) : -1;
+    if(cloud && cloudTs > localTs){
+      applyData(cloud);         // クラウドが新しい→採用
+      saveLocal();
+      render();
+      toast("クラウドから同期しました");
+      setSync("ready");
+    }else if(localTs > cloudTs){
+      await pushCloud();        // ローカルが新しい→送信
+      toast("クラウドへ同期しました");
+    }else{
+      setSync("ready");
+    }
+  }catch(e){ setSync("error"); }
+}
+
+async function authSignIn(email, pw){
+  if(!initSb()) return {error:"接続できません(オフラインの可能性があります)"};
+  const { data, error } = await sb.auth.signInWithPassword({email, password:pw});
+  if(error) return {error: error.message};
+  sbSession = data.session; return {ok:true};
+}
+async function authSignUp(email, pw){
+  if(!initSb()) return {error:"接続できません(オフラインの可能性があります)"};
+  const { data, error } = await sb.auth.signUp({email, password:pw});
+  if(error) return {error: error.message};
+  sbSession = data.session; return {ok:true};
+}
+async function authSignOut(){
+  if(sb){ try{ await sb.auth.signOut(); }catch(e){} }
+  sbSession = null; setSync("off");
+}
+
+function whenSbReady(cb){
+  if(window.supabase) return cb();
+  let n=0;
+  const iv=setInterval(()=>{
+    if(window.supabase){ clearInterval(iv); cb(); }
+    else if(++n>40){ clearInterval(iv); setSync(navigator.onLine?"off":"offline"); }
+  },150);
+}
+async function initCloud(){
+  if(!initSb()){ setSync(navigator.onLine?"off":"offline"); return; }
+  try{
+    const { data } = await sb.auth.getSession();
+    sbSession = (data && data.session) || null;
+    if(sbSession){ await cloudSync(); }
+    else setSync("off");
+  }catch(e){ setSync("error"); }
+}
+window.addEventListener("online", ()=>{ if(sbSession) cloudSync(); });
+window.addEventListener("offline", ()=>{ if(!sbSession) setSync("offline"); });
+
+/* バックアップ画面のクラウド同期セクション */
+function syncBoxHtml(){
+  if(sbSession){
+    const email = esc((sbSession.user && sbSession.user.email) || "");
+    return '<div class="card"><div class="row between" style="align-items:center;margin-bottom:8px">'+
+      '<div style="min-width:0"><div style="font-size:13px;font-weight:700">同期中</div>'+
+      '<div class="muted ellip" style="font-size:11px">'+email+'</div></div>'+
+      '<span class="syncbadge '+syncState+'" id="syncbadge2">'+syncLabel()+'</span></div>'+
+      '<div class="row" style="gap:8px">'+
+      '<button class="btn tealb" style="flex:1;font-weight:700;padding:10px 0" data-sa="syncnow">今すぐ同期</button>'+
+      '<button class="btn" style="flex:1;padding:10px 0;color:var(--text)" data-sa="logout">ログアウト</button></div></div>';
+  }
+  return '<div class="card">'+
+    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
+    'メールとパスワードでログインすると、データが自動でクラウドに保存され、複数端末で同期されます。初めての場合は「新規登録」を押してください(同じメール/パスワードで別端末からログインできます)。</div>'+
+    '<input class="input" id="sync-email" type="email" inputmode="email" placeholder="メールアドレス" autocomplete="username" style="margin-bottom:8px">'+
+    '<input class="input" id="sync-pw" type="password" placeholder="パスワード(6文字以上)" autocomplete="current-password" style="margin-bottom:10px">'+
+    '<div class="row" style="gap:8px">'+
+    '<button class="btn primary" style="flex:1;font-weight:700;padding:11px 0" data-sa="login">ログイン</button>'+
+    '<button class="btn tealb" style="flex:1;font-weight:700;padding:11px 0" data-sa="signup">新規登録</button></div>'+
+    (UI.syncMsg?'<div class="'+(UI.syncErr?"red":"teal")+'" style="font-size:11px;margin-top:10px;line-height:1.6">'+esc(UI.syncMsg)+'</div>':'')+'</div>';
+}
+function bindSyncBox(){
+  document.querySelectorAll("[data-sa]").forEach(el=>{
+    el.onclick = async ()=>{
+      const a = el.dataset.sa;
+      if(a==="logout"){ await authSignOut(); UI.syncMsg=""; render(); }
+      else if(a==="syncnow"){ await cloudSync(); }
+      else if(a==="login" || a==="signup"){
+        const email = (document.getElementById("sync-email").value||"").trim();
+        const pw = document.getElementById("sync-pw").value||"";
+        if(!email || pw.length<6){ UI.syncErr=true; UI.syncMsg="メールアドレスと6文字以上のパスワードを入力してください。"; updateSyncUi(); return; }
+        UI.syncErr=false; UI.syncMsg = (a==="login"?"ログイン中…":"登録中…"); updateSyncUi();
+        const r = a==="login" ? await authSignIn(email, pw) : await authSignUp(email, pw);
+        if(r.error){ UI.syncErr=true; UI.syncMsg = r.error; updateSyncUi(); return; }
+        UI.syncErr=false; UI.syncMsg=""; 
+        await cloudSync();
+        render();
+      }
+    };
+  });
+}
+
 /* ---------- 起動 ---------- */
 load();
 render();
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(()=>{ /* 未対応環境でも本体は動く */ });
 }
+setSync("nokey");
+whenSbReady(initCloud);
 </script>
 </body>
 </html>
