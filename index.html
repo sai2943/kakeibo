@@ -87,10 +87,10 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v18 (localStorage保存・完全オフライン)
+   収支台帳 v19 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
-const EXPENSE_CATS = ["食費","日用品","交通費","趣味・娯楽","交際費","医療・健康","住居・光熱","通信","遊技","その他"];
+const EXPENSE_CATS = ["消費","娯楽","自己投資"];
 const INCOME_CATS = ["給与","賞与","その他収入"];
 const UNIT_LABEL = {medal:"枚", ball:"玉", yen:"円"};
 const WD = ["日","月","火","水","木","金","土"];
@@ -386,12 +386,14 @@ function viewLedger(){
   const cats = {};
   me.filter(e=>e.type==="expense" && !isNetEntry(e)).forEach(e=>cats[e.category]=(cats[e.category]||0)+e.amount);
   const ct = Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  const QCOL = {"消費":"var(--teal)","娯楽":"var(--amber)","自己投資":"var(--blue)"};
   if(ct.length){
-    h += band("支出内訳") + '<div class="card">' + ct.map(([c,a])=>
-      '<div style="margin:8px 0"><div class="row between" style="font-size:12px;margin-bottom:3px">'+
+    h += band("支出内訳") + '<div class="card">' + ct.map(([c,a])=>{
+      const col = QCOL[c] || "var(--teal)";
+      return '<div style="margin:8px 0"><div class="row between" style="font-size:12px;margin-bottom:3px">'+
       '<span>'+esc(c)+'</span><span class="mono muted">'+yen(a)+' <span style="font-size:10px">('+Math.round(a/normExpense*100)+'%)</span></span></div>'+
-      '<div class="bar"><div style="width:'+(a/normExpense*100)+'%;background:var(--teal)"></div></div></div>'
-    ).join("") + '</div>';
+      '<div class="bar"><div style="width:'+(a/normExpense*100)+'%;background:'+col+'"></div></div></div>';
+    }).join("") + '</div>';
   }
 
   h += band("明細");
@@ -730,7 +732,7 @@ function bindMain(){
       else if(a==="backup"){ UI.screen="backup"; UI.msg=""; render(); }
       else if(a==="add"){
         if(UI.tab==="ledger"){ UI.editEntryId=null;
-          UI.entryForm={date:todayStr(),type:"expense",category:"食費",amount:"",memo:""};
+          UI.entryForm={date:todayStr(),type:"expense",category:"消費",amount:"",memo:""};
           UI.screen="entry"; render();
         } else if(UI.tab==="mahjong"){
           UI.mjDraft={id:uid(),date:todayStr(),store:"",category:"free",rule:"4",
@@ -798,7 +800,7 @@ function dl(content, name, type){
    ============================================================ */
 function viewEntry(){
   const f = UI.entryForm;
-  const cats = f.type==="expense" ? EXPENSE_CATS : INCOME_CATS;
+  
   return '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
     '<div style="font-size:14px;font-weight:700">'+(UI.editEntryId!==null?"記録を編集":"記録を追加")+'</div><div style="width:44px"></div></div>'+
     '<div class="row" style="gap:8px;margin-bottom:12px">'+
@@ -807,9 +809,13 @@ function viewEntry(){
     '<div class="row" style="gap:8px;margin-bottom:12px">'+
     '<input class="input" type="date" id="e-date" value="'+esc(f.date)+'" style="flex:1">'+
     '<input class="input mono r" type="number" inputmode="numeric" id="e-amount" placeholder="金額" value="'+esc(f.amount)+'" style="flex:1"></div>'+
-    '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
-    cats.map(c=>'<button class="chip '+(f.category===c?"sel":"")+'" data-a="ecat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>'+
-    '<input class="input" id="e-memo" placeholder="メモ(任意)" value="'+esc(f.memo)+'" style="margin-bottom:14px">'+
+    (f.type==="expense"
+      ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">支出の分類</div>'+
+        '<div class="row" style="gap:8px;margin-bottom:12px">'+
+        EXPENSE_CATS.map(c=>'<button class="btn '+(f.category===c?"sel":"")+'" style="flex:1;padding:12px 2px;font-size:13px" data-a="ecat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>'
+      : '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
+        INCOME_CATS.map(c=>'<button class="chip '+(f.category===c?"sel":"")+'" data-a="ecat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>')+
+    '<input class="input" id="e-memo" placeholder="メモ・店名など(任意)" value="'+esc(f.memo)+'" style="margin-bottom:14px">'+
     '<div class="row" style="gap:8px">'+
     (UI.editEntryId!==null?'<button class="btn danger" data-a="edel">削除</button>':'')+
     '<button class="btn primary" style="flex:1" data-a="esave">'+(UI.editEntryId!==null?"更新する":"追加する")+'</button></div>';
@@ -823,7 +829,7 @@ function bindEntry(){
     el.onclick = ()=>{
       const a=el.dataset.a, v=el.dataset.v;
       if(a==="back"){ UI.screen="main"; render(); }
-      else if(a==="etype"){ f.type=v; f.category = v==="expense"?"食費":"給与"; render(); }
+      else if(a==="etype"){ f.type=v; f.category = v==="expense"?"消費":"給与"; render(); }
       else if(a==="ecat"){ f.category=v; render(); }
       else if(a==="edel"){
         if(!confirm("この記録を削除しますか?")) return;
