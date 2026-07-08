@@ -102,7 +102,8 @@
   .bar>div{height:5px; border-radius:3px; opacity:.85;}
   .xbtn{background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:0 2px;}
   .signbtn{width:38px; height:38px; border-radius:6px; font-size:18px; font-weight:700; cursor:pointer;
-    flex-shrink:0; line-height:1; background:transparent; font-family:inherit;}
+    flex-shrink:0; line-height:1; background:transparent; font-family:inherit;
+    display:flex; align-items:center; justify-content:center; text-align:center; padding:0;}
   .amberpanel{background:rgba(242,179,61,.08); border:1px solid rgba(242,179,61,.35); border-radius:8px; padding:9px 10px;}
   textarea.input{height:120px; resize:vertical; font-size:11px;}
 </style>
@@ -113,7 +114,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v32 (localStorage保存・完全オフライン)
+   収支台帳 v33 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -946,9 +947,15 @@ function viewMjTable(){
       '<button class="mjt-key" data-mt="key" data-v="±">±</button>'+
       '<button class="mjt-key" data-mt="key" data-v="0">0</button>'+
       '<button class="mjt-key" data-mt="key" data-v="⌫">⌫</button>'+
-      (isScore?'<button class="mjt-key" data-mt="key" data-v="抜" style="color:var(--muted)">抜番</button>':'')+
-      (showTobi?'<button class="mjt-key" data-mt="key" data-v="飛" style="color:var(--amber);border-color:var(--amber)">飛び</button>':'')+
-      '<button class="mjt-key done" data-mt="keydone" style="grid-column:span '+(isScore?(showTobi?1:2):3)+'">完了</button></div></div>';
+      (isScore
+        ? '<button class="mjt-key" data-mt="key" data-v="抜" style="color:var(--muted)">抜番</button>'+
+          (showTobi?'<button class="mjt-key" data-mt="key" data-v="飛" style="color:var(--amber);border-color:var(--amber)">飛び</button>':'<div></div>')+
+          '<button class="mjt-key done" data-mt="keydone">完了</button>'+
+          '<button class="mjt-key" data-mt="key" data-v="◀" style="color:var(--teal);font-size:20px">◀</button>'+
+          '<div style="display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)">半荘内で移動</div>'+
+          '<button class="mjt-key" data-mt="key" data-v="▶" style="color:var(--teal);font-size:20px">▶</button>'
+        : '<button class="mjt-key done" data-mt="keydone" style="grid-column:span 3">完了</button>')+
+      '</div></div>';
   }
   h += '<div style="height:40px"></div>';
   return h;
@@ -1037,6 +1044,7 @@ function padInput(k){
   const t=UI.mjt, c=UI.mjtCell; if(!c) return;
   const get=()=>{ if(c.k==="s") return String(t.rows[c.r][c.c]||""); if(c.k==="cs") return String((t.chipStart[c.c]||"")); if(c.k==="ce") return String((t.chipEnd[c.c]||"")); if(c.k==="uma") return String(t[c.key]||""); return ""; };
   const set=(v)=>{ if(c.k==="s") t.rows[c.r][c.c]=v; else if(c.k==="cs") t.chipStart[c.c]=v; else if(c.k==="ce") t.chipEnd[c.c]=v; else if(c.k==="uma") t[c.key]=v; };
+  if(k==="◀"||k==="▶"){ if(c.k==="s"){ const np=t.players.length; let nc=c.c+(k==="▶"?1:-1); nc=(nc+np)%np; UI.mjtCell={k:"s",r:c.r,c:nc}; render(); } return; }
   if(k==="抜"){ if(c.k==="s"){ set(t.rows[c.r][c.c]==="x"?"":"x"); saveMjt(false); render(); } return; }
   if(k==="飛"){ if(c.k==="s"){ set(String(mjtTobiScore(t))); saveMjt(false); render(); } return; }
   let cur=get(); if(cur==="x") cur="";
