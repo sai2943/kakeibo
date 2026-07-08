@@ -87,7 +87,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v21 (localStorage保存・完全オフライン)
+   収支台帳 v22 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -114,25 +114,52 @@ function fixedDateFor(tpl, y, m){
   const d = Math.min(num(tpl.day)||1, daysInMonth(y,m));
   return y + "-" + String(m).padStart(2,"0") + "-" + String(d).padStart(2,"0");
 }
-function genFixedEntries(tpl){
+const fmtDate = dt => dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0");
+/* 頻度に応じた発生日リストを返す(今月〜当年12月) */
+function fixedOccurrences(tpl){
   const now = new Date();
   const y = now.getFullYear();
-  const startM = now.getMonth()+1;
-  for(let m=startM; m<=12; m++){
-    const mk = y + "-" + String(m).padStart(2,"0");
-    const exists = S.entries.some(e=>String(e.fixedId)===String(tpl.id) && e.date.startsWith(mk));
+  const yEnd = new Date(y, 11, 31);
+  const floor = new Date(y, now.getMonth(), 1);   // 今月1日(過去への遡り防止)
+  const freq = tpl.freq || "monthly";
+  const out = [];
+  if(freq==="weekly" || freq==="biweekly"){
+    const step = (freq==="weekly"?7:14) * 86400000;
+    let d = tpl.start ? new Date(tpl.start+"T00:00:00") : new Date(y, now.getMonth(), now.getDate());
+    while(d < floor) d = new Date(d.getTime()+step);   // 起点を今月まで進める
+    while(d <= yEnd){ out.push(new Date(d)); d = new Date(d.getTime()+step); }
+  } else {
+    const day = num(tpl.day)||1;
+    const stepM = (freq==="bimonthly"?2:1);
+    for(let m=now.getMonth(); m<=11; m+=stepM){
+      out.push(new Date(y, m, Math.min(day, daysInMonth(y, m+1))));
+    }
+  }
+  return out;
+}
+function genFixedEntries(tpl){
+  fixedOccurrences(tpl).forEach(dt=>{
+    const date = fmtDate(dt);
+    const exists = S.entries.some(e=>String(e.fixedId)===String(tpl.id) && e.date===date);
     if(!exists){
       S.entries.push({
-        id: uid()+"-f"+m, date: fixedDateFor(tpl,y,m),
+        id: uid()+"-f"+date, date,
         type: tpl.type, category: tpl.category,
         amount: num(tpl.amount), memo: tpl.name,
         src: "fixed", fixedId: tpl.id
       });
     }
-  }
+  });
 }
 function ensureFixedEntries(){
   (S.fixed||[]).forEach(genFixedEntries);
+}
+function fixedSchedLabel(t){
+  const freq = t.freq || "monthly";
+  if(freq==="weekly")   return "毎週("+(t.start||"").slice(5).replace("-","/")+"〜)";
+  if(freq==="biweekly") return "2週ごと("+(t.start||"").slice(5).replace("-","/")+"〜)";
+  if(freq==="bimonthly")return "2ヶ月ごと "+num(t.day)+"日";
+  return "毎月"+num(t.day)+"日";
 }
 function stopFixed(id){
   const today = todayStr();
@@ -392,7 +419,7 @@ function viewLedger(){
   let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
     '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月収支'+(hasFuture?'(予定込)':'')+'</div>'+
     '<div class="mono '+clsPM(bal)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(bal)+'</div>'+
-    (hasFuture?'<div class="muted" style="font-size:11px;margin-top:2px">実績 <span class="mono '+clsPM(actualBal)+'">'+signYen(actualBal)+'</span></div>':'')+'</div>'+
+    (hasFuture?'<div class="muted" style="font-size:11px;margin-top:3px">実績 <span class="mono '+clsPM(actualBal)+'">'+signYen(actualBal)+'</span>　予定 <span class="mono '+clsPM(bal-actualBal)+'">'+signYen(bal-actualBal)+'</span></div>':'')+'</div>'+
     '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
     '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">収入</div><div class="mono teal" style="font-size:16px">'+yen(normIncome)+'</div></div>'+
     '<div style="width:1px;background:var(--line)"></div>'+
@@ -625,7 +652,7 @@ function viewFixed(){
         '<div style="min-width:0;flex:1"><div style="font-size:14px;font-weight:700" class="ellip">'+esc(t.name)+'</div>'+
         '<div class="row" style="gap:6px;margin-top:4px;align-items:center">'+
         '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+esc(t.category)+'</span>'+
-        '<span class="muted" style="font-size:11px">毎月'+num(t.day)+'日</span></div></div>'+
+        '<span class="muted" style="font-size:11px">'+fixedSchedLabel(t)+'</span></div></div>'+
         '<div style="text-align:right"><div class="mono '+(t.type==="income"?"teal":"red")+'" style="font-size:16px;font-weight:700">'+
         (t.type==="income"?"+":"−")+yen(num(t.amount))+'</div>'+
         '<div class="row" style="gap:6px;margin-top:5px;justify-content:flex-end">'+
@@ -652,10 +679,20 @@ function viewFixed(){
       h += '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">'+
         INCOME_CATS.map(c=>'<button class="chip '+(f.category===c?"sel":"")+'" data-fa="fcat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>';
     }
+    /* 頻度 */
+    const freq = f.freq || "monthly";
+    h += '<div class="muted" style="font-size:11px;margin:0 2px 6px">頻度</div>'+
+      '<div class="row" style="gap:6px;margin-bottom:10px">'+
+      [["monthly","毎月"],["bimonthly","2ヶ月"],["weekly","毎週"],["biweekly","2週"]].map(([v,l])=>
+        '<button class="btn '+(freq===v?"sel":"")+'" style="flex:1;padding:9px 2px;font-size:12px" data-fa="ffreq" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
+    const isWeekly = (freq==="weekly"||freq==="biweekly");
     h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
-      '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">毎月の発生日</div>'+
-      '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-day" placeholder="1-31" value="'+esc(f.day)+'"></div>'+
-      '<div style="flex:1.4"><div class="muted" style="font-size:9px;margin-bottom:2px">金額</div>'+
+      (isWeekly
+        ? '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">起点日('+(freq==="weekly"?"毎週":"2週ごと")+')</div>'+
+          '<input class="input sm mono" type="date" id="fx-start" value="'+esc(f.start||todayStr())+'"></div>'
+        : '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">'+(freq==="bimonthly"?"発生日(2ヶ月ごと)":"毎月の発生日")+'</div>'+
+          '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-day" placeholder="1-31" value="'+esc(f.day)+'"></div>')+
+      '<div style="flex:1.2"><div class="muted" style="font-size:9px;margin-bottom:2px">金額</div>'+
       '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-amount" placeholder="円" value="'+esc(f.amount)+'"></div></div>'+
       '<div class="row" style="gap:8px">'+
       '<button class="btn" style="flex:1;color:var(--text)" data-fa="fcancel">やめる</button>'+
@@ -663,7 +700,7 @@ function viewFixed(){
       (f.editId
         ? '<div class="muted" style="font-size:10px;margin-top:8px;line-height:1.6">保存すると未来の予定分に反映されます(過去の実績は変わりません)。</div>'+
           '<button class="btn" style="width:100%;margin-top:10px;color:var(--red);border-color:var(--red);font-size:12px" data-fa="fdelete" data-v="'+f.editId+'">この固定費を完全に削除(過去含む)</button>'
-        : '<div class="muted" style="font-size:10px;margin-top:8px">登録すると今月から12月まで毎月計上されます。</div>')+
+        : '<div class="muted" style="font-size:10px;margin-top:8px">登録すると今月から当年12月まで、選んだ頻度で自動計上されます。</div>')+
       '</div>';
   }
   return h;
@@ -673,19 +710,21 @@ function bindFixed(){
   if(f){
     const n=document.getElementById("fx-name"); if(n) n.oninput=e=>f.name=e.target.value;
     const d=document.getElementById("fx-day"); if(d) d.oninput=e=>f.day=e.target.value;
+    const st=document.getElementById("fx-start"); if(st) st.onchange=e=>f.start=e.target.value;
     const a=document.getElementById("fx-amount"); if(a) a.oninput=e=>f.amount=e.target.value;
   }
   document.querySelectorAll("[data-fa]").forEach(el=>{
     el.onclick=()=>{
       const a=el.dataset.fa, v=el.dataset.v;
       if(a==="fback"){ UI.screen="main"; UI.tab="ledger"; UI.fixForm=null; render(); }
-      else if(a==="new"){ UI.fixForm={type:"expense",name:"",category:"消費",day:"",amount:""}; render(); }
+      else if(a==="new"){ UI.fixForm={type:"expense",name:"",category:"消費",freq:"monthly",day:"",start:todayStr(),amount:""}; render(); }
       else if(a==="fcancel"){ UI.fixForm=null; render(); }
       else if(a==="ftype"){ f.type=v; f.category=v==="expense"?"消費":"給与"; render(); }
       else if(a==="fcat"){ f.category=v; render(); }
+      else if(a==="ffreq"){ f.freq=v; if((v==="weekly"||v==="biweekly")&&!f.start) f.start=todayStr(); render(); }
       else if(a==="edit"){
         const t=(S.fixed||[]).find(x=>String(x.id)===String(v));
-        if(t){ UI.fixForm={editId:t.id, type:t.type, name:t.name, category:t.category, day:String(t.day), amount:String(t.amount)}; render(); }
+        if(t){ UI.fixForm={editId:t.id, type:t.type, name:t.name, category:t.category, freq:t.freq||"monthly", day:t.day?String(t.day):"", start:t.start||todayStr(), amount:String(t.amount)}; render(); }
       }
       else if(a==="stop"){
         const t=(S.fixed||[]).find(x=>String(x.id)===String(v));
@@ -702,11 +741,16 @@ function bindFixed(){
       else if(a==="fsave"){
         if(!f.name.trim()){ alert("項目名を入力してください。"); return; }
         if(num(f.amount)<=0){ alert("金額を入力してください。"); return; }
+        const freq = f.freq || "monthly";
+        const isW = (freq==="weekly"||freq==="biweekly");
+        if(isW && !f.start){ alert("起点日を選んでください。"); return; }
         let day = num(f.day); if(day<1) day=1; if(day>31) day=31;
+        const base={name:f.name.trim(), type:f.type, category:f.category, freq,
+          day:isW?"":String(day), start:isW?f.start:"", amount:String(num(f.amount))};
         if(f.editId){
-          updateFixed({id:f.editId, name:f.name.trim(), type:f.type, category:f.category, day:String(day), amount:String(num(f.amount))});
+          updateFixed(Object.assign({id:f.editId}, base));
         }else{
-          const tpl={id:uid(), name:f.name.trim(), type:f.type, category:f.category, day:String(day), amount:String(num(f.amount))};
+          const tpl=Object.assign({id:uid()}, base);
           (S.fixed=S.fixed||[]).push(tpl);
           genFixedEntries(tpl);
           save();
