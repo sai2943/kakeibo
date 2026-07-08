@@ -73,6 +73,7 @@
   .mjt-cell.abs{background:rgba(143,170,167,.10);}
   .mjt-auto{color:var(--amber);font-style:italic;}
   .mjt-add{color:var(--teal);cursor:pointer;font-weight:700;}
+  .mjt-pdel{font-size:9px;color:var(--red);cursor:pointer;margin-top:2px;font-weight:400;}
   .fab{position:fixed; right:20px; bottom:76px; width:54px; height:54px; border-radius:27px;
     background:var(--amber); color:#1a1508; font-size:28px; border:none; cursor:pointer;
     box-shadow:0 4px 16px rgba(0,0,0,.4); line-height:0; z-index:5;}
@@ -107,7 +108,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v25 (localStorage保存・完全オフライン)
+   収支台帳 v26 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -231,6 +232,8 @@ function applyData(d){
   S.mjTables = (Array.isArray(d.mjTables)?d.mjTables:[]).map(t=>{
     const n = Object.assign({}, t);
     if(!n.rule) n.rule = "3";
+    if(n.ruleName==null) n.ruleName = "";
+    if(n.meIdx===undefined) n.meIdx = null;
     const np = (n.players||["A","B","C"]).length;
     if(!Array.isArray(n.chipStart)) n.chipStart = new Array(np).fill("");
     if(!Array.isArray(n.chipEnd)){ n.chipEnd = (Array.isArray(n.chips)? n.chips.map(c=>c) : new Array(np).fill("")); }
@@ -766,9 +769,16 @@ function mjtCalc(t,pi){
   return { sum, chipNet, net: Math.round(sum*sr+chipNet*cr-fee) };
 }
 function newMjTable(){
-  return { id:uid(), date:todayStr(), rule:"3", players:["A","B","C"],
+  return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"],
     rows:[["","",""]], chipStart:["","",""], chipEnd:["","",""],
     scoreRate:"100", chipRate:"0", fees:["","",""] };
+}
+function mjtAvgRank(t, pi){
+  const rc = mjtRankCounts(t, pi);
+  const g = rc.reduce((a,b)=>a+b,0);
+  if(!g) return null;
+  let w=0; rc.forEach((n,i)=> w += (i+1)*n);
+  return w/g;
 }
 
 function viewMjTable(){
@@ -781,24 +791,35 @@ function viewMjTable(){
     '<button class="navbtn" data-mt="del" style="color:var(--red)">削除</button></div>';
 
   /* ルール */
-  h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
+  h += '<div class="row" style="gap:8px;margin-bottom:8px">'+
     [["3","3麻"],["4","4麻"]].map(([v,l])=>'<button class="btn '+(t.rule===v?"sel":"")+'" style="flex:1" data-mt="rule" data-v="'+v+'">'+l+'</button>').join("")+
     '<span class="muted" style="font-size:11px;align-self:center;white-space:nowrap">'+mjtSeats(t)+'人打ち</span></div>';
+  h += '<input class="input" placeholder="ルール名(例: 点3ウマ5・DUO虹)" value="'+esc(t.ruleName||"")+'" data-mt="rname" style="margin-bottom:10px">';
+
+  /* 自分の指定 */
+  h += '<div class="muted" style="font-size:11px;margin:0 2px 5px">「自分」を選ぶと成績を家計簿に反映できます</div>';
+  h += '<div style="overflow-x:auto;margin-bottom:10px"><div class="row" style="gap:6px">'+
+    P.map((p,i)=>'<button class="btn '+(t.meIdx===i?"sel":"")+'" style="white-space:nowrap;font-size:12px;padding:6px 12px" data-mt="setme" data-v="'+i+'">'+(t.meIdx===i?"★ ":"")+esc(p||("P"+(i+1)))+'</button>').join("")+'</div></div>';
 
   /* 集計(常時表示・sticky) */
-  h += '<div class="mjt-sticky"><div style="overflow-x:auto"><table class="mjt sum"><thead><tr><th style="width:38px">成績</th>'+
-    P.map((p,i)=>'<th '+colW+'>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>'+
-    '<tr><td class="mjt-no">着順</td>'+
-    P.map((p,ci)=>{ const rc=mjtRankCounts(t,ci); return '<td class="mjt-mini">'+rc.slice(0,mjtSeats(t)).map((n,k)=>(k+1)+':'+n).join(' ')+'</td>'; }).join("")+'</tr>'+
+  h += '<div class="mjt-sticky"><div style="overflow-x:auto"><table class="mjt sum"><thead><tr><th style="width:40px">成績</th>'+
+    P.map((p,i)=>'<th '+colW+'>'+(t.meIdx===i?'<span style="color:var(--amber)">★</span>':"")+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>'+
+    '<tr><td class="mjt-no">平均<br>着順</td>'+
+    P.map((p,ci)=>{ const av=mjtAvgRank(t,ci); return '<td class="mjt-cell amber" style="font-size:15px;font-weight:700">'+(av===null?"–":av.toFixed(2))+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no" style="font-size:9px">着順内訳</td>'+
+    P.map((p,ci)=>{ const rc=mjtRankCounts(t,ci); return '<td class="mjt-mini">'+rc.slice(0,mjtSeats(t)).map((n,k)=>'<div>'+(k+1)+'着 '+n+'</div>').join("")+'</td>'; }).join("")+'</tr>'+
     '<tr><td class="mjt-no">合計</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell '+(c.sum<0?"red":"")+'" style="font-size:13px">'+c.sum.toFixed(1)+'</td>'; }).join("")+'</tr>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell '+(c.sum<0?"red":"")+'" id="mjt-sum-'+ci+'" style="font-size:13px">'+c.sum.toFixed(1)+'</td>'; }).join("")+'</tr>'+
     '<tr><td class="mjt-no">収支</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" style="font-weight:700;font-size:13px;color:'+(c.net>=0?"var(--teal)":"var(--red)")+'">'+signYen(c.net)+'</td>'; }).join("")+'</tr>'+
-    '</tbody></table></div></div>';
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-net-'+ci+'" style="font-weight:700;font-size:13px;color:'+(c.net>=0?"var(--blue)":"var(--red)")+'">'+signYen(c.net)+'</td>'; }).join("")+'</tr>'+
+    '</tbody></table></div>'+
+    (t.meIdx!=null ? '<button class="btn primary full" style="margin-top:8px;padding:11px 0;font-weight:700" data-mt="tokakei">★ '+esc(t.players[t.meIdx]||"自分")+'の成績を家計簿に反映</button>' : '')+
+    '</div>';
 
   /* スコア表 */
   h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px"><table class="mjt"><thead><tr><th style="width:38px">半荘</th>'+
-    P.map((p,i)=>'<th '+colW+'><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前"></th>').join("")+
+    P.map((p,i)=>'<th '+colW+'><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前">'+
+      (P.length>mjtSeats(t)?'<div class="mjt-pdel" data-mt="pdel" data-v="'+i+'">×削除</div>':'')+'</th>').join("")+
     (P.length<6?'<th style="width:30px" class="mjt-add" data-mt="addp">＋</th>':'')+'</tr></thead><tbody>';
   (t.rows||[]).forEach((r,ri)=>{
     const autoIdx=mjtAutoIdx(t,ri);
@@ -832,7 +853,7 @@ function viewMjTable(){
       let inner,cls=""; if(er!==null){ inner=esc(String((t.chipEnd||[])[ci])); } else if(auto){ inner='<span class="mjt-auto">'+mjtChipEndDisp(t,ci)+'</span>'; } else inner='<span class="mjt-ph">·</span>';
       return '<td class="mjt-cell '+(sel?"sel ":"")+cls+'" data-mt="ce" data-c="'+ci+'">'+inner+'</td>'; }).join("")+'</tr>'+
     '<tr><td class="mjt-no">増減</td>'+
-    P.map((p,ci)=>{ const net=mjtChipNet(t,ci); return '<td class="mjt-cell '+(net<0?"red":(net>0?"":""))+'" style="color:'+(net<0?"var(--red)":net>0?"var(--teal)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</td>'; }).join("")+'</tr>'+
+    P.map((p,ci)=>{ const net=mjtChipNet(t,ci); return '<td class="mjt-cell" style="color:'+(net<0?"var(--red)":net>0?"var(--blue)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</td>'; }).join("")+'</tr>'+
     '</tbody></table></div>';
 
   /* 単価 */
@@ -867,17 +888,29 @@ function viewMjTable(){
 function bindMjTable(){
   const t = UI.mjt;
   document.querySelectorAll("[data-mt='pname']").forEach(el=>{ el.oninput=e=>{ t.players[num(el.dataset.v)]=e.target.value; saveMjt(false); }; });
-  document.querySelectorAll("[data-mt='rate']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; });
-  document.querySelectorAll("[data-mt='fee']").forEach(el=>{ el.oninput=e=>{ (t.fees=t.fees||[])[num(el.dataset.c)]=e.target.value; saveMjt(false); }; });
+  const rn=document.querySelector("[data-mt='rname']"); if(rn) rn.oninput=e=>{ t.ruleName=e.target.value; saveMjt(false); };
+  document.querySelectorAll("[data-mt='rate']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); updateMjtSummary(); }; });
+  document.querySelectorAll("[data-mt='fee']").forEach(el=>{ el.oninput=e=>{ (t.fees=t.fees||[])[num(el.dataset.c)]=e.target.value; saveMjt(false); updateMjtSummary(); }; });
 
   document.querySelectorAll("[data-mt]").forEach(el=>{
     const a=el.dataset.mt;
-    if(["pname","rate","fee"].includes(a)) return;
+    if(["pname","rate","fee","rname"].includes(a)) return;
     el.onclick=()=>{
       if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
       else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); } }
       else if(a==="rule"){ t.rule=el.dataset.v; UI.mjtCell=null; saveMjt(false); render(); }
+      else if(a==="setme"){ const i=num(el.dataset.v); t.meIdx = (t.meIdx===i?null:i); saveMjt(false); render(); }
       else if(a==="addp"){ if(t.players.length<6){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); UI.mjtCell=null; saveMjt(false); render(); } }
+      else if(a==="pdel"){
+        const i=num(el.dataset.v);
+        if(t.players.length<=mjtSeats(t)){ alert(mjtSeats(t)+"人より減らせません。"); return; }
+        if(confirm("「"+(t.players[i]||"")+"」を削除しますか?この列の記録も消えます。")){
+          t.players.splice(i,1); t.rows.forEach(r=>r.splice(i,1)); t.chipStart.splice(i,1); t.chipEnd.splice(i,1); (t.fees||[]).splice(i,1);
+          if(t.meIdx===i) t.meIdx=null; else if(t.meIdx>i) t.meIdx--;
+          UI.mjtCell=null; saveMjt(false); render();
+        }
+      }
+      else if(a==="tokakei"){ mjtToKakei(); }
       else if(a==="addrow"){ t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="rowdel"){ t.rows.splice(num(el.dataset.v),1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; render(); }
@@ -887,6 +920,40 @@ function bindMjTable(){
       else if(a==="keydone"){ UI.mjtCell=null; saveMjt(false); render(); }
     };
   });
+}
+function updateMjtSummary(){
+  const t=UI.mjt; if(!t) return;
+  t.players.forEach((p,ci)=>{
+    const c=mjtCalc(t,ci);
+    const se=document.getElementById("mjt-sum-"+ci); if(se) se.textContent=c.sum.toFixed(1);
+    const ne=document.getElementById("mjt-net-"+ci); if(ne){ ne.textContent=signYen(c.net); ne.style.color=(c.net>=0?"var(--blue)":"var(--red)"); }
+  });
+}
+/* スコア表の「自分」の成績を麻雀の収支記録(→家計簿)に反映 */
+function mjtToKakei(){
+  const t=UI.mjt; if(t.meIdx==null){ alert("先に「自分」を選んでください。"); return; }
+  const pi=t.meIdx;
+  const played=(t.rows||[]).some((r,ri)=>mjtScore(t,ri,pi)!==null);
+  if(!played){ alert("スコアが入力されていません。"); return; }
+  const c=mjtCalc(t,pi);
+  const rc=mjtRankCounts(t,pi);
+  const sess={ id:uid(), date:t.date, category:"set", rule:t.rule,
+    store:(t.ruleName||"").trim(),
+    score:String(c.sum), scoreRate:String(num(t.scoreRate)||0),
+    chips:String(c.chipNet), chipRate:String(num(t.chipRate)||0),
+    setFee:String(num((t.fees||[])[pi])||0),
+    ranks:[String(rc[0]),String(rc[1]),String(rc[2]),String(rc[3])].slice(0,mjtSeats(t)),
+    fromTable:t.id };
+  S.mjSessions.push(sess);
+  const fin=mjFinal(sess);
+  const linkId="mj-"+sess.id;
+  if(fin!==0){
+    S.entries.push({id:linkId, date:sess.date, src:"mahjong",
+      type: fin>0?"income":"expense", category:"遊技", amount:Math.abs(fin),
+      memo:"麻雀(セット・"+sess.rule+"麻)"+(sess.store?" @"+sess.store:"")});
+  }
+  save();
+  alert("家計簿に反映しました: "+signYen(fin)+"\n(麻雀タブ・家計簿に記録されました)");
 }
 function padInput(k){
   const t=UI.mjt, c=UI.mjtCell; if(!c) return;
