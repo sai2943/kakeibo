@@ -87,7 +87,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v19 (localStorage保存・完全オフライン)
+   収支台帳 v20 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -106,8 +106,43 @@ const todayStr = () => { const d=new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
 const uid = () => Date.now() + Math.floor(Math.random()*1000);
 
+/* ---------- 固定費(定期)テンプレート ----------
+   テンプレートが実エントリを生成する方式。日付が過去なら実績、未来なら予定。
+   当年12月まで生成。停止すると未来分だけ削除し過去は残す。 */
+const daysInMonth = (y,m) => new Date(y, m, 0).getDate();  // m:1-12
+function fixedDateFor(tpl, y, m){
+  const d = Math.min(num(tpl.day)||1, daysInMonth(y,m));
+  return y + "-" + String(m).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+}
+function genFixedEntries(tpl){
+  const now = new Date();
+  const y = now.getFullYear();
+  const startM = now.getMonth()+1;   // 今月から当年12月まで
+  for(let m=startM; m<=12; m++){
+    const mk = y + "-" + String(m).padStart(2,"0");
+    const exists = S.entries.some(e=>e.fixedId===tpl.id && e.date.startsWith(mk));
+    if(!exists){
+      S.entries.push({
+        id: uid()+"-f"+m, date: fixedDateFor(tpl,y,m),
+        type: tpl.type, category: tpl.category,
+        amount: num(tpl.amount), memo: tpl.name,
+        src: "fixed", fixedId: tpl.id
+      });
+    }
+  }
+}
+function ensureFixedEntries(){
+  (S.fixed||[]).forEach(genFixedEntries);
+}
+function stopFixed(id){
+  const today = todayStr();
+  S.entries = S.entries.filter(e=> !(e.fixedId===id && e.date > today));
+  S.fixed = (S.fixed||[]).filter(t=>t.id!==id);
+  save();
+}
+
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -131,6 +166,7 @@ function applyData(d){
   S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
   S.mdb = Array.isArray(d.mdb)?d.mdb:[];
   S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
+  S.fixed = Array.isArray(d.fixed)?d.fixed:[];
   S.updatedAt = d.updatedAt || 0;
 }
 function load(){
@@ -284,6 +320,7 @@ function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
   if(UI.screen==="mahjong-edit"){ app.innerHTML = viewMj(); bindMj(); return; }
+  if(UI.screen==="fixed"){ app.innerHTML = viewFixed(); bindFixed(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
   if(UI.screen==="backup"){ app.innerHTML = viewBackup(); bindBackup(); return; }
   if(UI.screen==="entry"){ app.innerHTML = viewEntry(); bindEntry(); return; }
@@ -302,6 +339,7 @@ const monthNav = () =>
 function viewMain(){
   let h = '<div class="row between" style="align-items:baseline">'+
     '<h1>収支台帳 <small>LEDGER</small></h1><div class="row" style="gap:6px">';
+  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="fixed">固定費</button>';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="csv">CSV出力</button>';
   if(UI.tab==="slot") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="mdb">機種データ</button>';
   h += '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>';
@@ -333,9 +371,14 @@ function viewLedger(){
   /* 内訳用: 収支カテゴリを除いた通常の収入・支出 */
   const normIncome = me.filter(e=>e.type==="income" && !isNetEntry(e)).reduce((s,e)=>s+e.amount,0);
   const normExpense = me.filter(e=>e.type==="expense" && !isNetEntry(e)).reduce((s,e)=>s+e.amount,0);
+  /* 実績/予定(案ア): 日付が今日以前=実績、未来=予定。大きい数字は予定込みの見込み */
+  const todayS = todayStr();
+  const hasFuture = me.some(e=>e.date>todayS);
+  const actualBal = me.filter(e=>e.date<=todayS).reduce((s,e)=> s + (e.type==="income"?e.amount:-e.amount), 0);
   let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
-    '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月収支</div>'+
-    '<div class="mono '+clsPM(bal)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(bal)+'</div></div>'+
+    '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月収支'+(hasFuture?'(予定込)':'')+'</div>'+
+    '<div class="mono '+clsPM(bal)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(bal)+'</div>'+
+    (hasFuture?'<div class="muted" style="font-size:11px;margin-top:2px">実績 <span class="mono '+clsPM(actualBal)+'">'+signYen(actualBal)+'</span></div>':'')+'</div>'+
     '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
     '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">収入</div><div class="mono teal" style="font-size:16px">'+yen(normIncome)+'</div></div>'+
     '<div style="width:1px;background:var(--line)"></div>'+
@@ -406,9 +449,12 @@ function viewLedger(){
       '<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
       list.map((e,i)=>{
         const signedAmt = e.type==="income" ? e.amount : -e.amount;
-        return '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="eedit" data-v="'+e.id+'">'+
+        const isFuture = e.date > todayS;
+        return '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+(isFuture?'opacity:.62;':'')+'" data-a="eedit" data-v="'+e.id+'">'+
         '<div style="flex:1;min-width:0"><div style="font-size:13px">'+esc(e.category)+
-        (e.src==="slot"||e.src==="mahjong"?' <span class="tag amber" style="border:1px solid var(--amber);font-size:9px">連携</span>':'')+'</div>'+
+        (e.src==="slot"||e.src==="mahjong"?' <span class="tag amber" style="border:1px solid var(--amber);font-size:9px">連携</span>':'')+
+        (e.src==="fixed"?' <span class="tag" style="border:1px solid var(--line);color:var(--muted);font-size:9px">定期</span>':'')+
+        (isFuture?' <span class="tag" style="border:1px solid var(--blue);color:var(--blue);font-size:9px">予定</span>':'')+'</div>'+
         (e.memo?'<div class="muted ellip" style="font-size:11px">'+esc(e.memo)+'</div>':'')+'</div>'+
         '<div class="mono '+clsPM(signedAmt)+'" style="font-size:14px">'+signYen(signedAmt)+'</div></div>';
       }).join("")+'</div></div>';
@@ -547,6 +593,93 @@ function mjStatRow(label, val, isYen, raw){
   const col = isYen ? clsPM(val) : (raw ? (val>=0?"blue":"red") : "");
   return '<div class="row between" style="font-size:12px;margin:3px 0"><span class="muted">'+label+'</span>'+
     '<span class="mono '+col+'">'+disp+'</span></div>';
+}
+
+function viewFixed(){
+  const f = UI.fixForm;
+  let h = '<div class="hdr"><button class="navbtn" data-fa="fback">‹ 戻る</button>'+
+    '<div style="font-size:14px;font-weight:700">固定費(定期)</div><div style="width:44px"></div></div>';
+  h += '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">'+
+    '毎月かかる固定費を登録すると、当年12月まで自動で計上されます。金額が変わるもの(光熱費など)は各月の記録を後で修正できます。停止すると未来の分だけ消え、過去の記録は残ります。</div>';
+
+  const list = S.fixed||[];
+  if(list.length){
+    h += band("登録済み");
+    list.forEach(t=>{
+      const catC = t.type==="income" ? "var(--teal)" : (t.category==="娯楽"?"var(--amber)":t.category==="自己投資"?"var(--blue)":"var(--teal)");
+      h += '<div class="card" style="margin-bottom:8px"><div class="row between" style="align-items:center">'+
+        '<div style="min-width:0;flex:1"><div style="font-size:14px;font-weight:700" class="ellip">'+esc(t.name)+'</div>'+
+        '<div class="row" style="gap:6px;margin-top:4px;align-items:center">'+
+        '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+esc(t.category)+'</span>'+
+        '<span class="muted" style="font-size:11px">毎月'+num(t.day)+'日</span></div></div>'+
+        '<div style="text-align:right"><div class="mono '+(t.type==="income"?"teal":"red")+'" style="font-size:16px;font-weight:700">'+
+        (t.type==="income"?"+":"−")+yen(num(t.amount))+'</div>'+
+        '<button class="btn" style="font-size:10px;padding:3px 10px;margin-top:4px;color:var(--red);border-color:var(--red)" data-fa="stop" data-v="'+t.id+'">停止</button></div></div></div>';
+    });
+  }
+
+  h += band(f?"新しい固定費":"追加");
+  if(!f){
+    h += '<button class="btn dash full" style="padding:14px 0" data-fa="new">＋ 固定費を追加</button>';
+  } else {
+    h += '<div class="card">'+
+      '<div class="row" style="gap:8px;margin-bottom:10px">'+
+      [["expense","支出"],["income","収入"]].map(([v,l])=>
+        '<button class="btn '+(f.type===v?"sel":"")+'" style="flex:1" data-fa="ftype" data-v="'+v+'">'+l+'</button>').join("")+'</div>'+
+      '<input class="input" id="fx-name" placeholder="項目名(例: 家賃 / iHerb / 電気代)" value="'+esc(f.name)+'" style="margin-bottom:10px">';
+    if(f.type==="expense"){
+      h += '<div class="muted" style="font-size:11px;margin:0 2px 6px">分類</div>'+
+        '<div class="row" style="gap:8px;margin-bottom:10px">'+
+        EXPENSE_CATS.map(c=>'<button class="btn '+(f.category===c?"sel":"")+'" style="flex:1;padding:10px 2px;font-size:13px" data-fa="fcat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>';
+    } else {
+      h += '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:10px">'+
+        INCOME_CATS.map(c=>'<button class="chip '+(f.category===c?"sel":"")+'" data-fa="fcat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>';
+    }
+    h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
+      '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">毎月の発生日</div>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-day" placeholder="1-31" value="'+esc(f.day)+'"></div>'+
+      '<div style="flex:1.4"><div class="muted" style="font-size:9px;margin-bottom:2px">金額</div>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-amount" placeholder="円" value="'+esc(f.amount)+'"></div></div>'+
+      '<div class="row" style="gap:8px">'+
+      '<button class="btn" style="flex:1;color:var(--text)" data-fa="fcancel">やめる</button>'+
+      '<button class="btn primary" style="flex:1.4;font-weight:700" data-fa="fsave">登録する</button></div>'+
+      '<div class="muted" style="font-size:10px;margin-top:8px">登録すると今月から12月まで毎月計上されます。</div></div>';
+  }
+  return h;
+}
+function bindFixed(){
+  const f = UI.fixForm;
+  if(f){
+    const n=document.getElementById("fx-name"); if(n) n.oninput=e=>f.name=e.target.value;
+    const d=document.getElementById("fx-day"); if(d) d.oninput=e=>f.day=e.target.value;
+    const a=document.getElementById("fx-amount"); if(a) a.oninput=e=>f.amount=e.target.value;
+  }
+  document.querySelectorAll("[data-fa]").forEach(el=>{
+    el.onclick=()=>{
+      const a=el.dataset.fa, v=el.dataset.v;
+      if(a==="fback"){ UI.screen="main"; UI.tab="ledger"; UI.fixForm=null; render(); }
+      else if(a==="new"){ UI.fixForm={type:"expense",name:"",category:"消費",day:"",amount:""}; render(); }
+      else if(a==="fcancel"){ UI.fixForm=null; render(); }
+      else if(a==="ftype"){ f.type=v; f.category=v==="expense"?"消費":"給与"; render(); }
+      else if(a==="fcat"){ f.category=v; render(); }
+      else if(a==="stop"){
+        const t=(S.fixed||[]).find(x=>x.id===v);
+        if(t && confirm("「"+t.name+"」の定期を停止しますか?\n未来の予定分は削除され、過去の記録は残ります。")){
+          stopFixed(v); render();
+        }
+      }
+      else if(a==="fsave"){
+        if(!f.name.trim()){ alert("項目名を入力してください。"); return; }
+        if(num(f.amount)<=0){ alert("金額を入力してください。"); return; }
+        let day = num(f.day); if(day<1) day=1; if(day>31) day=31;
+        const tpl={id:uid(), name:f.name.trim(), type:f.type, category:f.category, day:String(day), amount:String(num(f.amount))};
+        (S.fixed=S.fixed||[]).push(tpl);
+        genFixedEntries(tpl);
+        save();
+        UI.fixForm=null; render();
+      }
+    };
+  });
 }
 
 function viewMj(){
@@ -728,6 +861,7 @@ function bindMain(){
       else if(a==="mprev") moveMonth(-1);
       else if(a==="mnext") moveMonth(1);
       else if(a==="csv") exportCsv();
+      else if(a==="fixed"){ UI.screen="fixed"; UI.fixForm=null; render(); }
       else if(a==="mdb"){ UI.screen="mdb"; UI.mdbForm=null; render(); }
       else if(a==="backup"){ UI.screen="backup"; UI.msg=""; render(); }
       else if(a==="add"){
@@ -1712,6 +1846,7 @@ function bindSyncBox(){
 
 /* ---------- 起動 ---------- */
 load();
+ensureFixedEntries();
 render();
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(()=>{ /* 未対応環境でも本体は動く */ });
