@@ -113,7 +113,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v29 (localStorage保存・完全オフライン)
+   収支台帳 v30 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -774,7 +774,11 @@ function mjtCalc(t,pi){
   (t.rows||[]).forEach((r,ri)=>{ const s=mjtScore(t,ri,pi); if(s!==null) sum+=s; });
   const chipNet=mjtChipNet(t,pi);
   const sr=num(t.scoreRate)||0, cr=num(t.chipRate)||0, fee=num((t.fees||[])[pi])||0;
-  return { sum, chipNet, net: Math.round(sum*sr+chipNet*cr-fee) };
+  const scoreYen=Math.round(sum*sr);
+  const chipYen=Math.round(chipNet*cr);
+  const shushi=scoreYen+chipYen;      // スコア金額+チップ金額(ゲーム代引く前)
+  const net=shushi-fee;               // 支払(最終)
+  return { sum, chipNet, scoreYen, chipYen, shushi, fee, net };
 }
 function newMjTable(){
   return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"],
@@ -836,15 +840,18 @@ function viewMjTable(){
     P.map((p,ci)=>{ const av=mjtAvgRank(t,ci); return '<td class="mjt-cell amber" style="font-size:15px;font-weight:700">'+(av===null?"–":av.toFixed(2))+'</td>'; }).join("")+'</tr>'+
     '<tr><td class="mjt-no" style="font-size:10px">着順内訳</td>'+
     P.map((p,ci)=>{ const rc=mjtRankCounts(t,ci); return '<td class="mjt-mini">'+rc.slice(0,mjtSeats(t)).map((n,k)=>'<div>'+(k+1)+'着 '+n+'</div>').join("")+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no">合計</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-sum-'+ci+'" style="font-size:13px;color:'+(c.sum<0?"var(--red)":c.sum>0?"var(--blue)":"inherit")+'">'+c.sum.toFixed(1)+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no" style="font-size:10px">ゲーム代</td>'+
-    P.map((p,ci)=>{ const f=num((t.fees||[])[ci])||0; return '<td class="mjt-cell muted" id="mjt-fee-'+ci+'" style="font-size:11px">'+(f?"−¥"+f.toLocaleString("ja-JP"):"–")+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no" style="font-size:10px">スコア</td>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-sc-'+ci+'"><div style="font-size:13px;font-weight:700;color:'+(c.sum<0?"var(--red)":c.sum>0?"var(--blue)":"inherit")+'">'+c.sum.toFixed(1)+'</div><div class="muted" style="font-size:10px">'+signYen(c.scoreYen)+'</div></td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no" style="font-size:10px">チップ</td>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-cp-'+ci+'"><div style="font-size:13px;font-weight:700;color:'+(c.chipNet<0?"var(--red)":c.chipNet>0?"var(--blue)":"inherit")+'">'+(c.chipNet>0?"+":"")+c.chipNet+'</div><div class="muted" style="font-size:10px">'+signYen(c.chipYen)+'</div></td>'; }).join("")+'</tr>'+
     '<tr><td class="mjt-no">収支</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-net-'+ci+'" style="font-weight:700;font-size:14px;color:'+(c.net>=0?"var(--blue)":"var(--red)")+'">'+signYen(c.net)+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no" style="font-size:10px;color:var(--amber)">支払</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-pay-'+ci+'" style="font-size:12px;font-weight:700;color:'+(c.net<0?"var(--amber)":"var(--muted)")+'">'+(c.net<0?"¥"+Math.abs(c.net).toLocaleString("ja-JP"):(c.net>0?"受取":"±0"))+'</td>'; }).join("")+'</tr>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-net-'+ci+'" style="font-size:13px;font-weight:700;color:'+(c.shushi>=0?"var(--blue)":"var(--red)")+'">'+signYen(c.shushi)+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no" style="font-size:10px">ゲーム代</td>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell muted" id="mjt-fee-'+ci+'" style="font-size:11px">'+(c.fee?"−¥"+c.fee.toLocaleString("ja-JP"):"–")+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no" style="color:var(--amber)">支払</td>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); const pay=c.net; return '<td class="mjt-cell" id="mjt-pay-'+ci+'" style="font-size:14px;font-weight:700;color:'+(pay<0?"var(--red)":pay>0?"var(--blue)":"var(--muted)")+'">'+(pay<0?"¥"+Math.abs(pay).toLocaleString("ja-JP"):(pay>0?"+¥"+pay.toLocaleString("ja-JP"):"±0"))+'</td>'; }).join("")+'</tr>'+
     '</tbody></table></div>'+
+    (function(){ const fs=P.reduce((a,p,ci)=>a+(num((t.fees||[])[ci])||0),0); return fs>0?'<div style="text-align:center;font-size:12px;margin-top:6px" class="muted">店に払うゲーム代 合計 <span class="mono" style="color:var(--amber);font-weight:700">¥'+fs.toLocaleString("ja-JP")+'</span></div>':''; })()+
     (t.meIdx!=null ? '<button class="btn primary full" style="margin-top:8px;padding:11px 0;font-weight:700" data-mt="tokakei">★ '+esc(t.players[t.meIdx]||"自分")+'の成績を家計簿に反映</button>' : '')+
     '</div>';
 
@@ -950,8 +957,9 @@ function bindMjTable(){
   document.querySelectorAll("[data-mt='rd']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; el.onchange=()=>{ render(); }; });
   document.querySelectorAll("[data-mt='umasign']").forEach(el=>{ el.onclick=()=>{ const k=el.dataset.v; let cur=String(t[k]||""); if(cur===""||cur==="0"){ t[k]="-0"; } else if(cur.startsWith("-")){ t[k]=cur.slice(1); } else { t[k]="-"+cur; } saveMjt(false); render(); }; });
   const ft=document.querySelector("[data-mt='ftotal']"); if(ft) ft.oninput=e=>{ t.feeTotal=e.target.value; saveMjt(false); };
-  document.querySelectorAll("[data-mt='rate']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); updateMjtSummary(); }; });
-  document.querySelectorAll("[data-mt='fee']").forEach(el=>{ el.oninput=e=>{ (t.fees=t.fees||[])[num(el.dataset.c)]=e.target.value; saveMjt(false); updateMjtSummary(); updateMjtFeeSum(); }; });
+  document.querySelectorAll("[data-mt='rate']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; el.onchange=()=>render(); });
+  document.querySelectorAll("[data-mt='fee']").forEach(el=>{ el.oninput=e=>{ (t.fees=t.fees||[])[num(el.dataset.c)]=e.target.value; saveMjt(false); }; el.onchange=()=>render(); });
+  const ftt=document.querySelector("[data-mt='ftotal']"); if(ftt) ftt.onchange=()=>render();
 
   document.querySelectorAll("[data-mt]").forEach(el=>{
     const a=el.dataset.mt;
