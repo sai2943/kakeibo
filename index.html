@@ -87,7 +87,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v22 (localStorage保存・完全オフライン)
+   収支台帳 v23 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -380,11 +380,10 @@ const monthNav = () =>
 function viewMain(){
   let h = '<div class="row between" style="align-items:baseline">'+
     '<h1>収支台帳 <small>LEDGER</small></h1><div class="row" style="gap:6px">';
-  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="fixed">固定費</button>';
-  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="csv">CSV出力</button>';
+  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="fixed">固定費</button>';
   if(UI.tab==="slot") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="mdb">機種データ</button>';
   h += '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>';
-  h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="backup">backup</button></div></div>';
+  h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="backup">backup</button></div></div>';
 
   h += monthNav();
   if(UI.tab==="ledger") h += viewLedger();
@@ -1693,6 +1692,7 @@ function viewBackup(){
     '<div class="row" style="gap:8px;margin-bottom:8px">'+
     '<button class="btn primary" style="flex:1;padding:11px 0" data-a="bexport">ファイルに書き出す</button>'+
     '<button class="btn" style="flex:1;padding:11px 0;color:var(--text)" data-a="bcopy">コピー</button></div>'+
+    '<button class="btn" style="width:100%;padding:10px 0;color:var(--text);font-size:12px" data-a="csv">CSV形式で書き出す(表計算ソフト用)</button>'+
     band("インポート(復元)")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
     'バックアップJSONの中身を下に貼り付けて取り込みます。<span class="red">現在のデータは貼り付けた内容で完全に置き換わります。</span></div>'+
@@ -1708,6 +1708,7 @@ function bindBackup(){
     el.onclick = ()=>{
       const a=el.dataset.a;
       if(a==="back"){ UI.screen="main"; render(); }
+      else if(a==="csv"){ exportCsv(); }
       else if(a==="bexport"){
         dl(JSON.stringify(Object.assign({exportedAt:new Date().toISOString()},S), null, 1),
           "kakeibo_backup_"+todayStr()+".json", "application/json");
