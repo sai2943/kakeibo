@@ -1,7 +1,7 @@
-/* 収支台帳 service worker v20
+/* 収支台帳 service worker v21
    方針: ページ本体はネットワーク優先(更新が即反映)、失敗時キャッシュ(オフライン動作)。
    アイコン等の静的物はキャッシュ優先。 */
-const CACHE = "kakeibo-v20";
+const CACHE = "kakeibo-v21";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
