@@ -144,7 +144,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.56 (localStorage保存・完全オフライン)
+   収支台帳 1.57 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -429,7 +429,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.56";
+const APP_VERSION = "1.57";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -901,7 +901,7 @@ function viewMjTable(){
 
   /* 日付(最上部・縦ラベル) */
   h += '<div style="margin-bottom:10px"><div class="muted" style="font-size:9px;margin-bottom:3px">日付</div>'+
-    '<input class="input mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="width:100%"></div>';
+    '<input class="input mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="width:auto;min-width:160px;text-align:left"></div>';
 
   /* ルール名 */
   h += '<div style="margin-bottom:10px"><div class="muted" style="font-size:9px;margin-bottom:3px">ルール名</div>'+
