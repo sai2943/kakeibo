@@ -122,7 +122,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.48 (localStorage保存・完全オフライン)
+   収支台帳 1.49 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -407,7 +407,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.48";
+const APP_VERSION = "1.49";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1956,7 +1956,7 @@ function viewBorderTool(){
     '<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">'+
       '<div class="row between" style="align-items:center;margin-bottom:6px">'+
         '<div class="row" style="gap:8px;align-items:center"><span class="muted" style="font-size:9px">開始</span>'+
-          '<span class="mono" style="font-size:13px;font-weight:700">'+(m.startedAt?_hm(m.startedAt):"—")+'</span>'+
+          '<span class="mono" style="font-size:13px;font-weight:700" id="bt-started">'+(m.startedAt?_hm(m.startedAt):"—")+'</span>'+
           '<input class="input sm mono r" type="time" value="'+(m.startedAt?_hm(m.startedAt):"")+'" style="width:104px;padding:4px 6px" data-bstart></div>'+
         '<button class="chip" data-a="startnow" style="font-size:10px">今にリセット</button></div>'+
       '<div class="row" style="gap:8px;align-items:center"><span class="muted" style="font-size:9px;width:28px">休憩</span>'+
@@ -1972,25 +1972,42 @@ function viewBorderTool(){
   (m.segments||[]).forEach((g,gi)=>{
     h += '<div class="card2" style="margin-bottom:6px"><div class="row between" style="margin-bottom:6px">'+
       '<span class="muted" style="font-size:10px;font-weight:700">区間'+(gi+1)+'</span>'+
-      '<div class="row" style="gap:8px"><span class="mono muted" style="font-size:10px">'+segStat(g,rates)+'</span>'+
+      '<div class="row" style="gap:8px"><span class="mono muted" style="font-size:10px" id="segs-'+g.id+'">'+segStat(g,rates)+'</span>'+
       '<button class="xbtn" style="font-size:14px" data-a="btgdel" data-v="'+g.id+'">×</button></div></div>'+
       '<div class="grid2">'+segFields.map(([k,label])=>
         '<div><div class="muted" style="font-size:9px;margin-bottom:2px">'+label+'</div>'+
         '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(g[k]||"")+'" data-bseg="'+g.id+'|'+k+'"></div>').join("")+'</div>'+
-      '<div class="mono muted" style="font-size:10px;margin-top:5px">'+segFormula(g,rates)+'</div></div>';
+      '<div class="mono muted" style="font-size:10px;margin-top:5px" id="segf-'+g.id+'">'+segFormula(g,rates)+'</div></div>';
   });
   h += '<button class="btn dash full" style="margin-bottom:6px" data-a="btgadd">＋ 区間を追加(着席時/当たり後の再開時/現金追加時)</button>';
-  h += borderPanel(m, rates);
+  h += '<div id="bt-panel">'+borderPanel(m, rates)+'</div>';
   h += '</div><div style="height:30px"></div>';
   return h;
 }
+function updateBtPanel(){
+  const m = S.borderTool;
+  const rates = { pushPayout: m.pushPayout, pushDraw: m.pushDraw, genkin: m.genkin };
+  const el = document.getElementById("bt-panel");
+  if(el){
+    el.innerHTML = borderPanel(m, rates);
+    /* パネル内の手入力欄(未登録機種のみ)はinnerHTML差し替えでハンドラが外れるので張り直す */
+    el.querySelectorAll("[data-in='mborder']").forEach(x=>{ x.oninput=()=>{ m.border=x.value; saveLocal(); }; x.onchange=()=>{ save(); render(); }; });
+    el.querySelectorAll("[data-in='mty']").forEach(x=>{ x.oninput=()=>{ m.ty=x.value; saveLocal(); }; x.onchange=()=>{ save(); render(); }; });
+  }
+  (m.segments||[]).forEach(g=>{
+    const sf=document.getElementById("segf-"+g.id); if(sf) sf.textContent = segFormula(g, rates);
+    const ss=document.getElementById("segs-"+g.id); if(ss) ss.textContent = segStat(g, rates);
+  });
+  const st=document.getElementById("bt-started");
+  if(st) st.textContent = m.startedAt ? (String(new Date(m.startedAt).getHours()).padStart(2,"0")+":"+String(new Date(m.startedAt).getMinutes()).padStart(2,"0")) : "—";
+}
 function bindBorderTool(){
   const m = S.borderTool;
-  document.querySelectorAll("[data-bi]").forEach(el=>{ el.oninput=e=>{ m[el.dataset.bi]=e.target.value; saveLocal(); if(el.dataset.bi==="name") render(); }; el.onchange=()=>{ save(); render(); }; });
-  document.querySelectorAll("[data-bseg]").forEach(el=>{ el.oninput=e=>{ const [gid,k]=el.dataset.bseg.split("|"); const g=(m.segments||[]).find(x=>String(x.id)===String(gid)); if(g){ g[k]=e.target.value; if(!m.startedAt && e.target.value!=="") m.startedAt=Date.now(); saveLocal(); render(); } }; });
+  document.querySelectorAll("[data-bi]").forEach(el=>{ el.oninput=e=>{ m[el.dataset.bi]=e.target.value; saveLocal(); if(el.dataset.bi==="name") render(); }; el.onchange=()=>{ if(el.dataset.bi==="name"){ save(); render(); } else { save(); updateBtPanel(); } }; });
+  document.querySelectorAll("[data-bseg]").forEach(el=>{ el.oninput=e=>{ const [gid,k]=el.dataset.bseg.split("|"); const g=(m.segments||[]).find(x=>String(x.id)===String(gid)); if(g){ g[k]=e.target.value; if(!m.startedAt && e.target.value!=="") m.startedAt=Date.now(); saveLocal(); updateBtPanel(); } }; el.onchange=()=>{ save(); }; });
   document.querySelectorAll("[data-bstart]").forEach(el=>{ el.onchange=e=>{ const v=e.target.value; if(v){ const p=v.split(":"); const d=new Date(); d.setHours(Number(p[0])||0, Number(p[1])||0, 0, 0); m.startedAt=d.getTime(); save(); render(); } }; });
-  document.querySelectorAll("[data-in='mborder']").forEach(el=>{ el.oninput=e=>{ m.border=e.target.value; saveLocal(); render(); }; });
-  document.querySelectorAll("[data-in='mty']").forEach(el=>{ el.oninput=e=>{ m.ty=e.target.value; saveLocal(); render(); }; });
+  document.querySelectorAll("[data-in='mborder']").forEach(el=>{ el.oninput=e=>{ m.border=e.target.value; saveLocal(); }; el.onchange=()=>{ save(); render(); }; });
+  document.querySelectorAll("[data-in='mty']").forEach(el=>{ el.oninput=e=>{ m.ty=e.target.value; saveLocal(); }; el.onchange=()=>{ save(); render(); }; });
   document.querySelectorAll("[data-a]").forEach(el=>{
     const a=el.dataset.a, v=el.dataset.v;
     el.onclick=()=>{
