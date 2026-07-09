@@ -114,7 +114,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.42 (localStorage保存・完全オフライン)
+   収支台帳 1.43 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -210,7 +210,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:""}, updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -251,6 +251,7 @@ function applyData(d){
     return n;
   });
   S.mjPresets = Array.isArray(d.mjPresets)?d.mjPresets:[];
+  S.borderTool = Object.assign({id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:""}, d.borderTool||{});
   S.updatedAt = d.updatedAt || 0;
 }
 function load(){
@@ -400,7 +401,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.42";
+const APP_VERSION = "1.43";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -408,6 +409,7 @@ function render(){
   if(UI.screen==="fixed"){ app.innerHTML = viewFixed(); bindFixed(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
+  if(UI.screen==="bordertool"){ app.innerHTML = viewBorderTool(); bindBorderTool(); return; }
   if(UI.screen==="backup"){ app.innerHTML = viewBackup(); bindBackup(); return; }
   if(UI.screen==="entry"){ app.innerHTML = viewEntry(); bindEntry(); return; }
   app.innerHTML = viewMain(); bindMain();
@@ -721,8 +723,8 @@ function viewTool(){
   h += '<button class="btn dash full" style="padding:13px 0" data-a="mjtnew">＋ 新しいスコア表</button>';
   /* パチスロ */
   h += band("パチスロ");
-  h += '<div class="card" style="opacity:.6"><div style="font-size:13px">回転数記録</div>'+
-    '<div class="muted" style="font-size:11px;margin-top:2px">今はパチスロタブのセッション内にあります</div></div>';
+  h += '<div class="card" data-a="opentool" data-v="bordertool" style="cursor:pointer"><div class="row between" style="align-items:center"><div><div style="font-size:13px;font-weight:600">回転数・ボーダー試算</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:2px">この台を続けるか判断(収支の記録とは別)</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
   /* 投資 */
   h += band("投資");
   h += '<div class="card" style="opacity:.6"><div style="font-size:13px">準備中</div>'+
@@ -1437,6 +1439,7 @@ function bindMain(){
       else if(a==="csv") exportCsv();
       else if(a==="fixed"){ UI.screen="fixed"; UI.fixForm=null; render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
+      else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
       else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
       else if(a==="mdb"){ UI.screen="mdb"; UI.mdbForm=null; render(); }
       else if(a==="backup"){ UI.screen="backup"; UI.msg=""; render(); }
@@ -1780,26 +1783,7 @@ function viewMachine(m, s){
       hits.map(x=>'<button class="chip" data-a="msug" data-v="'+m.id+'|'+esc(x.name)+'">'+esc(x.name)+'</button>').join("")+'</div>':'')+'</div>';
 
   if(m.kind==="pachi"){
-    h += '<div style="margin-bottom:8px">';
-    (m.segments||[]).forEach((g,gi)=>{
-      const isPush = g.kind==="push";
-      const fields = isPush
-        ? [["rpStart","開始 残プッシュ"],["rpEnd","終了 残プッシュ"],["sb","開始 残玉(通常0)"],["eb","当たり時 残玉"],["ss","開始 回転数"],["es","当たり時 回転数"]]
-        : [["sb","開始 玉数"],["ss","開始 回転数"],["eb","終了 玉数(当たり時)"],["es","終了 回転数(当たり時)"]];
-      h += '<div class="card2" style="margin-bottom:6px"><div class="row between" style="margin-bottom:6px">'+
-        '<div class="row" style="gap:6px"><span class="muted" style="font-size:10px;font-weight:700">通常時 区間'+(gi+1)+'</span>'+
-        '<button class="chip" style="font-weight:700;border-color:'+(isPush?"var(--amber)":"var(--teal)")+';color:'+(isPush?"var(--amber)":"var(--teal)")+'" '+
-        'data-a="gkind" data-v="'+m.id+'|'+g.id+'">'+(isPush?"貯玉プッシュ":"持ち玉(玉数)")+'</button></div>'+
-        '<div class="row" style="gap:8px"><span class="mono muted" style="font-size:10px" id="gstat-'+g.id+'">'+segStat(g)+'</span>'+
-        '<button class="xbtn" style="font-size:14px" data-a="gdel" data-v="'+m.id+'|'+g.id+'">×</button></div></div>'+
-        '<div class="grid2">'+fields.map(([k,label])=>
-          '<div><div class="muted" style="font-size:9px;margin-bottom:2px">'+label+'</div>'+
-          '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(g[k]||"")+'"'+
-          (k==="sb"&&isPush?' placeholder="0"':'')+' data-in="gseg" data-v="'+m.id+'|'+g.id+'|'+k+'"></div>').join("")+'</div>'+
-        '<div class="mono muted" style="font-size:10px;margin-top:5px" id="gform-'+g.id+'">'+segFormula(g)+'</div></div>';
-    });
-    h += '<button class="btn dash full" style="margin-bottom:6px" data-a="gadd" data-v="'+m.id+'">＋ 通常時区間(着席時/当たり後の再開時/現金追加時)</button>';
-    h += '<div id="mpanel-'+m.id+'">'+borderPanel(m)+'</div></div>';
+    h += '<div class="muted" style="font-size:10px;margin-bottom:8px;padding:6px 8px;border:1px dashed var(--line);border-radius:8px">回転数・ボーダーの試算は「ツール」タブに移動しました(収支の記録とは別のため)。</div>';
   }
 
   /* 収支(貯玉方式・任意) */
@@ -1834,12 +1818,12 @@ function viewMachine(m, s){
   h += '<input class="input sm" placeholder="メモ(据え/挙動/やめ時など)" value="'+esc(m.memo)+'" data-in="mmemo" data-v="'+m.id+'" style="margin-top:8px"></div>';
   return h;
 }
-const segStat = g => segDone(g) ? segUsed(g)+"発 / "+segSpins(g)+"回転" : "";
-const segFormula = g => (g.kind==="push" && segDone(g))
-  ? "台入球 = "+segPushes(g)+"プッシュ×"+num((UI.draft&&UI.draft.pushPayout)||230)+(num(g.sb)?" + 残"+num(g.sb):"")+" − "+num(g.eb)+" = "+segUsed(g)+"発" : "";
+const segStat = (g, s) => segDone(g) ? segUsed(g,s)+"発 / "+segSpins(g)+"回転" : "";
+const segFormula = (g, s) => (g.kind==="push" && segDone(g))
+  ? "台入球 = "+segPushes(g)+"プッシュ×"+num((s&&s.pushPayout)||(UI.draft&&UI.draft.pushPayout)||230)+(num(g.sb)?" + 残"+num(g.sb):"")+" − "+num(g.eb)+" = "+segUsed(g,s)+"発" : "";
 
-function borderPanel(m){
-  const t = machineTotals(m);
+function borderPanel(m, s){
+  const t = machineTotals(m, s);
   if(t.rate250===null) return "";
   const master = findMaster(m);
   const denom = master ? fnum(master.denom) : 0;
@@ -1886,7 +1870,76 @@ function borderPanel(m){
       '<span class="muted" style="font-size:10px;font-weight:400"> ('+(t.costRate250>=ab?"+":"−")+Math.abs(t.costRate250-ab).toFixed(2)+'回)</span></span></div>';
   return h+'</div>';
 }
-</script>
+
+/* ---------- ボーダー試算ツール(独立・収支とは無関係) ---------- */
+function viewBorderTool(){
+  const m = S.borderTool;
+  const rates = { pushPayout: m.pushPayout, pushDraw: m.pushDraw };
+  const master = findMaster(m);
+  let h = '<div class="row between" style="align-items:center;margin-bottom:6px">'+
+    '<button class="navbtn" data-a="btback" style="font-size:14px">‹ 戻る</button>'+
+    '<h1 style="font-size:17px;margin:0">ボーダー試算</h1>'+
+    '<button class="chip" data-a="btreset" style="color:var(--red)">クリア</button></div>';
+  h += '<div class="muted" style="font-size:11px;margin-bottom:12px">この台を続けるか判断するための試算です(収支の記録とは別)。着席時・当たり後の再開時・現金追加時に区間を足していくと、回転率とボーダー乖離が出ます。</div>';
+
+  /* 貯玉プッシュ レート */
+  h += band("貯玉プッシュ(玉/回)");
+  h += '<div class="card" style="margin-bottom:12px"><div class="grid2">'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">払出(出玉計算用)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="230" value="'+esc(m.pushPayout||"")+'" data-bi="pushPayout"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">引落(コスト計算用)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="245" value="'+esc(m.pushDraw||"")+'" data-bi="pushDraw"></div></div>'+
+    '<div class="muted" style="font-size:10px;margin-top:5px">貯玉プッシュを使う時だけ入力。持ち玉(玉数)区間のみなら不要。</div></div>';
+
+  /* 機種名 */
+  h += band("機種");
+  h += '<div class="card" style="margin-bottom:12px"><div class="muted" style="font-size:9px;margin-bottom:2px">機種名</div>'+
+    '<input class="input sm" placeholder="機種名(登録済みなら理論ボーダー自動)" value="'+esc(m.name||"")+'" data-bi="name">'+
+    (master ? '<div class="mono teal" style="font-size:10px;margin-top:4px">✓ 登録あり: 1/'+fnum(master.denom)+(fnum(master.ty)>0?' / 理論TY '+fnum(master.ty)+'発':'')+'</div>'
+      : (m.name?'<div class="muted" style="font-size:10px;margin-top:4px">未登録 — 下でボーダーを手入力できます</div>':''))+'</div>';
+
+  /* 通常時区間 */
+  h += band("通常時 区間");
+  h += '<div style="margin-bottom:8px">';
+  (m.segments||[]).forEach((g,gi)=>{
+    const isPush = g.kind==="push";
+    const fields = isPush
+      ? [["rpStart","開始 残プッシュ"],["rpEnd","終了 残プッシュ"],["sb","開始 残玉(通常0)"],["eb","当たり時 残玉"],["ss","開始 回転数"],["es","当たり時 回転数"]]
+      : [["sb","開始 玉数"],["ss","開始 回転数"],["eb","終了 玉数(当たり時)"],["es","終了 回転数(当たり時)"]];
+    h += '<div class="card2" style="margin-bottom:6px"><div class="row between" style="margin-bottom:6px">'+
+      '<div class="row" style="gap:6px"><span class="muted" style="font-size:10px;font-weight:700">区間'+(gi+1)+'</span>'+
+      '<button class="chip" style="font-weight:700;border-color:'+(isPush?"var(--amber)":"var(--teal)")+';color:'+(isPush?"var(--amber)":"var(--teal)")+'" '+
+      'data-a="btgkind" data-v="'+g.id+'">'+(isPush?"貯玉プッシュ":"持ち玉(玉数)")+'</button></div>'+
+      '<div class="row" style="gap:8px"><span class="mono muted" style="font-size:10px">'+segStat(g,rates)+'</span>'+
+      '<button class="xbtn" style="font-size:14px" data-a="btgdel" data-v="'+g.id+'">×</button></div></div>'+
+      '<div class="grid2">'+fields.map(([k,label])=>
+        '<div><div class="muted" style="font-size:9px;margin-bottom:2px">'+label+'</div>'+
+        '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(g[k]||"")+'"'+
+        (k==="sb"&&isPush?' placeholder="0"':'')+' data-bseg="'+g.id+'|'+k+'"></div>').join("")+'</div>'+
+      '<div class="mono muted" style="font-size:10px;margin-top:5px">'+segFormula(g,rates)+'</div></div>';
+  });
+  h += '<button class="btn dash full" style="margin-bottom:6px" data-a="btgadd">＋ 区間を追加(着席時/当たり後の再開時/現金追加時)</button>';
+  h += borderPanel(m, rates);
+  h += '</div><div style="height:30px"></div>';
+  return h;
+}
+function bindBorderTool(){
+  const m = S.borderTool;
+  document.querySelectorAll("[data-bi]").forEach(el=>{ el.oninput=e=>{ m[el.dataset.bi]=e.target.value; saveLocal(); if(el.dataset.bi==="name") render(); }; el.onchange=()=>{ save(); render(); }; });
+  document.querySelectorAll("[data-bseg]").forEach(el=>{ el.oninput=e=>{ const [gid,k]=el.dataset.bseg.split("|"); const g=(m.segments||[]).find(x=>String(x.id)===String(gid)); if(g){ g[k]=e.target.value; saveLocal(); render(); } }; });
+  document.querySelectorAll("[data-in='mborder']").forEach(el=>{ el.oninput=e=>{ m.border=e.target.value; saveLocal(); render(); }; });
+  document.querySelectorAll("[data-in='mty']").forEach(el=>{ el.oninput=e=>{ m.ty=e.target.value; saveLocal(); render(); }; });
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    const a=el.dataset.a, v=el.dataset.v;
+    el.onclick=()=>{
+      if(a==="btback"){ UI.screen="main"; UI.tab="tool"; render(); }
+      else if(a==="btreset"){ if(confirm("試算をクリアしますか?(機種名・区間をすべて消します)")){ S.borderTool={id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:m.pushPayout,pushDraw:m.pushDraw}; save(); render(); } }
+      else if(a==="btgadd"){ (m.segments=m.segments||[]).push({id:uid(),kind:"ball",sb:"",ss:"",eb:"",es:"",rpStart:"",rpEnd:""}); save(); render(); }
+      else if(a==="btgkind"){ const g=(m.segments||[]).find(x=>String(x.id)===String(v)); if(g){ g.kind=g.kind==="push"?"ball":"push"; save(); render(); } }
+      else if(a==="btgdel"){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(v)); save(); render(); }
+    };
+  });
+}</script>
 <script>
 /* ---------- セッション画面のバインド ---------- */
 function bindSession(){
