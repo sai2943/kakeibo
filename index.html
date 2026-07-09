@@ -144,7 +144,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.57 (localStorage保存・完全オフライン)
+   収支台帳 1.58 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -429,7 +429,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.57";
+const APP_VERSION = "1.58";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -899,18 +899,12 @@ function viewMjTable(){
     '<div style="font-size:14px;font-weight:700">麻雀スコア表</div>'+
     '<button class="navbtn" data-mt="del" style="color:var(--red)">削除</button></div>';
 
-  /* 日付(最上部・縦ラベル) */
-  h += '<div style="margin-bottom:10px"><div class="muted" style="font-size:9px;margin-bottom:3px">日付</div>'+
-    '<input class="input mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="width:auto;min-width:160px;text-align:left"></div>';
-
-  /* ルール名 */
-  h += '<div style="margin-bottom:10px"><div class="muted" style="font-size:9px;margin-bottom:3px">ルール名</div>'+
-    '<input class="input" placeholder="例: 点3ウマ5・DUO虹" value="'+esc(t.ruleName||"")+'" data-mt="rname"></div>';
-
-  /* 人数 */
-  h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
-    [["3","3麻"],["4","4麻"]].map(([v,l])=>'<button class="btn '+(t.rule===v?"sel":"")+'" style="flex:1" data-mt="rule" data-v="'+v+'">'+l+'</button>').join("")+
-    '<span class="muted" style="font-size:11px;align-self:center;white-space:nowrap">'+mjtSeats(t)+'人打ち</span></div>';
+  /* 日付 + ルール名(横並び) */
+  h += '<div class="row" style="gap:10px;align-items:flex-end;margin-bottom:12px">'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:3px">日付</div>'+
+    '<input class="input mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="width:auto;min-width:150px;text-align:left"></div>'+
+    '<div style="flex:1;min-width:0"><div class="muted" style="font-size:9px;margin-bottom:3px">ルール名</div>'+
+    '<input class="input" placeholder="例: DUO虹" value="'+esc(t.ruleName||"")+'" data-mt="rname"></div></div>';
 
   /* 保存済みルール(横スクロール + 編集モード) */
   h += '<div style="margin-bottom:12px">';
@@ -930,7 +924,11 @@ function viewMjTable(){
   h += '<button class="btn" style="font-size:11px;padding:6px 12px;margin-top:8px" data-mt="savepreset">＋ 現在のルールを保存</button></div>';
 
   /* ルール詳細(飛びボタン用) */
-  h += '<div class="card" style="margin-bottom:10px"><div class="muted" style="font-size:10px;margin-bottom:6px">ルール設定(飛びボタン用)</div>'+
+  h += '<div class="card" style="margin-bottom:10px"><div class="muted" style="font-size:10px;margin-bottom:8px">ルール設定</div>'+
+    '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px">'+
+    [["3","3麻"],["4","4麻"]].map(([v,l])=>'<button class="btn '+(t.rule===v?"sel":"")+'" style="flex:1;font-size:12px;padding:7px 0" data-mt="rule" data-v="'+v+'">'+l+'</button>').join("")+
+    '<span class="muted" style="font-size:11px;white-space:nowrap">'+mjtSeats(t)+'人打ち</span></div>'+
+    '<div class="muted" style="font-size:9px;margin-bottom:6px;border-top:1px solid var(--line);padding-top:8px">以下は飛びボタン・計算用</div>'+
     '<div class="row" style="gap:8px;margin-bottom:8px">'+
     '<div style="flex:1"><div class="muted" style="font-size:9px">持ち点(配給原点)</div><input class="input sm mono r" type="number" inputmode="numeric" placeholder="例 25000" value="'+esc(t.mochi||"")+'" data-mt="rd" data-v="mochi"></div>'+
     '<div style="flex:1"><div class="muted" style="font-size:9px">返し点(基準点)</div><input class="input sm mono r" type="number" inputmode="numeric" placeholder="例 30000" value="'+esc(t.kaeshi||"")+'" data-mt="rd" data-v="kaeshi"></div></div>'+
@@ -1127,7 +1125,7 @@ function bindMjTable(){
       if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
       else if(a==="pdf"){ mjtPrint(); }
       else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); } }
-      else if(a==="rule"){ t.rule=el.dataset.v; const seats=num(t.rule)||3; while(t.players.length<seats){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); } UI.mjtCell=null; saveMjt(false); render(); }
+      else if(a==="rule"){ const nv=el.dataset.v; if(nv!==t.rule && confirm((nv==="3"?"3麻":"4麻")+"に変更しますか?\nウマ・着順計算が"+(nv==="3"?"3人":"4人")+"用に変わります(スコアのデータは消えません)。")){ t.rule=nv; const seats=num(t.rule)||3; while(t.players.length<seats){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); } UI.mjtCell=null; saveMjt(false); render(); } }
       else if(a==="setme"){ const i=num(el.dataset.v); t.meIdx = (t.meIdx===i?null:i); saveMjt(false); render(); }
       else if(a==="addp"){ if(t.players.length<6){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); UI.mjtCell=null; saveMjt(false); render(); } }
       else if(a==="pdel"){
