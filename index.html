@@ -144,7 +144,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.55 (localStorage保存・完全オフライン)
+   収支台帳 1.56 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -429,7 +429,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.55";
+const APP_VERSION = "1.56";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -899,24 +899,35 @@ function viewMjTable(){
     '<div style="font-size:14px;font-weight:700">麻雀スコア表</div>'+
     '<button class="navbtn" data-mt="del" style="color:var(--red)">削除</button></div>';
 
-  /* ルール */
-  h += '<div class="row" style="gap:8px;margin-bottom:8px">'+
+  /* 日付(最上部・縦ラベル) */
+  h += '<div style="margin-bottom:10px"><div class="muted" style="font-size:9px;margin-bottom:3px">日付</div>'+
+    '<input class="input mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="width:100%"></div>';
+
+  /* ルール名 */
+  h += '<div style="margin-bottom:10px"><div class="muted" style="font-size:9px;margin-bottom:3px">ルール名</div>'+
+    '<input class="input" placeholder="例: 点3ウマ5・DUO虹" value="'+esc(t.ruleName||"")+'" data-mt="rname"></div>';
+
+  /* 人数 */
+  h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
     [["3","3麻"],["4","4麻"]].map(([v,l])=>'<button class="btn '+(t.rule===v?"sel":"")+'" style="flex:1" data-mt="rule" data-v="'+v+'">'+l+'</button>').join("")+
     '<span class="muted" style="font-size:11px;align-self:center;white-space:nowrap">'+mjtSeats(t)+'人打ち</span></div>';
-  h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:8px"><span class="muted" style="font-size:11px;white-space:nowrap">日付</span>'+
-    '<input class="input sm mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="flex:1"></div>';
-  h += '<input class="input" placeholder="ルール名(例: 点3ウマ5・DUO虹)" value="'+esc(t.ruleName||"")+'" data-mt="rname" style="margin-bottom:8px">';
 
-  /* ルールプリセット */
-  h += '<div style="margin-bottom:10px">';
+  /* 保存済みルール(横スクロール + 編集モード) */
+  h += '<div style="margin-bottom:12px">';
   if((S.mjPresets||[]).length){
-    h += '<div class="muted" style="font-size:10px;margin-bottom:4px">保存済みルール(タップで適用)</div>'+
-      '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:6px">'+
-      S.mjPresets.map(p=>'<span style="display:inline-flex;align-items:center;gap:2px">'+
-        '<button class="chip" data-mt="applypreset" data-v="'+p.id+'">'+esc(p.name)+'</button>'+
-        '<button class="chip" style="padding:6px 8px;color:var(--red)" data-mt="delpreset" data-v="'+p.id+'">×</button></span>').join("")+'</div>';
+    const editing = UI.mjtEditPresets;
+    h += '<div class="row between" style="align-items:center;margin-bottom:5px">'+
+      '<span class="muted" style="font-size:10px">保存済みルール '+(editing?"(× で削除)":"(タップで適用)")+'</span>'+
+      '<button class="chip" style="font-size:10px;padding:4px 10px'+(editing?";border-color:var(--teal);color:var(--teal)":"")+'" data-mt="editpresets">'+(editing?"完了":"編集")+'</button></div>'+
+      '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div class="row" style="gap:6px;flex-wrap:nowrap;padding-bottom:2px">'+
+      S.mjPresets.map(p=>{
+        const sel=(t.ruleName||"").trim()===(p.name||"").trim();
+        return editing
+          ? '<button class="chip" style="white-space:nowrap;border-color:var(--red);color:var(--red)" data-mt="delpreset" data-v="'+p.id+'">'+esc(p.name)+' ×</button>'
+          : '<button class="chip'+(sel?" sel":"")+'" style="white-space:nowrap" data-mt="applypreset" data-v="'+p.id+'">'+esc(p.name)+'</button>';
+      }).join("")+'</div></div>';
   }
-  h += '<button class="btn" style="font-size:11px;padding:6px 12px" data-mt="savepreset">＋ 現在のルールを保存</button></div>';
+  h += '<button class="btn" style="font-size:11px;padding:6px 12px;margin-top:8px" data-mt="savepreset">＋ 現在のルールを保存</button></div>';
 
   /* ルール詳細(飛びボタン用) */
   h += '<div class="card" style="margin-bottom:10px"><div class="muted" style="font-size:10px;margin-bottom:6px">ルール設定(飛びボタン用)</div>'+
@@ -1110,6 +1121,7 @@ function bindMjTable(){
     el.onclick=()=>{
       if(a==="umasign"){ const f=el.dataset.v; const cur=String(t[f]||""); t[f]=cur.startsWith("-")?cur.slice(1):"-"+cur; saveMjt(false); render(); return; }
       if(a==="savepreset"){ mjtSavePreset(); return; }
+      if(a==="editpresets"){ UI.mjtEditPresets = !UI.mjtEditPresets; render(); return; }
       if(a==="applypreset"){ mjtApplyPreset(el.dataset.v); return; }
       if(a==="delpreset"){ mjtDelPreset(el.dataset.v); return; }
       if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
