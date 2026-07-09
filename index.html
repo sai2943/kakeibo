@@ -114,7 +114,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.40 (localStorage保存・完全オフライン)
+   収支台帳 1.41 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -400,7 +400,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.40";
+const APP_VERSION = "1.41";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -430,7 +430,7 @@ const monthNav = () =>
 /* ---------- メイン画面 ---------- */
 function viewMain(){
   let h = '<div class="row between" style="align-items:baseline">'+
-    '<h1>収支台帳 <small>LEDGER</small></h1><div class="row" style="gap:6px">';
+    '<h1>収支台帳</h1><div class="row" style="gap:6px">';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="fixed">固定費</button>';
   if(UI.tab==="slot") h += '<button class="btn" style="font-size:11px;padding:4px 10px" data-a="mdb">機種データ</button>';
   h += '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>';
@@ -700,11 +700,11 @@ function mjStatRow(label, val, isYen, raw){
 function viewTool(){
   if(UI.screen==="mjtable") return "";  // 別画面で描画
   let h = '<div class="row between" style="align-items:baseline;margin-top:4px">'+
-    '<h1>ツール <small>TOOLS</small></h1></div>';
+    '<h1>ツール</h1></div>';
   h += '<div class="muted" style="font-size:12px;line-height:1.7;margin:8px 2px 14px">'+
     '各遊技を打つための補助ツールです(収支の記録とは別)。</div>';
   /* 麻雀 */
-  h += band("麻雀 — 点数表");
+  h += band("麻雀 — スコア表");
   h += '<div class="muted" style="font-size:11px;margin:0 2px 8px">当日のセットの半荘ごとのスコアを記録・集計します。</div>';
   (S.mjTables||[]).slice().sort((a,b)=>a.date<b.date?1:-1).forEach(t=>{
     const names = t.players.join("・");
@@ -714,7 +714,7 @@ function viewTool(){
       '<span class="muted mono" style="font-size:11px;flex-shrink:0">'+t.date.slice(5).replace("-","/")+'</span></div>'+
       '<div class="muted" style="font-size:11px;margin-top:2px">'+rounds+'半荘</div></button>';
   });
-  h += '<button class="btn dash full" style="padding:13px 0" data-a="mjtnew">＋ 新しい点数表</button>';
+  h += '<button class="btn dash full" style="padding:13px 0" data-a="mjtnew">＋ 新しいスコア表</button>';
   /* パチスロ */
   h += band("パチスロ");
   h += '<div class="card" style="opacity:.6"><div style="font-size:13px">回転数記録</div>'+
