@@ -114,15 +114,32 @@
     display:flex; align-items:center; justify-content:center; text-align:center; padding:0;}
   .amberpanel{background:rgba(242,179,61,.08); border:1px solid rgba(242,179,61,.35); border-radius:8px; padding:9px 10px;}
   textarea.input{height:120px; resize:vertical; font-size:11px;}
+  #print-area{ display:none; }
+  @media print{
+    body > *:not(#print-area){ display:none !important; }
+    #print-area{ display:block !important; }
+    .pr-wrap{ color:#000; font-family:-apple-system,sans-serif; padding:4px; }
+    .pr-title{ font-size:19px; font-weight:700; }
+    .pr-sub{ font-size:12px; color:#333; margin:2px 0 12px; }
+    .pr-tbl{ border-collapse:collapse; width:100%; margin-bottom:12px; }
+    .pr-tbl th, .pr-tbl td{ border:1px solid #888; padding:4px 6px; text-align:center; font-size:12px; color:#000; }
+    .pr-tbl th{ background:#e8f0ee; font-weight:700; }
+    .pr-no, .pr-lbl{ background:#f4f4f4; font-weight:700; }
+    .pr-neg{ color:#c00; }
+    .pr-abs{ color:#aaa; }
+    .pr-sum .pr-final td{ font-weight:700; border-top:2px solid #333; font-size:13px; }
+    .pr-foot{ font-size:10px; color:#666; margin-top:6px; }
+  }
 </style>
 </head>
 <body>
 <div id="app"></div>
+<div id="print-area"></div>
 <div id="toast" class="toast">保存しました</div>
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.50 (localStorage保存・完全オフライン)
+   収支台帳 1.51 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -407,7 +424,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.50";
+const APP_VERSION = "1.51";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -802,6 +819,45 @@ function mjtCalc(t,pi){
   const net=shushi-fee;               // 支払(最終)
   return { sum, chipNet, scoreYen, chipYen, shushi, fee, net };
 }
+function mjtPrintHtml(t){
+  const P=t.players, seats=mjtSeats(t), rows=(t.rows||[]);
+  const calcs=P.map((p,ci)=>mjtCalc(t,ci));
+  const money=n=>(n<0?"−":"")+"¥"+Math.abs(n).toLocaleString("ja-JP");
+  let h='<div class="pr-wrap">';
+  h+='<div class="pr-title">麻雀スコア表</div>';
+  h+='<div class="pr-sub">'+esc(t.date||"")+(t.ruleName?" ・ "+esc(t.ruleName):"")+" ・ "+seats+"人打ち</div>";
+  /* 半荘ごとスコア */
+  h+='<table class="pr-tbl"><thead><tr><th>No</th>'+P.map((p,i)=>'<th>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>';
+  rows.forEach((r,ri)=>{
+    h+='<tr><td class="pr-no">'+(ri+1)+'</td>'+P.map((p,ci)=>{
+      if(mjtAbsent(t,ri,ci)) return '<td class="pr-abs">抜</td>';
+      const s=mjtScore(t,ri,ci);
+      if(s===null) return '<td></td>';
+      return '<td class="'+(s<0?"pr-neg":"")+'">'+s.toFixed(1)+'</td>';
+    }).join("")+'</tr>';
+  });
+  h+='</tbody></table>';
+  /* 集計(アプリの成績表と同じ値) */
+  h+='<table class="pr-tbl pr-sum"><tbody>';
+  h+='<tr><td class="pr-lbl">平均着順</td>'+P.map((p,ci)=>{const av=mjtAvgRank(t,ci);return '<td>'+(av===null?"–":av.toFixed(2))+'</td>';}).join("")+'</tr>';
+  h+='<tr><td class="pr-lbl">合計</td>'+calcs.map(c=>'<td class="'+(c.sum<0?"pr-neg":"")+'">'+c.sum.toFixed(1)+'</td>').join("")+'</tr>';
+  h+='<tr><td class="pr-lbl">チップ</td>'+calcs.map(c=>'<td class="'+(c.chipNet<0?"pr-neg":"")+'">'+(c.chipNet>0?"+":"")+c.chipNet+'</td>').join("")+'</tr>';
+  h+='<tr><td class="pr-lbl">収支</td>'+calcs.map(c=>'<td class="'+(c.shushi<0?"pr-neg":"")+'">'+money(c.shushi)+'</td>').join("")+'</tr>';
+  const anyFee=calcs.some(c=>c.fee>0);
+  if(anyFee){
+    h+='<tr><td class="pr-lbl">場代</td>'+calcs.map(c=>'<td class="pr-neg">'+(c.fee>0?money(-c.fee):"–")+'</td>').join("")+'</tr>';
+    h+='<tr class="pr-final"><td class="pr-lbl">支払</td>'+calcs.map(c=>'<td class="'+(c.net<0?"pr-neg":"")+'">'+money(c.net)+'</td>').join("")+'</tr>';
+  }
+  h+='</tbody></table>';
+  h+='<div class="pr-foot">スコア1点=¥'+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ 収支台帳</div>";
+  h+='</div>';
+  return h;
+}
+function mjtPrint(){
+  const pa=document.getElementById("print-area");
+  if(pa) pa.innerHTML=mjtPrintHtml(UI.mjt);
+  setTimeout(()=>{ window.print(); }, 60);
+}
 function newMjTable(){
   return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"],
     rows:[["","",""]], chipStart:["","",""], chipEnd:["","",""],
@@ -895,6 +951,8 @@ function viewMjTable(){
     '</div>';
 
   /* 単価(上に配置) */
+  /* PDF共有 */
+  h += '<button class="btn tealb full" style="margin-bottom:14px;padding:11px 0;font-weight:700" data-mt="pdf">PDFで共有 / 印刷</button>';
   /* スコア表 */
   h += band("スコア(半荘ごと)");
   h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px"><table class="mjt score"><thead><tr><th style="width:38px">半荘</th>'+
@@ -1031,6 +1089,7 @@ function bindMjTable(){
       if(a==="applypreset"){ mjtApplyPreset(el.dataset.v); return; }
       if(a==="delpreset"){ mjtDelPreset(el.dataset.v); return; }
       if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
+      else if(a==="pdf"){ mjtPrint(); }
       else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); } }
       else if(a==="rule"){ t.rule=el.dataset.v; const seats=num(t.rule)||3; while(t.players.length<seats){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); } UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="setme"){ const i=num(el.dataset.v); t.meIdx = (t.meIdx===i?null:i); saveMjt(false); render(); }
