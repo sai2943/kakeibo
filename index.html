@@ -91,6 +91,14 @@
     border:1px solid var(--teal); color:var(--teal); font-size:12px; padding:6px 16px; border-radius:16px;
     z-index:60; opacity:0; transition:opacity .25s; pointer-events:none;}
   .toast.show{opacity:1;}
+  #updatebar{position:fixed; left:12px; right:12px; bottom:12px; z-index:9999;
+    background:var(--teal); color:#04201d; border-radius:12px; padding:11px 14px;
+    display:flex; align-items:center; gap:10px; box-shadow:0 6px 24px rgba(0,0,0,.4);
+    font-size:13px; font-weight:700;}
+  #updatebar span{flex:1; line-height:1.4;}
+  #updatebar button{border:none; border-radius:8px; font-weight:700; cursor:pointer;}
+  #updatebar-btn{background:#04201d; color:#eafff9; padding:8px 12px; font-size:13px;}
+  #updatebar-x{background:transparent; color:#04201d; padding:6px 4px; font-size:17px; line-height:1;}
   .hdr{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
   .navbtn{background:none; border:none; color:var(--muted); font-size:14px; cursor:pointer; padding:4px; font-family:inherit;}
   h1{font-size:15px; font-weight:700; letter-spacing:.06em; margin:0 0 4px;}
@@ -114,7 +122,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.43 (localStorage保存・完全オフライン)
+   収支台帳 1.44 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -252,6 +260,7 @@ function applyData(d){
   });
   S.mjPresets = Array.isArray(d.mjPresets)?d.mjPresets:[];
   S.borderTool = Object.assign({id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:""}, d.borderTool||{});
+  (S.borderTool.segments||[]).forEach(g=>{ delete g.kind; }); /* 貯玉プッシュ一本化: 旧区間の kind は不要 */
   S.updatedAt = d.updatedAt || 0;
 }
 function load(){
@@ -360,16 +369,12 @@ const modeShort = m => m==="nori" ? "乗打" : m==="dai" ? "代打" : "単独";
    台に入った玉(回転率用) = プッシュ数×払出玉 + 開始残玉 − 当たり時残玉
    引き落とし玉(コスト用) = プッシュ数×引き落とし玉 + 開始残玉 − 当たり時残玉 */
 const segPushes = g => Math.max(0, num(g.rpStart) - num(g.rpEnd));
-const segUsed = (g, s) => { s=s||UI.draft; return g.kind==="push"
-  ? Math.max(0, segPushes(g)*num((s&&s.pushPayout)||230) + num(g.sb) - num(g.eb))
-  : Math.max(0, num(g.sb) - num(g.eb)); };
-const segCost = (g, s) => { s=s||UI.draft; return g.kind==="push"
-  ? Math.max(0, segPushes(g)*num((s&&s.pushDraw)||245) + num(g.sb) - num(g.eb))
-  : segUsed(g, s); };
+const segUsed = (g, s) => { s=s||UI.draft; return Math.max(0, segPushes(g)*num((s&&s.pushPayout)||230) + num(g.sb) - num(g.eb)); };
+const segCost = (g, s) => { s=s||UI.draft; return Math.max(0, segPushes(g)*num((s&&s.pushDraw)||245) + num(g.sb) - num(g.eb)); };
 const segSpins = g => Math.max(0, num(g.es) - num(g.ss));
-const segDone = g => g.kind==="push"
-  ? (g.rpStart!=="" && g.rpEnd!=="" && g.ss!=="" && g.es!=="")
-  : (g.sb!=="" && g.eb!=="" && g.ss!=="" && g.es!=="");
+/* 貯玉プッシュ一本化: 残プッシュ空欄なら segPushes=0 で持ち玉(残玉差)ケースに一致 */
+const segDone = g => g.ss!=="" && g.es!=="" &&
+  ((g.rpStart!=="" && g.rpEnd!=="") || (g.sb!=="" && g.eb!==""));
 function machineTotals(m, s){
   s = s||UI.draft;
   const segs = (m.segments||[]).filter(segDone);
@@ -401,7 +406,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.43";
+const APP_VERSION = "1.44";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1606,13 +1611,7 @@ function viewSession(){
     '<span class="muted" style="font-size:12px;width:74px">パチンコ</span>'+
     '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 250" value="'+esc(s.pExchange||"")+'" style="flex:1" data-in="pexchange">'+
     '<span class="muted" style="font-size:12px">玉=1000円</span></div>'+
-    '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
-    '<span class="muted" style="font-size:11px;width:74px">貯玉プッシュ</span>'+
-    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="払出230" value="'+esc(s.pushPayout||"")+'" style="flex:1" data-in="pushpayout">'+
-    '<span class="muted" style="font-size:11px">/</span>'+
-    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="引落245" value="'+esc(s.pushDraw||"")+'" style="flex:1" data-in="pushdraw">'+
-    '<span class="muted" style="font-size:10px">玉/回</span></div>'+
-    '<div class="muted" style="font-size:10px">使う方だけ入力。前回値を記憶します。</div>';
+    '<div class="muted" style="font-size:10px">使う方だけ入力。前回値を記憶します。貯玉プッシュのレートは「ツール」タブのボーダー試算で設定します。</div>';
 
   /* ----- 代打ち: 報酬 ----- */
   if(s.mode==="dai"){
@@ -1819,8 +1818,14 @@ function viewMachine(m, s){
   return h;
 }
 const segStat = (g, s) => segDone(g) ? segUsed(g,s)+"発 / "+segSpins(g)+"回転" : "";
-const segFormula = (g, s) => (g.kind==="push" && segDone(g))
-  ? "台入球 = "+segPushes(g)+"プッシュ×"+num((s&&s.pushPayout)||(UI.draft&&UI.draft.pushPayout)||230)+(num(g.sb)?" + 残"+num(g.sb):"")+" − "+num(g.eb)+" = "+segUsed(g,s)+"発" : "";
+const segFormula = (g, s) => {
+  if(!segDone(g)) return "";
+  const pp = num((s&&s.pushPayout)||(UI.draft&&UI.draft.pushPayout)||230);
+  const p = segPushes(g);
+  return p>0
+    ? "台入球 = "+p+"プッシュ×"+pp+(num(g.sb)?" + 残"+num(g.sb):"")+" − "+num(g.eb)+" = "+segUsed(g,s)+"発"
+    : "台入球 = 残"+num(g.sb)+" − "+num(g.eb)+" = "+segUsed(g,s)+"発";
+};
 
 function borderPanel(m, s){
   const t = machineTotals(m, s);
@@ -1898,24 +1903,19 @@ function viewBorderTool(){
     (master ? '<div class="mono teal" style="font-size:10px;margin-top:4px">✓ 登録あり: 1/'+fnum(master.denom)+(fnum(master.ty)>0?' / 理論TY '+fnum(master.ty)+'発':'')+'</div>'
       : (m.name?'<div class="muted" style="font-size:10px;margin-top:4px">未登録 — 下でボーダーを手入力できます</div>':''))+'</div>';
 
-  /* 通常時区間 */
+  /* 通常時区間(貯玉プッシュ一本化) */
   h += band("通常時 区間");
+  h += '<div class="muted" style="font-size:10px;margin-bottom:8px;line-height:1.6">貯玉プッシュ区間は残プッシュを入力。持ち玉区間は<b>残プッシュを空</b>にして残玉に持ち玉を入れる。</div>';
   h += '<div style="margin-bottom:8px">';
+  const segFields = [["rpStart","開始 残プッシュ"],["rpEnd","終了 残プッシュ"],["sb","開始 残玉"],["eb","当たり時 残玉"],["ss","開始 回転数"],["es","当たり時 回転数"]];
   (m.segments||[]).forEach((g,gi)=>{
-    const isPush = g.kind==="push";
-    const fields = isPush
-      ? [["rpStart","開始 残プッシュ"],["rpEnd","終了 残プッシュ"],["sb","開始 残玉(通常0)"],["eb","当たり時 残玉"],["ss","開始 回転数"],["es","当たり時 回転数"]]
-      : [["sb","開始 玉数"],["ss","開始 回転数"],["eb","終了 玉数(当たり時)"],["es","終了 回転数(当たり時)"]];
     h += '<div class="card2" style="margin-bottom:6px"><div class="row between" style="margin-bottom:6px">'+
-      '<div class="row" style="gap:6px"><span class="muted" style="font-size:10px;font-weight:700">区間'+(gi+1)+'</span>'+
-      '<button class="chip" style="font-weight:700;border-color:'+(isPush?"var(--amber)":"var(--teal)")+';color:'+(isPush?"var(--amber)":"var(--teal)")+'" '+
-      'data-a="btgkind" data-v="'+g.id+'">'+(isPush?"貯玉プッシュ":"持ち玉(玉数)")+'</button></div>'+
+      '<span class="muted" style="font-size:10px;font-weight:700">区間'+(gi+1)+'</span>'+
       '<div class="row" style="gap:8px"><span class="mono muted" style="font-size:10px">'+segStat(g,rates)+'</span>'+
       '<button class="xbtn" style="font-size:14px" data-a="btgdel" data-v="'+g.id+'">×</button></div></div>'+
-      '<div class="grid2">'+fields.map(([k,label])=>
+      '<div class="grid2">'+segFields.map(([k,label])=>
         '<div><div class="muted" style="font-size:9px;margin-bottom:2px">'+label+'</div>'+
-        '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(g[k]||"")+'"'+
-        (k==="sb"&&isPush?' placeholder="0"':'')+' data-bseg="'+g.id+'|'+k+'"></div>').join("")+'</div>'+
+        '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(g[k]||"")+'" data-bseg="'+g.id+'|'+k+'"></div>').join("")+'</div>'+
       '<div class="mono muted" style="font-size:10px;margin-top:5px">'+segFormula(g,rates)+'</div></div>';
   });
   h += '<button class="btn dash full" style="margin-bottom:6px" data-a="btgadd">＋ 区間を追加(着席時/当たり後の再開時/現金追加時)</button>';
@@ -1934,8 +1934,7 @@ function bindBorderTool(){
     el.onclick=()=>{
       if(a==="btback"){ UI.screen="main"; UI.tab="tool"; render(); }
       else if(a==="btreset"){ if(confirm("試算をクリアしますか?(機種名・区間をすべて消します)")){ S.borderTool={id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:m.pushPayout,pushDraw:m.pushDraw}; save(); render(); } }
-      else if(a==="btgadd"){ (m.segments=m.segments||[]).push({id:uid(),kind:"ball",sb:"",ss:"",eb:"",es:"",rpStart:"",rpEnd:""}); save(); render(); }
-      else if(a==="btgkind"){ const g=(m.segments||[]).find(x=>String(x.id)===String(v)); if(g){ g.kind=g.kind==="push"?"ball":"push"; save(); render(); } }
+      else if(a==="btgadd"){ (m.segments=m.segments||[]).push({id:uid(),sb:"",ss:"",eb:"",es:"",rpStart:"",rpEnd:""}); save(); render(); }
       else if(a==="btgdel"){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(v)); save(); render(); }
     };
   });
@@ -1954,8 +1953,7 @@ function bindSession(){
       else if(kind==="smemo"){ s.memo=el.value; }
       else if(kind==="exchange"){ s.exchange=el.value; refreshSlot(); }
       else if(kind==="pexchange"){ s.pExchange=el.value; refreshSlot(); }
-      else if(kind==="pushpayout"){ s.pushPayout=el.value; refreshSlot(); }
-      else if(kind==="pushdraw"){ s.pushDraw=el.value; refreshSlot(); }
+
       else if(kind==="myshare"){ s.myShare=el.value; refreshSlot(); }
       else if(kind==="xlabel"||kind==="xamount"){
         const x = s.expenses.find(e=>String(e.id)===String(v));
@@ -2252,6 +2250,9 @@ function viewBackup(){
     band("保存の診断")+
     '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="btest">保存テストを実行</button>'+
     (UI.msg?'<div class="mono teal" style="font-size:11px;margin-top:10px;line-height:1.8;white-space:pre-wrap">'+esc(UI.msg)+'</div>':'')+
+    band("アプリの更新")+
+    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">最新版が公開されているか確認し、あれば再読み込みして取り込みます(オンライン時のみ)。</div>'+
+    '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="chkupd">更新を確認して再読み込み</button>'+
     '<div class="muted" style="text-align:center;font-size:11px;margin-top:24px;opacity:.7">収支台帳 バージョン '+APP_VERSION+'</div>';
 }
 function bindBackup(){
@@ -2260,6 +2261,7 @@ function bindBackup(){
     el.onclick = ()=>{
       const a=el.dataset.a;
       if(a==="back"){ UI.screen="main"; render(); }
+      else if(a==="chkupd"){ checkForUpdate(true); }
       else if(a==="csv"){ exportCsv(); }
       else if(a==="bexport"){
         dl(JSON.stringify(Object.assign({exportedAt:new Date().toISOString()},S), null, 1),
@@ -2483,6 +2485,61 @@ render();
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(()=>{ /* 未対応環境でも本体は動く */ });
 }
+
+/* ---------- アプリ更新チェック ---------- */
+let updateChecking = false, lastUpdateCheck = 0;
+async function checkForUpdate(manual){
+  const now = Date.now();
+  if(!manual && now - lastUpdateCheck < 60000) return;   /* 自動は60秒throttle。手動は常に実行 */
+  if(updateChecking) return;
+  updateChecking = true; lastUpdateCheck = now;
+  try{
+    if("serviceWorker" in navigator){
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(reg){ try{ await reg.update(); }catch(e){} }
+    }
+    const res = await fetch("./index.html?_=" + now, { cache:"no-store" });
+    if(!res.ok) throw new Error("fetch " + res.status);
+    const txt = await res.text();
+    const mt = txt.match(/APP_VERSION\s*=\s*"([\d.]+)"/);
+    const latest = mt ? mt[1] : null;
+    if(latest && latest !== APP_VERSION) showUpdateBar(latest, manual);
+    else if(manual) toast("最新です(" + APP_VERSION + ")");
+  }catch(e){
+    if(manual) toast("確認できませんでした(オフライン?)");
+  }finally{
+    updateChecking = false;
+  }
+}
+function showUpdateBar(latest, manual){
+  /* 手動は即確認ダイアログ。自動はバー通知のみ(入力中に勝手にリロードしない) */
+  if(manual){
+    if(confirm("新しいバージョン " + latest + " があります。\n今すぐ再読み込みしますか?(現在 " + APP_VERSION + ")")) reloadForUpdate();
+    return;
+  }
+  if(document.getElementById("updatebar")) return;
+  const bar = document.createElement("div");
+  bar.id = "updatebar";
+  bar.innerHTML = '<span>新バージョン ' + esc(latest) + ' が利用できます</span>'+
+    '<button id="updatebar-btn">再読み込み</button>'+
+    '<button id="updatebar-x" aria-label="閉じる">×</button>';
+  document.body.appendChild(bar);
+  document.getElementById("updatebar-btn").onclick = reloadForUpdate;
+  document.getElementById("updatebar-x").onclick = ()=>bar.remove();
+}
+async function reloadForUpdate(){
+  try{
+    if("serviceWorker" in navigator){
+      const reg = await navigator.serviceWorker.getRegistration();
+      if(reg){ try{ await reg.update(); }catch(e){} }
+    }
+  }catch(e){}
+  location.reload();
+}
+/* 起動時・復帰時の自動チェック */
+setTimeout(()=>checkForUpdate(false), 1500);
+document.addEventListener("visibilitychange", ()=>{ if(document.visibilityState==="visible") checkForUpdate(false); });
+
 setSync("nokey");
 whenSbReady(initCloud);
 </script>
