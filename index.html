@@ -122,7 +122,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.47 (localStorage保存・完全オフライン)
+   収支台帳 1.48 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -218,7 +218,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750"}, updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -259,7 +259,7 @@ function applyData(d){
     return n;
   });
   S.mjPresets = Array.isArray(d.mjPresets)?d.mjPresets:[];
-  S.borderTool = Object.assign({id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750"}, d.borderTool||{});
+  S.borderTool = Object.assign({id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, d.borderTool||{});
   (S.borderTool.segments||[]).forEach(g=>{ delete g.kind; }); /* 貯玉プッシュ一本化: 旧区間の kind は不要 */
   S.updatedAt = d.updatedAt || 0;
 }
@@ -407,7 +407,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.47";
+const APP_VERSION = "1.48";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1878,20 +1878,30 @@ function borderPanel(m, s){
       '<span class="muted" style="font-size:10px;font-weight:400"> ('+(t.costRate250>=ab?"+":"−")+Math.abs(t.costRate250-ab).toFixed(2)+'回)</span></span></div>';
   // --- 時給(遊技モード別 what-if。現在の出玉効率 rate250 を各モードの単価で評価し直す) ---
   const bJudge = bKezuri!==null ? bKezuri : bTheory;
-  const kachi = fnum(m.kachi), rph = fnum(m.rph);
-  if(bJudge!==null && rph>0 && kachi>0 && t.rate250>0){
+  const kachi = fnum(m.kachi);
+  // 回転数/時: 開始時刻があり経過5分〜18hなら実測、それ以外は仮定値
+  let rphUsed = fnum(m.rph), rphMeasured = null, elapsedH = null;
+  if(m.startedAt){
+    elapsedH = (Date.now()-m.startedAt)/3600000 - fnum(m.breakMin)/60;
+    if(elapsedH >= 5/60 && elapsedH <= 18 && t.spins>0){ rphMeasured = t.spins/elapsedH; rphUsed = rphMeasured; }
+  }
+  if(bJudge!==null && rphUsed>0 && kachi>0 && t.rate250>0){
     const uK = 100/kachi;   // 換金単価(円/玉)
     const uC = fnum(m.genkin)>0 ? 1000/fnum(m.genkin) : uK;   // 現金貸出単価(円/玉、貸出削り込み)
     const hedari = (fnum(m.pushDraw)>0 && fnum(m.pushPayout)>0) ? fnum(m.pushDraw)/fnum(m.pushPayout) : 245/230;  // 貯玉プッシュ手数料比
-    const wMochi   = rph*250*uK*(1/bJudge - 1/t.rate250);            // 持玉:換金単価・手数料なし
-    const wChodama = rph*250*uK*(1/bJudge - hedari/t.rate250);       // 貯玉:換金単価・引落/払出の手数料
-    const wCash    = rph*250*(uK/bJudge - uC/t.rate250);             // 現金:出玉=換金単価/投資=貸出単価
+    const wMochi   = rphUsed*250*uK*(1/bJudge - 1/t.rate250);            // 持玉:換金単価・手数料なし
+    const wChodama = rphUsed*250*uK*(1/bJudge - hedari/t.rate250);       // 貯玉:換金単価・引落/払出の手数料
+    const wCash    = rphUsed*250*(uK/bJudge - uC/t.rate250);             // 現金:出玉=換金単価/投資=貸出単価
     const hasCash  = (m.segments||[]).some(g=>num(g.cash)>0);
+    let rphLine;
+    if(rphMeasured!==null) rphLine = '実測 '+Math.round(rphMeasured).toLocaleString()+'回転/時 (経過'+elapsedH.toFixed(1)+'h'+(fnum(m.breakMin)>0?'・休憩'+fnum(m.breakMin)+'分':'')+'・'+t.spins.toLocaleString()+'回転) → 反映中';
+    else if(m.startedAt) rphLine = '計測中 経過'+Math.round(Math.max(0,elapsedH)*60)+'分 — 仮定値 '+fnum(m.rph)+'回転/時を使用';
+    else rphLine = '仮定値 '+fnum(m.rph)+'回転/時(区間入力で開始時刻を自動記録→実測に切替)';
     const wl = (label,val,strong)=> '<div class="row between" style="font-size:'+(strong?12:11)+'px;margin-bottom:3px">'+
       '<span'+(strong?' style="font-weight:700"':' class="muted"')+'>'+label+'</span>'+
       '<span class="mono '+clsPM(val)+'"'+(strong?' style="font-weight:700"':'')+'>'+(val>=0?"+":"−")+Math.round(Math.abs(val)).toLocaleString()+'円/時</span></div>';
     h += '<div style="border-top:1px solid rgba(242,179,61,.3);padding-top:6px;margin-top:6px">'+
-      '<div class="muted" style="font-size:9px;margin-bottom:3px">時給 — 削り後B基準・'+rph+'回転/時の目安</div>'+
+      '<div class="muted" style="font-size:9px;margin-bottom:3px">時給 — 削り後B基準 / '+esc(rphLine)+'</div>'+
       wl("持玉遊技", wMochi, true)+
       wl("貯玉遊技", wChodama, false)+
       (hasCash ? wl("現金遊技", wCash, false) : '')+'</div>';
@@ -1935,14 +1945,24 @@ function viewBorderTool(){
 
   /* 時給の設定 */
   h += band("時給の設定");
+  const _hm = ts => { const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   h += '<div class="card" style="margin-bottom:12px"><div class="grid2">'+
     '<div><div class="muted" style="font-size:9px;margin-bottom:2px">換金率(100円=◯玉)</div>'+
     '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="25" value="'+esc(m.kachi||"")+'" data-bi="kachi"></div>'+
     '<div><div class="muted" style="font-size:9px;margin-bottom:2px">現金貸出(1000円=◯玉)</div>'+
     '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(m.genkin||"")+'" data-bi="genkin"></div></div>'+
-    '<div style="margin-top:6px"><div class="muted" style="font-size:9px;margin-bottom:2px">回転数/時(通常時の目安)</div>'+
+    '<div style="margin-top:6px"><div class="muted" style="font-size:9px;margin-bottom:2px">回転数/時(仮定値・実測が出るまで使用)</div>'+
     '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="750" value="'+esc(m.rph||"")+'" style="width:130px" data-bi="rph"></div>'+
-    '<div class="muted" style="font-size:10px;margin-top:5px;line-height:1.6">換金率=出玉の価値(等価4円なら25玉)。現金貸出=貸出で削る店の実玉数(1000円240玉など)。回転数/時=打ち出しペースの目安。前回値を記憶。</div></div>';
+    '<div style="border-top:1px solid var(--line);margin-top:10px;padding-top:8px">'+
+      '<div class="row between" style="align-items:center;margin-bottom:6px">'+
+        '<div class="row" style="gap:8px;align-items:center"><span class="muted" style="font-size:9px">開始</span>'+
+          '<span class="mono" style="font-size:13px;font-weight:700">'+(m.startedAt?_hm(m.startedAt):"—")+'</span>'+
+          '<input class="input sm mono r" type="time" value="'+(m.startedAt?_hm(m.startedAt):"")+'" style="width:104px;padding:4px 6px" data-bstart></div>'+
+        '<button class="chip" data-a="startnow" style="font-size:10px">今にリセット</button></div>'+
+      '<div class="row" style="gap:8px;align-items:center"><span class="muted" style="font-size:9px;width:28px">休憩</span>'+
+        '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="0" value="'+esc(m.breakMin||"")+'" style="width:80px" data-bi="breakMin">'+
+        '<span class="muted" style="font-size:11px">分(昼休憩など経過から除く)</span></div></div>'+
+    '<div class="muted" style="font-size:10px;margin-top:8px;line-height:1.6">換金率=出玉の価値(等価4円なら25玉)。現金貸出=貸出で削る店の実玉数。開始時刻は初回区間の入力で自動記録、ズレたら修正/リセット可。前回値を記憶(開始・休憩はクリアで初期化)。</div></div>';
 
   /* 通常時区間(貯玉プッシュ一本化) */
   h += band("通常時 区間");
@@ -1967,16 +1987,18 @@ function viewBorderTool(){
 function bindBorderTool(){
   const m = S.borderTool;
   document.querySelectorAll("[data-bi]").forEach(el=>{ el.oninput=e=>{ m[el.dataset.bi]=e.target.value; saveLocal(); if(el.dataset.bi==="name") render(); }; el.onchange=()=>{ save(); render(); }; });
-  document.querySelectorAll("[data-bseg]").forEach(el=>{ el.oninput=e=>{ const [gid,k]=el.dataset.bseg.split("|"); const g=(m.segments||[]).find(x=>String(x.id)===String(gid)); if(g){ g[k]=e.target.value; saveLocal(); render(); } }; });
+  document.querySelectorAll("[data-bseg]").forEach(el=>{ el.oninput=e=>{ const [gid,k]=el.dataset.bseg.split("|"); const g=(m.segments||[]).find(x=>String(x.id)===String(gid)); if(g){ g[k]=e.target.value; if(!m.startedAt && e.target.value!=="") m.startedAt=Date.now(); saveLocal(); render(); } }; });
+  document.querySelectorAll("[data-bstart]").forEach(el=>{ el.onchange=e=>{ const v=e.target.value; if(v){ const p=v.split(":"); const d=new Date(); d.setHours(Number(p[0])||0, Number(p[1])||0, 0, 0); m.startedAt=d.getTime(); save(); render(); } }; });
   document.querySelectorAll("[data-in='mborder']").forEach(el=>{ el.oninput=e=>{ m.border=e.target.value; saveLocal(); render(); }; });
   document.querySelectorAll("[data-in='mty']").forEach(el=>{ el.oninput=e=>{ m.ty=e.target.value; saveLocal(); render(); }; });
   document.querySelectorAll("[data-a]").forEach(el=>{
     const a=el.dataset.a, v=el.dataset.v;
     el.onclick=()=>{
       if(a==="btback"){ UI.screen="main"; UI.tab="tool"; render(); }
-      else if(a==="btreset"){ if(confirm("試算をクリアしますか?(機種名・区間をすべて消します)")){ S.borderTool={id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:m.pushPayout,pushDraw:m.pushDraw,kezuri:m.kezuri,kachi:m.kachi,genkin:m.genkin,rph:m.rph}; save(); render(); } }
+      else if(a==="btreset"){ if(confirm("試算をクリアしますか?(機種名・区間をすべて消します)")){ S.borderTool={id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:m.pushPayout,pushDraw:m.pushDraw,kezuri:m.kezuri,kachi:m.kachi,genkin:m.genkin,rph:m.rph,startedAt:0,breakMin:""}; save(); render(); } }
       else if(a==="btgadd"){ (m.segments=m.segments||[]).push({id:uid(),sb:"",ss:"",eb:"",es:"",rpStart:"",rpEnd:"",cash:""}); save(); render(); }
       else if(a==="btgdel"){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(v)); save(); render(); }
+      else if(a==="startnow"){ m.startedAt=Date.now(); save(); render(); }
     };
   });
 }</script>
