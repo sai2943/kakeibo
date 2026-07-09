@@ -114,7 +114,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v38 (localStorage保存・完全オフライン)
+   収支台帳 v39 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -1018,7 +1018,7 @@ function bindMjTable(){
       if(a==="delpreset"){ mjtDelPreset(el.dataset.v); return; }
       if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
       else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); } }
-      else if(a==="rule"){ t.rule=el.dataset.v; UI.mjtCell=null; saveMjt(false); render(); }
+      else if(a==="rule"){ t.rule=el.dataset.v; const seats=num(t.rule)||3; while(t.players.length<seats){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); } UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="setme"){ const i=num(el.dataset.v); t.meIdx = (t.meIdx===i?null:i); saveMjt(false); render(); }
       else if(a==="addp"){ if(t.players.length<6){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); UI.mjtCell=null; saveMjt(false); render(); } }
       else if(a==="pdel"){
