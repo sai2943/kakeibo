@@ -144,7 +144,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.53 (localStorage保存・完全オフライン)
+   収支台帳 1.54 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -429,7 +429,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.53";
+const APP_VERSION = "1.54";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -903,6 +903,8 @@ function viewMjTable(){
   h += '<div class="row" style="gap:8px;margin-bottom:8px">'+
     [["3","3麻"],["4","4麻"]].map(([v,l])=>'<button class="btn '+(t.rule===v?"sel":"")+'" style="flex:1" data-mt="rule" data-v="'+v+'">'+l+'</button>').join("")+
     '<span class="muted" style="font-size:11px;align-self:center;white-space:nowrap">'+mjtSeats(t)+'人打ち</span></div>';
+  h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:8px"><span class="muted" style="font-size:11px;white-space:nowrap">日付</span>'+
+    '<input class="input sm mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="flex:1"></div>';
   h += '<input class="input" placeholder="ルール名(例: 点3ウマ5・DUO虹)" value="'+esc(t.ruleName||"")+'" data-mt="rname" style="margin-bottom:8px">';
 
   /* ルールプリセット */
@@ -1087,6 +1089,7 @@ function bindMjTable(){
   const t = UI.mjt;
   document.querySelectorAll("[data-mt='pname']").forEach(el=>{ el.oninput=e=>{ t.players[num(el.dataset.v)]=e.target.value; saveMjt(false); }; });
   const rn=document.querySelector("[data-mt='rname']"); if(rn) rn.oninput=e=>{ t.ruleName=e.target.value; saveMjt(false); };
+  const dt=document.querySelector("[data-mt='date']"); if(dt) dt.onchange=e=>{ if(e.target.value){ t.date=e.target.value; saveMjt(false); render(); } };
   document.querySelectorAll("[data-mt='rd']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; el.onchange=()=>{ render(); }; });
   document.querySelectorAll("[data-mt='umaabs']").forEach(el=>{ el.oninput=e=>{ const f=el.dataset.v; const neg=String(t[f]||"").startsWith("-"); t[f]=(neg?"-":"")+e.target.value.replace(/-/g,""); saveMjt(false); }; el.onchange=()=>render(); });
   const ft=document.querySelector("[data-mt='ftotal']"); if(ft) ft.oninput=e=>{ t.feeTotal=e.target.value; saveMjt(false); };
