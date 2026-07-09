@@ -114,7 +114,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v37 (localStorage保存・完全オフライン)
+   収支台帳 v38 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -844,6 +844,9 @@ function viewMjTable(){
         '<button class="signbtn" style="width:28px;height:32px;border:1.5px solid '+(neg?"var(--red)":"var(--teal)")+';color:'+(neg?"var(--red)":"var(--teal)")+';background:'+(neg?"rgba(229,115,115,.1)":"rgba(45,212,191,.1)")+'" data-mt="umasign" data-v="'+k+'">'+(neg?"−":"＋")+'</button>'+
         '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="0" value="'+esc(String(t[k]||"").replace("-",""))+'" data-mt="umaabs" data-v="'+k+'" style="flex:1;min-width:0"></div></div>';
     }).join("")+'</div>'+
+    '<div class="muted" style="font-size:9px;margin-bottom:2px">単価</div><div class="row" style="gap:8px;margin-bottom:8px">'+
+    '<div style="flex:1"><div class="muted" style="font-size:8px">スコア(1点=)</div><input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc(t.scoreRate)+'" data-mt="rate" data-v="scoreRate"></div>'+
+    '<div style="flex:1"><div class="muted" style="font-size:8px">チップ(1枚=)</div><input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc(t.chipRate)+'" data-mt="rate" data-v="chipRate"></div></div>'+
     '<label class="row" style="gap:8px;align-items:center;font-size:12px;cursor:pointer"><input type="checkbox" data-mt="hako" '+(t.hakoshita?"checked":"")+'><span>箱下あり(マイナス続行)</span></label>'+
     (mjtHasTobi(t)
       ? '<div class="muted" style="font-size:10px;margin-top:6px">✓ 飛び時スコア = <span class="mono" style="color:var(--amber);font-weight:700">'+mjtTobiScore(t)+'</span> … スコアのセルを選ぶとキーパッドに「飛び」が出ます</div>'
@@ -878,27 +881,6 @@ function viewMjTable(){
     '</div>';
 
   /* 単価(上に配置) */
-  h += '<div class="card" style="margin-bottom:12px"><div class="row" style="gap:8px">'+
-    '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">スコア単価(1点=)</div>'+
-    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(t.scoreRate)+'" data-mt="rate" data-v="scoreRate"></div>'+
-    '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">チップ単価(1枚=)</div>'+
-    '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(t.chipRate)+'" data-mt="rate" data-v="chipRate"></div></div></div>';
-
-  /* チップ(上に配置) */
-  h += band("チップ(開始→終了 枚数)");
-  h += '<div style="overflow-x:auto;margin-bottom:14px"><table class="mjt"><thead><tr><th style="width:38px"></th>'+
-    P.map((p,i)=>'<th '+colW+'>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>'+
-    '<tr><td class="mjt-no">開始</td>'+
-    P.map((p,ci)=>{ const sel=UI.mjtCell&&UI.mjtCell.k==="cs"&&UI.mjtCell.c===ci; const x=(t.chipStart||[])[ci]||""; const neg=(num(x)||0)<0;
-      return '<td class="mjt-cell '+(sel?"sel ":"")+(neg?"red":"")+'" data-mt="cs" data-c="'+ci+'">'+(x===""?'<span class="mjt-ph">·</span>':esc(String(x)))+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no">終了</td>'+
-    P.map((p,ci)=>{ const sel=UI.mjtCell&&UI.mjtCell.k==="ce"&&UI.mjtCell.c===ci; const er=mjtChipEndRaw(t,ci); const auto=mjtChipAutoIdx(t)===ci;
-      let inner="",cls=""; if(er!==null){ inner=esc(String((t.chipEnd||[])[ci])); } else if(auto){ inner='<span class="mjt-auto">'+mjtChipEndDisp(t,ci)+'</span>'; } else inner='<span class="mjt-ph">·</span>';
-      return '<td class="mjt-cell '+(sel?"sel ":"")+cls+'" data-mt="ce" data-c="'+ci+'">'+inner+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no">増減</td>'+
-    P.map((p,ci)=>{ const net=mjtChipNet(t,ci); return '<td class="mjt-cell" style="color:'+(net<0?"var(--red)":net>0?"var(--blue)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</td>'; }).join("")+'</tr>'+
-    '</tbody></table></div>';
-
   /* スコア表 */
   h += band("スコア(半荘ごと)");
   h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px"><table class="mjt score"><thead><tr><th style="width:38px">半荘</th>'+
@@ -924,6 +906,21 @@ function viewMjTable(){
   });
   h += '</tbody></table></div>';
   h += '<button class="btn dash full" style="padding:10px 0;margin-bottom:14px" data-mt="addrow">＋ 半荘を追加</button>';
+
+  /* チップ(スコアの下) */
+  h += band("チップ(開始→終了 枚数)");
+  h += '<div style="overflow-x:auto;margin-bottom:14px"><table class="mjt"><thead><tr><th style="width:38px"></th>'+
+    P.map((p,i)=>'<th '+colW+'>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>'+
+    '<tr><td class="mjt-no">開始</td>'+
+    P.map((p,ci)=>{ const sel=UI.mjtCell&&UI.mjtCell.k==="cs"&&UI.mjtCell.c===ci; const x=(t.chipStart||[])[ci]||""; const neg=(num(x)||0)<0;
+      return '<td class="mjt-cell '+(sel?"sel ":"")+(neg?"red":"")+'" data-mt="cs" data-c="'+ci+'">'+(x===""?'<span class="mjt-ph">·</span>':esc(String(x)))+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no">終了</td>'+
+    P.map((p,ci)=>{ const sel=UI.mjtCell&&UI.mjtCell.k==="ce"&&UI.mjtCell.c===ci; const er=mjtChipEndRaw(t,ci); const auto=mjtChipAutoIdx(t)===ci;
+      let inner="",cls=""; if(er!==null){ inner=esc(String((t.chipEnd||[])[ci])); } else if(auto){ inner='<span class="mjt-auto">'+mjtChipEndDisp(t,ci)+'</span>'; } else inner='<span class="mjt-ph">·</span>';
+      return '<td class="mjt-cell '+(sel?"sel ":"")+cls+'" data-mt="ce" data-c="'+ci+'">'+inner+'</td>'; }).join("")+'</tr>'+
+    '<tr><td class="mjt-no">増減</td>'+
+    P.map((p,ci)=>{ const net=mjtChipNet(t,ci); return '<td class="mjt-cell" style="color:'+(net<0?"var(--red)":net>0?"var(--blue)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</td>'; }).join("")+'</tr>'+
+    '</tbody></table></div>';
 
   /* ゲーム代(会計フロー) */
   h += band("ゲーム代(精算)");
