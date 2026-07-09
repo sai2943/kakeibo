@@ -122,7 +122,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.45 (localStorage保存・完全オフライン)
+   収支台帳 1.47 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -218,7 +218,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:""}, updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750"}, updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -259,7 +259,7 @@ function applyData(d){
     return n;
   });
   S.mjPresets = Array.isArray(d.mjPresets)?d.mjPresets:[];
-  S.borderTool = Object.assign({id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:""}, d.borderTool||{});
+  S.borderTool = Object.assign({id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750"}, d.borderTool||{});
   (S.borderTool.segments||[]).forEach(g=>{ delete g.kind; }); /* 貯玉プッシュ一本化: 旧区間の kind は不要 */
   S.updatedAt = d.updatedAt || 0;
 }
@@ -369,12 +369,13 @@ const modeShort = m => m==="nori" ? "乗打" : m==="dai" ? "代打" : "単独";
    台に入った玉(回転率用) = プッシュ数×払出玉 + 開始残玉 − 当たり時残玉
    引き落とし玉(コスト用) = プッシュ数×引き落とし玉 + 開始残玉 − 当たり時残玉 */
 const segPushes = g => Math.max(0, num(g.rpStart) - num(g.rpEnd));
-const segUsed = (g, s) => { s=s||UI.draft; return Math.max(0, segPushes(g)*num((s&&s.pushPayout)||230) + num(g.sb) - num(g.eb)); };
-const segCost = (g, s) => { s=s||UI.draft; return Math.max(0, segPushes(g)*num((s&&s.pushDraw)||245) + num(g.sb) - num(g.eb)); };
+const cashBalls = (g, s) => num(g.cash)>0 ? num(g.cash)*fnum((s&&s.genkin)||250)/1000 : 0;   // 現金投資額→玉(貸出レート、削り対応)
+const segUsed = (g, s) => { s=s||UI.draft; return Math.max(0, segPushes(g)*num((s&&s.pushPayout)||230) + cashBalls(g,s) + num(g.sb) - num(g.eb)); };
+const segCost = (g, s) => { s=s||UI.draft; return Math.max(0, segPushes(g)*num((s&&s.pushDraw)||245) + cashBalls(g,s) + num(g.sb) - num(g.eb)); };
 const segSpins = g => Math.max(0, num(g.es) - num(g.ss));
-/* 貯玉プッシュ一本化: 残プッシュ空欄なら segPushes=0 で持ち玉(残玉差)ケースに一致 */
+/* 貯玉プッシュ一本化 + 現金: 残プッシュ空・現金なしなら持ち玉(残玉差)。現金投資があれば現金区間として成立 */
 const segDone = g => g.ss!=="" && g.es!=="" &&
-  ((g.rpStart!=="" && g.rpEnd!=="") || (g.sb!=="" && g.eb!==""));
+  ((g.rpStart!=="" && g.rpEnd!=="") || (g.sb!=="" && g.eb!=="") || num(g.cash)>0);
 function machineTotals(m, s){
   s = s||UI.draft;
   const segs = (m.segments||[]).filter(segDone);
@@ -406,7 +407,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.45";
+const APP_VERSION = "1.47";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1833,14 +1834,18 @@ function borderPanel(m, s){
   if(t.rate250===null) return "";
   const master = findMaster(m);
   const denom = master ? fnum(master.denom) : 0;
-  const bTheory = denom>0 && master && fnum(master.ty)>0 ? denom*250/fnum(master.ty) : null;
+  const kez = Math.max(0, Math.min(50, fnum(m.kezuri)));   // 削り率 %
+  const kezF = 1 - kez/100;
+  // 理論ボーダー(回/250発相当): 登録機種は 分母×250/理論TY、未登録は手入力ボーダー(回/千円=等価で同値)
+  const bTheory = denom>0
+    ? (master && fnum(master.ty)>0 ? denom*250/fnum(master.ty) : null)
+    : (fnum(m.border)>0 ? fnum(m.border) : null);
+  // 削り後ボーダー = 理論B ÷ (1−削り率/100)。出玉が減る→ボーダーは上がる(厳しくなる)
+  const bKezuri = (bTheory!==null && kez>0 && kezF>0) ? bTheory/kezF : null;
+  // 実効ボーダー(実測avgTY): 参考・削り率の較正用。短期サンプルは荒れるので判定基準にはしない
   const bEff = denom>0 && t.avgTY>0 ? denom*250/t.avgTY : null;
-  let ab = null;
-  if(denom>0) ab = bEff!==null ? bEff : bTheory;
-  else {
-    const b = fnum(m.border);
-    if(b){ const ty=fnum(m.ty); ab = (ty>0 && t.avgTY>0) ? b*(ty/t.avgTY) : b; }
-  }
+  // 判定基準(active border): 削り後 → 理論 → 実効(理論が無い時のみ)
+  const ab = bKezuri!==null ? bKezuri : (bTheory!==null ? bTheory : bEff);
   const dev = ab && t.costRate250!==null ? (t.costRate250/ab-1)*100 : null;
 
   let h = '<div class="amberpanel"><div class="row between" style="align-items:baseline;margin-bottom:6px">'+
@@ -1849,38 +1854,55 @@ function borderPanel(m, s){
   if(t.costRate250!==null && Math.abs(t.costRate250-t.rate250)>0.005)
     h += '<div class="row between" style="font-size:11px;margin-bottom:6px"><span class="muted">コスト補正(貯玉手数料込)</span>'+
       '<span class="mono">'+t.costRate250.toFixed(2)+' 回/250発</span></div>';
-  if(t.avgTY!==null)
-    h += '<div class="row between" style="font-size:11px;margin-bottom:6px"><span class="muted">実測平均出玉('+t.payouts.length+'回)</span>'+
-      '<span class="mono">'+Math.round(t.avgTY)+'発</span></div>';
+  // --- 理論ボーダー ---
   if(denom>0){
     h += '<div class="row between" style="font-size:11px;margin-bottom:4px"><span class="muted">機種データ: 1/'+fnum(master.denom)+
       (fnum(master.ty)>0?' / 理論TY '+fnum(master.ty)+'発':'')+'</span>'+
       (bTheory!==null?'<span class="mono">理論B '+bTheory.toFixed(2)+'</span>':'')+'</div>';
-    if(bEff!==null)
-      h += '<div class="row between" style="font-size:11px;margin-bottom:4px"><span class="muted">実効ボーダー(実測TY '+t.payouts.length+'回)</span>'+
-        '<span class="mono" style="font-weight:700">'+bEff.toFixed(2)+' 回/250発</span></div>';
   } else {
-    h += '<div class="grid2" style="margin:4px 0 6px">'+
-      '<div><div class="muted" style="font-size:9px;margin-bottom:2px">ボーダー(回/千円)</div>'+
-      '<input class="input sm mono r" type="number" inputmode="decimal" step="0.1" value="'+esc(m.border||"")+'" data-in="mborder" data-v="'+m.id+'"></div>'+
-      '<div><div class="muted" style="font-size:9px;margin-bottom:2px">理論平均出玉(任意)</div>'+
-      '<input class="input sm mono r" type="number" inputmode="numeric" value="'+esc(m.ty||"")+'" data-in="mty" data-v="'+m.id+'"></div></div>';
-    if(fnum(m.border)>0 && fnum(m.ty)>0 && t.avgTY>0)
-      h += '<div class="row between" style="font-size:11px;margin-bottom:4px"><span class="muted">補正ボーダー(削れ反映)</span>'+
-        '<span class="mono">'+(fnum(m.border)*fnum(m.ty)/t.avgTY).toFixed(2)+' 回/250発</span></div>';
+    h += '<div style="margin:4px 0 6px"><div class="muted" style="font-size:9px;margin-bottom:2px">理論ボーダー(回/千円)</div>'+
+      '<input class="input sm mono r" type="number" inputmode="decimal" step="0.1" value="'+esc(m.border||"")+'" data-in="mborder" data-v="'+m.id+'"></div>';
   }
+  // --- 削り後ボーダー(判定基準) ---
+  if(bKezuri!==null)
+    h += '<div class="row between" style="font-size:12px;margin-bottom:4px"><span style="font-weight:700">削り後B(削り'+kez+'%)</span>'+
+      '<span class="mono amber" style="font-weight:700">'+bKezuri.toFixed(2)+' 回/250発</span></div>';
+  // --- 実測(参考・較正用) ---
+  if(t.avgTY!==null)
+    h += '<div style="font-size:10px;margin-bottom:4px" class="muted">参考: 実測平均出玉 '+t.payouts.length+'回 '+Math.round(t.avgTY)+'発'+
+      (bEff!==null?' → 実効B '+bEff.toFixed(2):'')+'</div>';
   if(dev!==null && ab)
     h += '<div class="row between" style="align-items:baseline;border-top:1px solid rgba(242,179,61,.3);padding-top:6px;margin-top:2px">'+
       '<span style="font-size:11px;font-weight:700">ボーダー乖離</span>'+
       '<span class="mono '+clsPM(dev)+'" style="font-size:15px;font-weight:700">'+(dev>=0?"+":"−")+Math.abs(dev).toFixed(1)+'%'+
       '<span class="muted" style="font-size:10px;font-weight:400"> ('+(t.costRate250>=ab?"+":"−")+Math.abs(t.costRate250-ab).toFixed(2)+'回)</span></span></div>';
+  // --- 時給(遊技モード別 what-if。現在の出玉効率 rate250 を各モードの単価で評価し直す) ---
+  const bJudge = bKezuri!==null ? bKezuri : bTheory;
+  const kachi = fnum(m.kachi), rph = fnum(m.rph);
+  if(bJudge!==null && rph>0 && kachi>0 && t.rate250>0){
+    const uK = 100/kachi;   // 換金単価(円/玉)
+    const uC = fnum(m.genkin)>0 ? 1000/fnum(m.genkin) : uK;   // 現金貸出単価(円/玉、貸出削り込み)
+    const hedari = (fnum(m.pushDraw)>0 && fnum(m.pushPayout)>0) ? fnum(m.pushDraw)/fnum(m.pushPayout) : 245/230;  // 貯玉プッシュ手数料比
+    const wMochi   = rph*250*uK*(1/bJudge - 1/t.rate250);            // 持玉:換金単価・手数料なし
+    const wChodama = rph*250*uK*(1/bJudge - hedari/t.rate250);       // 貯玉:換金単価・引落/払出の手数料
+    const wCash    = rph*250*(uK/bJudge - uC/t.rate250);             // 現金:出玉=換金単価/投資=貸出単価
+    const hasCash  = (m.segments||[]).some(g=>num(g.cash)>0);
+    const wl = (label,val,strong)=> '<div class="row between" style="font-size:'+(strong?12:11)+'px;margin-bottom:3px">'+
+      '<span'+(strong?' style="font-weight:700"':' class="muted"')+'>'+label+'</span>'+
+      '<span class="mono '+clsPM(val)+'"'+(strong?' style="font-weight:700"':'')+'>'+(val>=0?"+":"−")+Math.round(Math.abs(val)).toLocaleString()+'円/時</span></div>';
+    h += '<div style="border-top:1px solid rgba(242,179,61,.3);padding-top:6px;margin-top:6px">'+
+      '<div class="muted" style="font-size:9px;margin-bottom:3px">時給 — 削り後B基準・'+rph+'回転/時の目安</div>'+
+      wl("持玉遊技", wMochi, true)+
+      wl("貯玉遊技", wChodama, false)+
+      (hasCash ? wl("現金遊技", wCash, false) : '')+'</div>';
+  }
   return h+'</div>';
 }
 
 /* ---------- ボーダー試算ツール(独立・収支とは無関係) ---------- */
 function viewBorderTool(){
   const m = S.borderTool;
-  const rates = { pushPayout: m.pushPayout, pushDraw: m.pushDraw };
+  const rates = { pushPayout: m.pushPayout, pushDraw: m.pushDraw, genkin: m.genkin };
   const master = findMaster(m);
   let h = '<div class="row between" style="align-items:center;margin-bottom:6px">'+
     '<button class="navbtn" data-a="btback" style="font-size:14px">‹ 戻る</button>'+
@@ -1904,11 +1926,29 @@ function viewBorderTool(){
     (master ? '<div class="mono teal" style="font-size:10px;margin-top:4px">✓ 登録あり: 1/'+fnum(master.denom)+(fnum(master.ty)>0?' / 理論TY '+fnum(master.ty)+'発':'')+'</div>'
       : (m.name?'<div class="muted" style="font-size:10px;margin-top:4px">未登録 — 下でボーダーを手入力できます</div>':''))+'</div>';
 
+  /* 削り率 */
+  h += band("削り率(出玉の削れ)");
+  h += '<div class="card" style="margin-bottom:12px"><div class="row" style="gap:8px;align-items:center">'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="5" value="'+esc(m.kezuri||"")+'" style="width:84px" data-bi="kezuri">'+
+    '<span class="muted" style="font-size:12px">% 理論を下回る分</span></div>'+
+    '<div class="muted" style="font-size:10px;margin-top:5px;line-height:1.6">釘の削りで出玉が理論に届かない分。理論ボーダーをこの分だけ厳しくした<b>削り後ボーダー</b>を判定基準にします(例:5%=出玉が理論の95%)。0で理論ボーダー基準。店・釘に合わせて調整、前回値を記憶します。</div></div>';
+
+  /* 時給の設定 */
+  h += band("時給の設定");
+  h += '<div class="card" style="margin-bottom:12px"><div class="grid2">'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">換金率(100円=◯玉)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="25" value="'+esc(m.kachi||"")+'" data-bi="kachi"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">現金貸出(1000円=◯玉)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(m.genkin||"")+'" data-bi="genkin"></div></div>'+
+    '<div style="margin-top:6px"><div class="muted" style="font-size:9px;margin-bottom:2px">回転数/時(通常時の目安)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="750" value="'+esc(m.rph||"")+'" style="width:130px" data-bi="rph"></div>'+
+    '<div class="muted" style="font-size:10px;margin-top:5px;line-height:1.6">換金率=出玉の価値(等価4円なら25玉)。現金貸出=貸出で削る店の実玉数(1000円240玉など)。回転数/時=打ち出しペースの目安。前回値を記憶。</div></div>';
+
   /* 通常時区間(貯玉プッシュ一本化) */
   h += band("通常時 区間");
-  h += '<div class="muted" style="font-size:10px;margin-bottom:8px;line-height:1.6">貯玉プッシュ区間は残プッシュを入力。持ち玉区間は<b>残プッシュを空</b>にして残玉に持ち玉を入れる。</div>';
+  h += '<div class="muted" style="font-size:10px;margin-bottom:8px;line-height:1.6">貯玉プッシュ区間は残プッシュを入力。持ち玉区間は<b>残プッシュを空</b>にして残玉に持ち玉を入れる。現金区間は<b>現金投資(円)</b>を入力。</div>';
   h += '<div style="margin-bottom:8px">';
-  const segFields = [["rpStart","開始 残プッシュ"],["rpEnd","終了 残プッシュ"],["sb","開始 残玉"],["eb","当たり時 残玉"],["ss","開始 回転数"],["es","当たり時 回転数"]];
+  const segFields = [["rpStart","開始 残プッシュ"],["rpEnd","終了 残プッシュ"],["sb","開始 残玉"],["eb","当たり時 残玉"],["ss","開始 回転数"],["es","当たり時 回転数"],["cash","現金投資(円)"]];
   (m.segments||[]).forEach((g,gi)=>{
     h += '<div class="card2" style="margin-bottom:6px"><div class="row between" style="margin-bottom:6px">'+
       '<span class="muted" style="font-size:10px;font-weight:700">区間'+(gi+1)+'</span>'+
@@ -1934,8 +1974,8 @@ function bindBorderTool(){
     const a=el.dataset.a, v=el.dataset.v;
     el.onclick=()=>{
       if(a==="btback"){ UI.screen="main"; UI.tab="tool"; render(); }
-      else if(a==="btreset"){ if(confirm("試算をクリアしますか?(機種名・区間をすべて消します)")){ S.borderTool={id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:m.pushPayout,pushDraw:m.pushDraw}; save(); render(); } }
-      else if(a==="btgadd"){ (m.segments=m.segments||[]).push({id:uid(),sb:"",ss:"",eb:"",es:"",rpStart:"",rpEnd:""}); save(); render(); }
+      else if(a==="btreset"){ if(confirm("試算をクリアしますか?(機種名・区間をすべて消します)")){ S.borderTool={id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:m.pushPayout,pushDraw:m.pushDraw,kezuri:m.kezuri,kachi:m.kachi,genkin:m.genkin,rph:m.rph}; save(); render(); } }
+      else if(a==="btgadd"){ (m.segments=m.segments||[]).push({id:uid(),sb:"",ss:"",eb:"",es:"",rpStart:"",rpEnd:"",cash:""}); save(); render(); }
       else if(a==="btgdel"){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(v)); save(); render(); }
     };
   });
