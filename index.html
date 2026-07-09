@@ -114,7 +114,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v35 (localStorage保存・完全オフライン)
+   収支台帳 v36 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -902,7 +902,7 @@ function viewMjTable(){
         if(mjtAbsent(t,ri,ci)){ inner='<span class="mjt-abs">抜</span>'; cls="abs"; }
         else { const raw=mjtRawScore(t,ri,ci);
           if(raw!==null){ inner=esc(String(t.rows[ri][ci])); cls=(raw<0?"red":raw>0?"blue":""); }
-          else if(autoIdx===ci){ const s=mjtScore(t,ri,ci); inner='<span class="mjt-auto">'+s+'</span>'; cls=(s<0?"red":""); }
+          else if(autoIdx===ci){ const s=mjtScore(t,ri,ci); inner='<span style="font-style:italic">'+s+'</span>'; cls=(s<0?"red":s>0?"blue":""); }
           else inner='<span class="mjt-ph">·</span>';
         }
         return '<td class="mjt-cell '+(sel?"sel ":"")+cls+'" data-mt="cell" data-r="'+ri+'" data-c="'+ci+'">'+inner+'</td>';
