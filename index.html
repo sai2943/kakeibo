@@ -122,7 +122,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.49 (localStorage保存・完全オフライン)
+   収支台帳 1.50 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -407,7 +407,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.49";
+const APP_VERSION = "1.50";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1931,10 +1931,14 @@ function viewBorderTool(){
 
   /* 機種名 */
   h += band("機種");
+  const pachiList = (S.mdb||[]).filter(x=>x.kind==="pachi" && (x.name||"").trim());
   h += '<div class="card" style="margin-bottom:12px"><div class="muted" style="font-size:9px;margin-bottom:2px">機種名</div>'+
-    '<input class="input sm" placeholder="機種名(登録済みなら理論ボーダー自動)" value="'+esc(m.name||"")+'" data-bi="name">'+
+    '<input class="input sm" placeholder="機種名(下から選択 or 手入力)" value="'+esc(m.name||"")+'" data-bi="name">'+
     (master ? '<div class="mono teal" style="font-size:10px;margin-top:4px">✓ 登録あり: 1/'+fnum(master.denom)+(fnum(master.ty)>0?' / 理論TY '+fnum(master.ty)+'発':'')+'</div>'
-      : (m.name?'<div class="muted" style="font-size:10px;margin-top:4px">未登録 — 下でボーダーを手入力できます</div>':''))+'</div>';
+      : (m.name?'<div class="muted" style="font-size:10px;margin-top:4px">未登録 — 下でボーダーを手入力できます</div>':''))+
+    (pachiList.length ? '<div style="margin-top:8px"><div class="muted" style="font-size:9px;margin-bottom:4px">登録機種から選ぶ</div><div class="row" style="flex-wrap:wrap;gap:6px">'+
+      pachiList.map(x=>'<button class="chip'+((m.name||"").trim()===(x.name||"").trim()?' sel':'')+'" data-a="btpick" data-v="'+x.id+'">'+esc(x.name)+'</button>').join("")+'</div></div>' : '')+
+    '</div>';
 
   /* 削り率 */
   h += band("削り率(出玉の削れ)");
@@ -2016,6 +2020,7 @@ function bindBorderTool(){
       else if(a==="btgadd"){ (m.segments=m.segments||[]).push({id:uid(),sb:"",ss:"",eb:"",es:"",rpStart:"",rpEnd:"",cash:""}); save(); render(); }
       else if(a==="btgdel"){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(v)); save(); render(); }
       else if(a==="startnow"){ m.startedAt=Date.now(); save(); render(); }
+      else if(a==="btpick"){ const x=(S.mdb||[]).find(z=>String(z.id)===String(v)); if(x){ m.name=x.name; save(); render(); } }
     };
   });
 }</script>
