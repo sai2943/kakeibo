@@ -114,7 +114,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 v36 (localStorage保存・完全オフライン)
+   収支台帳 v37 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -210,7 +210,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -250,6 +250,7 @@ function applyData(d){
     delete n.chips; delete n.fee;
     return n;
   });
+  S.mjPresets = Array.isArray(d.mjPresets)?d.mjPresets:[];
   S.updatedAt = d.updatedAt || 0;
 }
 function load(){
@@ -817,7 +818,18 @@ function viewMjTable(){
   h += '<div class="row" style="gap:8px;margin-bottom:8px">'+
     [["3","3麻"],["4","4麻"]].map(([v,l])=>'<button class="btn '+(t.rule===v?"sel":"")+'" style="flex:1" data-mt="rule" data-v="'+v+'">'+l+'</button>').join("")+
     '<span class="muted" style="font-size:11px;align-self:center;white-space:nowrap">'+mjtSeats(t)+'人打ち</span></div>';
-  h += '<input class="input" placeholder="ルール名(例: 点3ウマ5・DUO虹)" value="'+esc(t.ruleName||"")+'" data-mt="rname" style="margin-bottom:10px">';
+  h += '<input class="input" placeholder="ルール名(例: 点3ウマ5・DUO虹)" value="'+esc(t.ruleName||"")+'" data-mt="rname" style="margin-bottom:8px">';
+
+  /* ルールプリセット */
+  h += '<div style="margin-bottom:10px">';
+  if((S.mjPresets||[]).length){
+    h += '<div class="muted" style="font-size:10px;margin-bottom:4px">保存済みルール(タップで適用)</div>'+
+      '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:6px">'+
+      S.mjPresets.map(p=>'<span style="display:inline-flex;align-items:center;gap:2px">'+
+        '<button class="chip" data-mt="applypreset" data-v="'+p.id+'">'+esc(p.name)+'</button>'+
+        '<button class="chip" style="padding:6px 8px;color:var(--red)" data-mt="delpreset" data-v="'+p.id+'">×</button></span>').join("")+'</div>';
+  }
+  h += '<button class="btn" style="font-size:11px;padding:6px 12px" data-mt="savepreset">＋ 現在のルールを保存</button></div>';
 
   /* ルール詳細(飛びボタン用) */
   h += '<div class="card" style="margin-bottom:10px"><div class="muted" style="font-size:10px;margin-bottom:6px">ルール設定(飛びボタン用)</div>'+
@@ -1004,6 +1016,9 @@ function bindMjTable(){
     if(a==="hako"){ el.onchange=()=>{ t.hakoshita=el.checked; saveMjt(false); render(); }; return; }
     el.onclick=()=>{
       if(a==="umasign"){ const f=el.dataset.v; const cur=String(t[f]||""); t[f]=cur.startsWith("-")?cur.slice(1):"-"+cur; saveMjt(false); render(); return; }
+      if(a==="savepreset"){ mjtSavePreset(); return; }
+      if(a==="applypreset"){ mjtApplyPreset(el.dataset.v); return; }
+      if(a==="delpreset"){ mjtDelPreset(el.dataset.v); return; }
       if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
       else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); } }
       else if(a==="rule"){ t.rule=el.dataset.v; UI.mjtCell=null; saveMjt(false); render(); }
@@ -1081,6 +1096,32 @@ function padInput(k){
   set(cur);
   saveMjt(false); renderKeepScroll();
 }
+function mjtSavePreset(){
+  const t=UI.mjt; const nm=(t.ruleName||"").trim();
+  if(!nm){ alert("先にルール名を入力してください。"); return; }
+  const p={ id:uid(), name:nm, rule:t.rule, mochi:t.mochi, kaeshi:t.kaeshi, uma1:t.uma1, uma2:t.uma2, uma3:t.uma3, uma4:t.uma4, hakoshita:t.hakoshita, scoreRate:t.scoreRate, chipRate:t.chipRate };
+  const i=(S.mjPresets||[]).findIndex(x=>x.name===nm);
+  if(i>=0){ p.id=S.mjPresets[i].id; S.mjPresets[i]=p; alert("「"+nm+"」を上書き保存しました。"); }
+  else { (S.mjPresets=S.mjPresets||[]).push(p); alert("「"+nm+"」を保存しました。"); }
+  save(); render();
+}
+function mjtApplyPreset(id){
+  const p=(S.mjPresets||[]).find(x=>String(x.id)===String(id)); if(!p) return;
+  const t=UI.mjt;
+  t.ruleName=p.name; t.rule=p.rule||"3"; t.mochi=p.mochi||""; t.kaeshi=p.kaeshi||"";
+  t.uma1=p.uma1||""; t.uma2=p.uma2||""; t.uma3=p.uma3||""; t.uma4=p.uma4||"";
+  t.hakoshita=!!p.hakoshita; t.scoreRate=p.scoreRate||"0"; t.chipRate=p.chipRate||"0";
+  const seats=num(p.rule)||3;
+  while(t.players.length<seats){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); }
+  UI.mjtCell=null; saveMjt(false); render();
+}
+function mjtDelPreset(id){
+  const p=(S.mjPresets||[]).find(x=>String(x.id)===String(id)); if(!p) return;
+  if(confirm("保存ルール「"+p.name+"」を削除しますか?(記録済みのデータには影響しません)")){
+    S.mjPresets=(S.mjPresets||[]).filter(x=>String(x.id)!==String(id)); save(); render();
+  }
+}
+
 function saveMjt(persist){
   const t=UI.mjt; if(!t) return;
   const i=(S.mjTables||[]).findIndex(x=>String(x.id)===String(t.id));
