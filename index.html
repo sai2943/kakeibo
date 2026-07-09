@@ -128,7 +128,7 @@
     .pr-tbl th, .pr-tbl td{ border:1px solid #777 !important; padding:2px 4px; text-align:center; font-size:11px; color:#000 !important; background:#fff !important; }
     .pr-tbl th{ background:#dfe9e7 !important; font-weight:700; }
     .pr-no, .pr-lbl{ background:#eee !important; font-weight:700; }
-    .pr-neg{ color:#c00 !important; }
+    .pr-tbl td.pr-neg{ color:#c00 !important; }
     .pr-abs{ color:#999 !important; }
     .pr-tbl tr{ break-inside:avoid; page-break-inside:avoid; }
     .pr-sum{ break-inside:avoid; page-break-inside:avoid; }
@@ -144,7 +144,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.52 (localStorage保存・完全オフライン)
+   収支台帳 1.53 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -429,7 +429,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.52";
+const APP_VERSION = "1.53";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -740,12 +740,22 @@ function viewTool(){
   h += band("麻雀 — スコア表");
   h += '<div class="muted" style="font-size:11px;margin:0 2px 8px">当日のセットの半荘ごとのスコアを記録・集計します。</div>';
   (S.mjTables||[]).slice().sort((a,b)=>a.date<b.date?1:-1).forEach(t=>{
-    const names = t.players.join("・");
+    const names = (t.players||[]).map((p,i)=>p||("P"+(i+1))).join("・");
     const rounds = (t.rows||[]).filter(r=>r.some(x=>x!=="")).length;
-    h += '<button class="btn full" style="padding:12px 14px;text-align:left;display:block;margin-bottom:8px" data-a="mjtopen" data-v="'+t.id+'">'+
-      '<div class="row between"><span style="font-weight:700;font-size:13px" class="ellip">'+esc(names)+'</span>'+
-      '<span class="muted mono" style="font-size:11px;flex-shrink:0">'+t.date.slice(5).replace("-","/")+'</span></div>'+
-      '<div class="muted" style="font-size:11px;margin-top:2px">'+rounds+'半荘</div></button>';
+    const seats = num(t.rule)||3;
+    const title = (t.ruleName||"").trim() || "ルール未設定";
+    const hasMe = t.meIdx!=null && (t.players||[])[t.meIdx]!=null;
+    const meNet = hasMe ? mjtCalc(t, t.meIdx).net : null;
+    h += '<div class="listitem" data-a="mjtopen" data-v="'+t.id+'">'+
+      '<div style="flex:1;min-width:0"><div class="row" style="font-size:13px;gap:6px;align-items:center">'+
+      '<span class="mono muted" style="font-size:11px;flex-shrink:0">'+t.date.slice(5).replace("-","/")+'</span>'+
+      '<span class="tag" style="border:1px solid var(--teal);color:var(--teal);flex-shrink:0">'+seats+'人</span>'+
+      '<span class="ellip" style="font-weight:700">'+esc(title)+'</span></div>'+
+      '<div class="muted ellip" style="font-size:11px;margin-top:3px">'+esc(names)+' ・ '+rounds+'半荘</div></div>'+
+      (hasMe
+        ? '<div class="mono '+clsPM(meNet)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(meNet)+'</div>'
+        : '<span style="font-size:18px;color:var(--muted);flex-shrink:0;margin-left:8px">›</span>')+
+      '</div>';
   });
   h += '<button class="btn dash full" style="padding:13px 0" data-a="mjtnew">＋ 新しいスコア表</button>';
   /* パチスロ */
