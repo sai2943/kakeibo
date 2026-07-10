@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.76 (localStorage保存・完全オフライン)
+   収支台帳 1.77 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -437,7 +437,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.76";
+const APP_VERSION = "1.77";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -632,15 +632,7 @@ function viewSlot(foot){
   const total = gamble.reduce((a,s)=>a+finalOwn(s),0);
   const daiTotal = daiSess.reduce((a,s)=>a+finalOwn(s),0);
   const exps = ms.reduce((a,s)=>a+expTotal(s),0);
-  let h = '<div class="card2" style="margin-top:2px;padding:12px">'+
-    '<div class="row">'+
-    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">稼働日数</div><div class="mono" style="font-size:17px;font-weight:700">'+ms.length+'日</div></div>'+
-    '<div style="width:1px;background:var(--line)"></div>'+
-    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">経費計</div><div class="mono red" style="font-size:17px;font-weight:700">'+yen(exps)+'</div></div>'+
-    '</div>'+
-    (daiTotal!==0 ? '<div class="row between" style="border-top:1px solid var(--line);padding-top:9px;margin-top:10px;font-size:12px"><span class="muted">代打ち報酬(→家計簿の収入)</span><span class="mono '+clsPM(daiTotal)+'">'+signYen(daiTotal)+'</span></div>' : '')+
-    '</div>';
-  h += band("セッション");
+  let h = band("セッション");
   if(!ms.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の稼働記録はありません。右下の「＋」から追加できます。</div>';
   ms.forEach(s=>{
     const fin = finalOwn(s);
@@ -663,15 +655,7 @@ function viewMahjong(foot){
   const ms = (S.mjSessions||[]).filter(s=>s.date.startsWith(mk)).sort((a,b)=>a.date<b.date?1:-1);
   const total = ms.reduce((a,s)=>a+mjFinal(s),0);
   const hanchans = ms.reduce((a,s)=>a+mjHanchan(s),0);
-  let h = '<div class="card2" style="margin-top:2px;padding:12px">'+
-    '<div class="row">'+
-    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">半荘数</div><div class="mono" style="font-size:17px;font-weight:700">'+hanchans+'</div></div>'+
-    '<div style="width:1px;background:var(--line)"></div>'+
-    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">日数</div><div class="mono" style="font-size:17px;font-weight:700">'+ms.length+'日</div></div>'+
-    '</div></div>';
-
-  /* ルール別集計(全期間) */
-  h += band("ルール名別 成績(全期間)");
+  let h = band("ルール名別 成績(全期間)");
   h += viewMjStats();
 
   /* 当月セッション一覧 */
