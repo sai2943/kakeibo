@@ -145,10 +145,10 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.79 (localStorage保存・完全オフライン)
+   収支台帳 1.80 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
-const EXPENSE_CATS = ["消費","娯楽","自己投資"];
+const EXPENSE_CATS = ["消費","娯楽"];
 const INCOME_CATS = ["給与","賞与","その他収入"];
 const UNIT_LABEL = {medal:"枚", ball:"玉", yen:"円"};
 const WD = ["日","月","火","水","木","金","土"];
@@ -437,7 +437,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.79";
+const APP_VERSION = "1.80";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1572,7 +1572,7 @@ function viewFixed(){
   if(list.length){
     h += band("登録済み");
     list.forEach(t=>{
-      const catC = t.type==="income" ? "var(--teal)" : (t.category==="娯楽"?"var(--amber)":t.category==="自己投資"?"var(--blue)":"var(--teal)");
+      const catC = t.type==="income" ? "var(--teal)" : (t.category==="娯楽"?"var(--amber)":"var(--teal)");
       h += '<div class="card" style="margin-bottom:8px"><div class="row between" style="align-items:center">'+
         '<div style="min-width:0;flex:1"><div style="font-size:14px;font-weight:700" class="ellip">'+esc(t.name)+'</div>'+
         '<div class="row" style="gap:6px;margin-top:4px;align-items:center">'+
