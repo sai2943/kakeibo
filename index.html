@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.75 (localStorage保存・完全オフライン)
+   収支台帳 1.76 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -437,7 +437,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.75";
+const APP_VERSION = "1.76";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -514,8 +514,14 @@ function viewMain(){
         '<div style="flex:1;text-align:center"><div class="muted" style="font-size:11px;margin-bottom:3px">パチスロ</div><div class="mono '+clsPM(slotNet)+'" style="font-size:18px;font-weight:700">'+signYen(slotNet)+'</div></div>'+
         '<div style="width:1px;background:var(--line)"></div>'+
         '<div style="flex:1;text-align:center"><div class="muted" style="font-size:11px;margin-bottom:3px">麻雀</div><div class="mono '+clsPM(mjNet)+'" style="font-size:18px;font-weight:700">'+signYen(mjNet)+'</div></div></div>' : '')+
-      (S.bank&&S.bank.switch ? '<div class="row between" style="border-top:1px solid var(--line);padding-top:10px;margin-top:'+(both?"11":"8")+'px;cursor:pointer" data-a="bank"><span class="muted" style="font-size:11px">軍資金残高</span><span><span class="mono teal" style="font-size:16px;font-weight:700">¥'+bankBalance().toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:10px"> / ¥'+(num(S.bank.ceiling)||300000).toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>' : '')+
       '</div>';
+    if(S.bank&&S.bank.switch){
+      const bBal=bankBalance(), bCeil=num(S.bank.ceiling)||300000, bPct=Math.max(0,Math.min(100,bCeil>0?bBal/bCeil*100:0)), bLow=bBal<bCeil*0.15;
+      h += '<div class="card" style="margin-bottom:12px;cursor:pointer;padding:12px 14px" data-a="bank">'+
+        '<div class="row between" style="align-items:baseline;margin-bottom:7px"><span style="font-size:12px;font-weight:700">軍資金</span><span><span class="mono '+(bLow?"red":"teal")+'" style="font-size:17px;font-weight:700">¥'+bBal.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:10px"> / ¥'+bCeil.toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>'+
+        '<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+bPct+'%;background:'+(bLow?"var(--red)":bBal>bCeil?"var(--amber)":"var(--teal)")+'"></div></div>'+
+        '</div>';
+    }
     h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
       [["slot","パチスロ"],["mahjong","麻雀"]].map(([v,l])=>
         '<button class="btn '+(gsub===v?"sel":"")+'" style="flex:1;padding:8px 0;font-weight:700" data-a="gamesub" data-v="'+v+'">'+l+'</button>').join("")+
