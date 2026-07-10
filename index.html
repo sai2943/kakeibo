@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.80 (localStorage保存・完全オフライン)
+   収支台帳 1.81 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -196,8 +196,10 @@ function fixedOccurrences(tpl){
   return out;
 }
 function genFixedEntries(tpl){
+  const skips = tpl.skips || [];
   fixedOccurrences(tpl).forEach(dt=>{
     const date = fmtDate(dt);
+    if(skips.includes(date)) return;
     const exists = S.entries.some(e=>String(e.fixedId)===String(tpl.id) && e.date===date);
     if(!exists){
       S.entries.push({
@@ -227,6 +229,8 @@ function stopFixed(id){
 }
 function updateFixed(tpl){
   /* 編集: 未来の予定分だけ新しい内容に。過去の実績は事実なので変えない */
+  const old = (S.fixed||[]).find(t=>String(t.id)===String(tpl.id));
+  if(old && old.skips && tpl.skips===undefined) tpl.skips = old.skips;
   const today = todayStr();
   S.entries = S.entries.filter(e=> !(String(e.fixedId)===String(tpl.id) && e.date > today));
   S.fixed = (S.fixed||[]).map(t=> String(t.id)===String(tpl.id) ? tpl : t);
@@ -437,7 +441,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.80";
+const APP_VERSION = "1.81";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1978,7 +1982,13 @@ function bindEntry(){
       else if(a==="etype"){ f.type=v; f.category = v==="expense"?"消費":"給与"; render(); }
       else if(a==="ecat"){ f.category=v; render(); }
       else if(a==="edel"){
-        if(!confirm("この記録を削除しますか?")) return;
+        const ent = S.entries.find(x=>x.id===UI.editEntryId);
+        const isFixed = ent && ent.fixedId;
+        if(!confirm(isFixed ? "この定期記録の今回分をスキップします。\n(定期設定は残り、来月以降は自動で計上されます)\nよろしいですか?" : "この記録を削除しますか?")) return;
+        if(isFixed){
+          const tpl = (S.fixed||[]).find(t=>String(t.id)===String(ent.fixedId));
+          if(tpl){ tpl.skips = tpl.skips || []; if(!tpl.skips.includes(ent.date)) tpl.skips.push(ent.date); }
+        }
         S.entries = S.entries.filter(x=>x.id!==UI.editEntryId);
         save(); UI.screen="main"; render();
       }
