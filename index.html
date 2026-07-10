@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.70 (localStorage保存・完全オフライン)
+   収支台帳 1.71 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -241,7 +241,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, budgets:{}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
 let UI = {
   tab:"games", gameSub:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -269,6 +269,7 @@ function applyData(d){
   S.wishlist = Array.isArray(d.wishlist)?d.wishlist:[];
   S.bank = Object.assign({switch:"",ceiling:"300000",seed:"",txns:[]}, d.bank||{});
   S.savings = Object.assign({goals:[],txns:[]}, d.savings||{});
+  S.budgets = (d.budgets && typeof d.budgets==="object") ? d.budgets : {};
   if(!Array.isArray(S.savings.goals) || !S.savings.goals.length){
     S.savings.goals = [{id:uid(),name:"引越し資金",target:"",done:false,doneDate:""},{id:uid(),name:"生活防衛費",target:"500000",done:false,doneDate:""}];
   }
@@ -436,7 +437,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.70";
+const APP_VERSION = "1.71";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -587,6 +588,27 @@ function viewLedger(){
       '<span>'+esc(c)+'</span><span class="mono muted">'+yen(a)+' <span style="font-size:10px">('+Math.round(a/normIncome*100)+'%)</span></span></div>'+
       '<div class="bar"><div style="width:'+(a/normIncome*100)+'%;background:var(--teal)"></div></div></div>'
     ).join("") + '</div>';
+  }
+
+  /* 娯楽予算(浪費枠) */
+  {
+    const entCap = num((S.budgets||{})["娯楽"]);
+    const entSpent = me.filter(e=>e.type==="expense" && e.category==="娯楽" && !isNetEntry(e)).reduce((a,e)=>a+e.amount,0);
+    const entPct = entCap>0 ? Math.min(100, entSpent/entCap*100) : 0;
+    const entOver = entSpent - entCap;
+    const entNear = entCap>0 && entSpent >= entCap*0.8 && entSpent < entCap;
+    const entCol = entCap>0 ? (entOver>0?"var(--red)":entNear?"var(--amber)":"var(--teal)") : "var(--muted)";
+    h += band("娯楽予算(浪費枠)");
+    h += '<div class="card" style="cursor:pointer;margin-bottom:14px" data-a="setentbudget">';
+    if(entCap>0){
+      h += '<div class="row between" style="align-items:baseline;margin-bottom:6px"><span style="font-size:12px;font-weight:700">今月の娯楽</span>'+
+        '<span><span class="mono '+(entOver>0?"red":entNear?"amber":"teal")+'" style="font-size:16px;font-weight:700">¥'+entSpent.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:11px"> / ¥'+entCap.toLocaleString("ja-JP")+'</span></span></div>'+
+        '<div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+entPct+'%;background:'+entCol+'"></div></div>'+
+        '<div class="row between" style="font-size:10px;margin-top:5px">'+(entOver>0?'<span class="red" style="font-weight:700">超過 ¥'+entOver.toLocaleString("ja-JP")+'</span>':'<span class="muted">残り ¥'+Math.max(0,entCap-entSpent).toLocaleString("ja-JP")+'</span>')+'<span class="mono muted">'+Math.floor(entPct)+'% ・ タップで上限変更</span></div>';
+    } else {
+      h += '<div class="row between" style="align-items:center"><span class="muted" style="font-size:12px">今月の娯楽 ¥'+entSpent.toLocaleString("ja-JP")+'</span><span class="teal" style="font-size:12px">＋ 上限を設定</span></div>';
+    }
+    h += '</div>';
   }
 
   const cats = {};
@@ -1306,7 +1328,7 @@ function viewAssets(){
       '<div class="row between" style="font-size:10px;margin-top:4px"><span class="muted">'+(tgt>0&&sBal>=tgt?"達成!":tgt>0?"あと ¥"+Math.max(0,tgt-sBal).toLocaleString("ja-JP"):"目標額 未設定")+'</span><span class="mono muted">'+(tgt>0?Math.floor(pct):0)+'%</span></div>';
   } else h+='<div class="muted" style="font-size:11px">全目標 達成</div>';
   h+='</div>';
-  h+='<div class="muted" style="font-size:10px;text-align:center;margin-top:12px">浪費枠・ポートフォリオは今後ここに追加</div>';
+  h+='<div class="muted" style="font-size:10px;text-align:center;margin-top:12px">ポートフォリオは今後ここに追加</div>';
   return h;
 }
 
@@ -1887,6 +1909,7 @@ function bindMain(){
       else if(a==="wishlist"){ UI.screen="wishlist"; render(); }
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
+      else if(a==="setentbudget"){ const p=prompt("娯楽の月間予算(上限・円):", ((S.budgets||{})["娯楽"])||""); if(p===null)return; (S.budgets=S.budgets||{})["娯楽"]=String(num(p)); save(); render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
       else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
