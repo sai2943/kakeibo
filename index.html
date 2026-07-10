@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.64 (localStorage保存・完全オフライン)
+   収支台帳 1.65 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -432,7 +432,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.64";
+const APP_VERSION = "1.65";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -608,11 +608,15 @@ function viewLedger(){
 function viewSlot(){
   const mk = monthKey();
   const ms = S.sessions.filter(s=>s.date.startsWith(mk)).sort((a,b)=>a.date<b.date?1:-1);
-  const total = ms.reduce((a,s)=>a+finalOwn(s),0);
+  const gamble = ms.filter(s=>s.mode!=="dai");
+  const daiSess = ms.filter(s=>s.mode==="dai");
+  const total = gamble.reduce((a,s)=>a+finalOwn(s),0);
+  const daiTotal = daiSess.reduce((a,s)=>a+finalOwn(s),0);
   const exps = ms.reduce((a,s)=>a+expTotal(s),0);
   let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
     '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月遊技収支(経費控除後)</div>'+
     '<div class="mono '+clsPM(total)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(total)+'</div></div>'+
+    (daiTotal!==0 ? '<div class="row between" style="border-top:1px solid var(--line);padding-top:8px;margin-top:6px;font-size:12px"><span class="muted">代打ち報酬(→家計簿の収入)</span><span class="mono '+clsPM(daiTotal)+'">'+signYen(daiTotal)+'</span></div>' : '')+
     '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
     '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">稼働日数</div><div class="mono" style="font-size:16px">'+ms.length+'日</div></div>'+
     '<div style="width:1px;background:var(--line)"></div>'+
