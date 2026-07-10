@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.66 (localStorage保存・完全オフライン)
+   収支台帳 1.67 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -241,7 +241,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -268,6 +268,10 @@ function applyData(d){
   S.fixed = Array.isArray(d.fixed)?d.fixed:[];
   S.wishlist = Array.isArray(d.wishlist)?d.wishlist:[];
   S.bank = Object.assign({switch:"",ceiling:"300000",seed:"",txns:[]}, d.bank||{});
+  S.savings = Object.assign({goals:[],txns:[]}, d.savings||{});
+  if(!Array.isArray(S.savings.goals) || !S.savings.goals.length){
+    S.savings.goals = [{id:uid(),name:"引越し資金",target:"",done:false,doneDate:""},{id:uid(),name:"生活防衛費",target:"500000",done:false,doneDate:""}];
+  }
   S.mjTables = (Array.isArray(d.mjTables)?d.mjTables:[]).map(t=>{
     const n = Object.assign({}, t);
     if(!n.rule) n.rule = "3";
@@ -432,7 +436,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.66";
+const APP_VERSION = "1.67";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -440,6 +444,7 @@ function render(){
   if(UI.screen==="fixed"){ app.innerHTML = viewFixed(); bindFixed(); return; }
   if(UI.screen==="wishlist"){ app.innerHTML = viewWishlist(); bindWishlist(); return; }
   if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
+  if(UI.screen==="savings"){ app.innerHTML = viewSavings(); bindSavings(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
   if(UI.screen==="bordertool"){ app.innerHTML = viewBorderTool(); bindBorderTool(); return; }
@@ -468,6 +473,7 @@ function viewMain(){
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="fixed">固定費</button>';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="wishlist">ほしい物</button>';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="bank">軍資金</button>';
+  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="savings">貯金</button>';
   h += '</div><div class="row" style="gap:6px">';
   h += '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>';
   h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="backup">backup</button></div></div>';
@@ -1329,6 +1335,79 @@ function bindBank(){
   });
 }
 
+/* ---------- 貯金(目標ゲージ・口座) ---------- */
+function savingsBalance(){
+  const tx=(S.savings&&S.savings.txns)||[];
+  const dep=tx.filter(t=>t.type==="deposit").reduce((a,t)=>a+num(t.amount),0);
+  const wd=tx.filter(t=>t.type==="withdraw").reduce((a,t)=>a+num(t.amount),0);
+  const adj=tx.filter(t=>t.type==="adjust").reduce((a,t)=>a+num(t.amount),0);
+  return bankSaved()+dep-wd+adj;
+}
+function savingsDeposits(){ return ((S.savings&&S.savings.txns)||[]).filter(t=>t.type==="deposit").reduce((a,t)=>a+num(t.amount),0); }
+function savingsCurGoal(){ return ((S.savings&&S.savings.goals)||[]).find(g=>!g.done)||null; }
+function viewSavings(){
+  const sv=S.savings, bal=savingsBalance(), goal=savingsCurGoal();
+  const swept=bankSaved(), deposited=savingsDeposits();
+  let h='<div class="hdr"><button class="navbtn" data-sa="back">‹ 戻る</button><div style="font-size:14px;font-weight:700">貯金</div><div style="width:44px"></div></div>';
+  h+='<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">軍資金の天井超え(+EVの回収)と先取りが積み上がる箱。目標は順番に:まず引越し資金、次に生活防衛費。同じ箱で目標だけ切り替わります。</div>';
+  h+='<div class="card" style="margin-bottom:12px">';
+  h+='<div class="row between" style="align-items:baseline"><span class="muted" style="font-size:11px">残高</span><span class="mono teal" style="font-size:28px;font-weight:700">¥'+bal.toLocaleString("ja-JP")+'</span></div>';
+  if(goal){
+    const tgt=num(goal.target), pct=tgt>0?Math.min(100,bal/tgt*100):0, remain=Math.max(0,tgt-bal), reached=tgt>0&&bal>=tgt;
+    h+='<div style="margin-top:12px"><div class="row between" style="font-size:12px;margin-bottom:6px"><span style="font-weight:700">目標: '+esc(goal.name)+'</span><span class="mono muted">¥'+tgt.toLocaleString("ja-JP")+'</span></div>';
+    h+='<div style="height:10px;background:var(--surface2);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(reached?"var(--teal)":"var(--amber)")+'"></div></div>';
+    h+='<div class="row between" style="font-size:11px;margin-top:6px">'+(reached?'<span class="teal" style="font-weight:700">達成!</span>':tgt>0?'<span class="muted">あと ¥'+remain.toLocaleString("ja-JP")+'</span>':'<span class="muted">目標額を設定してください(下でタップ)</span>')+'<span class="mono muted">'+(tgt>0?Math.floor(pct):0)+'%</span></div>';
+    if(reached) h+='<button class="btn tealb full" style="margin-top:10px;padding:9px 0;font-weight:700" data-sa="achieve" data-v="'+goal.id+'">この目標を達成にして次へ</button>';
+    h+='</div>';
+  } else h+='<div class="teal" style="font-size:13px;font-weight:700;margin-top:12px;text-align:center">全目標 達成</div>';
+  h+='</div>';
+  h+='<div class="card2" style="margin-bottom:14px;font-size:12px;padding:12px">'+
+    '<div class="row between" style="margin-bottom:5px"><span class="muted">軍資金からのスイープ累計</span><span class="mono teal">¥'+swept.toLocaleString("ja-JP")+'</span></div>'+
+    '<div class="row between"><span class="muted">先取り累計</span><span class="mono">¥'+deposited.toLocaleString("ja-JP")+'</span></div></div>';
+  h+=band("操作");
+  h+='<div class="row" style="gap:8px;margin-bottom:8px">'+
+    '<button class="btn" style="flex:1;font-size:12px;padding:9px 0" data-sa="deposit">先取り入金</button>'+
+    '<button class="btn" style="flex:1;font-size:12px;padding:9px 0" data-sa="withdraw">引き出し</button>'+
+    '<button class="btn" style="flex:1;font-size:12px;padding:9px 0" data-sa="adjust">調整</button></div>';
+  h+=band("目標");
+  (sv.goals||[]).forEach(g=>{
+    const cur = goal && g.id===goal.id;
+    h+='<div class="listitem" style="'+(cur?"border-color:var(--amber)":"")+'"><div style="flex:1;min-width:0;cursor:pointer" data-sa="goaledit" data-v="'+g.id+'">'+
+      '<div style="font-size:13px;font-weight:700">'+(g.done?"✓ ":cur?"▶ ":"")+esc(g.name)+(g.done?' <span class="muted" style="font-size:10px;font-weight:400">達成済</span>':cur?' <span class="amber" style="font-size:10px;font-weight:400">進行中</span>':'')+'</div>'+
+      '<div class="muted mono" style="font-size:10px">目標 ¥'+num(g.target).toLocaleString("ja-JP")+'(タップで編集)</div></div>'+
+      '<button class="xbtn" style="font-size:13px;flex-shrink:0" data-sa="goaldel" data-v="'+g.id+'">×</button></div>';
+  });
+  h+='<button class="btn" style="font-size:11px;padding:6px 12px;margin-top:4px;border-style:dashed;color:var(--muted)" data-sa="goaladd">＋ 目標を追加</button>';
+  const txns=(sv.txns||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  if(txns.length){
+    h+=band("記録");
+    const LBL={deposit:"先取り入金",withdraw:"引き出し",adjust:"調整"};
+    txns.forEach(t=>{
+      const amt = t.type==="withdraw"? -num(t.amount) : num(t.amount);
+      h+='<div class="listitem"><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700">'+(LBL[t.type]||t.type)+'</div><div class="muted mono" style="font-size:10px">'+esc(t.date)+'</div></div>'+
+        '<div class="mono '+clsPM(amt)+'" style="font-size:14px;font-weight:700">'+signYen(amt)+'</div>'+
+        '<button class="xbtn" style="font-size:13px;margin-left:8px;flex-shrink:0" data-sa="txndel" data-v="'+t.id+'">×</button></div>';
+    });
+  }
+  return h;
+}
+function bindSavings(){
+  document.querySelectorAll("[data-sa]").forEach(el=>{
+    const a=el.dataset.sa, v=el.dataset.v, sv=S.savings;
+    el.onclick=()=>{
+      if(a==="back"){ UI.screen="main"; render(); return; }
+      if(a==="deposit"){ const p=prompt("先取り入金する額(円):",""); if(p===null)return; const amt=num(p); if(amt<=0)return; (sv.txns=sv.txns||[]).push({id:uid(),date:todayStr(),type:"deposit",amount:String(amt)}); save(); render(); return; }
+      if(a==="withdraw"){ const p=prompt("引き出す額(円):",""); if(p===null)return; const amt=num(p); if(amt<=0)return; (sv.txns=sv.txns||[]).push({id:uid(),date:todayStr(),type:"withdraw",amount:String(amt)}); save(); render(); return; }
+      if(a==="adjust"){ const p=prompt("調整額(円・マイナス可):",""); if(p===null)return; const amt=num(p); if(amt===0)return; (sv.txns=sv.txns||[]).push({id:uid(),date:todayStr(),type:"adjust",amount:String(amt)}); save(); render(); return; }
+      if(a==="achieve"){ const g=(sv.goals||[]).find(x=>x.id===v); if(g && confirm("「"+g.name+"」を達成にして次の目標へ進みます。よろしいですか?")){ g.done=true; g.doneDate=todayStr(); save(); render(); } return; }
+      if(a==="goaledit"){ const g=(sv.goals||[]).find(x=>x.id===v); if(!g)return; const name=prompt("目標の名前:",g.name||""); if(name===null)return; const tg=prompt("目標額(円):",g.target||""); if(tg===null)return; g.name=(name.trim()||g.name); g.target=String(num(tg)); save(); render(); return; }
+      if(a==="goaladd"){ const name=prompt("目標の名前:",""); if(name===null||!name.trim())return; const tg=prompt("目標額(円):",""); if(tg===null)return; (sv.goals=sv.goals||[]).push({id:uid(),name:name.trim(),target:String(num(tg)),done:false,doneDate:""}); save(); render(); return; }
+      if(a==="goaldel"){ const g=(sv.goals||[]).find(x=>x.id===v); if(g && confirm("目標「"+g.name+"」を削除?")){ sv.goals=(sv.goals||[]).filter(x=>x.id!==v); save(); render(); } return; }
+      if(a==="txndel"){ if(confirm("この記録を削除?")){ sv.txns=(sv.txns||[]).filter(t=>t.id!==v); save(); render(); } return; }
+    };
+  });
+}
+
 /* ---------- ほしい物リスト(承認フロー) ---------- */
 function wishDaysLeft(w){
   if(!w.cooldownStart || !num(w.cooldownDays)) return 0;
@@ -1762,6 +1841,7 @@ function bindMain(){
       else if(a==="fixed"){ UI.screen="fixed"; UI.fixForm=null; render(); }
       else if(a==="wishlist"){ UI.screen="wishlist"; render(); }
       else if(a==="bank"){ UI.screen="bank"; render(); }
+      else if(a==="savings"){ UI.screen="savings"; render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
       else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
