@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.73 (localStorage保存・完全オフライン)
+   収支台帳 1.74 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -437,7 +437,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.73";
+const APP_VERSION = "1.74";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -502,10 +502,10 @@ function viewMain(){
     const gmk = monthKey();
     const gme = S.entries.filter(e=>e.date.startsWith(gmk));
     const gambleNet = gme.filter(e=>e.src==="slot"||e.src==="mahjong").reduce((a,e)=>a+(e.type==="income"?e.amount:-e.amount),0);
-    h += '<div class="card" style="margin-bottom:12px">'+
-      '<div class="row between" style="align-items:baseline"><span class="muted" style="font-size:11px">当月の遊技収支</span><span class="mono '+clsPM(gambleNet)+'" style="font-size:26px;font-weight:700">'+signYen(gambleNet)+'</span></div>'+
-      (S.bank && S.bank.switch ? '<div class="row between" style="border-top:1px solid var(--line);padding-top:10px;margin-top:9px;cursor:pointer" data-a="bank"><span class="muted" style="font-size:11px">軍資金残高</span><span><span class="mono teal" style="font-size:16px;font-weight:700">¥'+bankBalance().toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:10px"> / ¥'+(num(S.bank.ceiling)||300000).toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>' : '')+
-      '</div>';
+    h += '<div class="card" style="margin-bottom:10px;padding:10px 14px"><div class="row between" style="align-items:center;font-size:12px">'+
+      '<span><span class="muted">当月遊技 </span><span class="mono '+clsPM(gambleNet)+'" style="font-weight:700;font-size:14px">'+signYen(gambleNet)+'</span></span>'+
+      (S.bank && S.bank.switch ? '<span style="cursor:pointer" data-a="bank"><span class="muted">軍資金 </span><span class="mono teal" style="font-weight:700;font-size:14px">¥'+bankBalance().toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span>' : '')+
+      '</div></div>';
     h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
       [["slot","パチスロ"],["mahjong","麻雀"]].map(([v,l])=>
         '<button class="btn '+(gsub===v?"sel":"")+'" style="flex:1;padding:8px 0;font-weight:700" data-a="gamesub" data-v="'+v+'">'+l+'</button>').join("")+
@@ -584,19 +584,6 @@ function viewLedger(){
     h += '</div>';
   });
   h += '</div>';
-
-  const cats = {};
-  me.filter(e=>e.type==="expense" && !isNetEntry(e)).forEach(e=>cats[e.category]=(cats[e.category]||0)+e.amount);
-  const ct = Object.entries(cats).sort((a,b)=>b[1]-a[1]);
-  const QCOL = {"消費":"var(--teal)","娯楽":"var(--amber)","自己投資":"var(--blue)"};
-  if(ct.length){
-    h += band("支出内訳") + '<div class="card">' + ct.map(([c,a])=>{
-      const col = QCOL[c] || "var(--teal)";
-      return '<div style="margin:8px 0"><div class="row between" style="font-size:12px;margin-bottom:3px">'+
-      '<span>'+esc(c)+'</span><span class="mono muted">'+yen(a)+' <span style="font-size:10px">('+Math.round(a/normExpense*100)+'%)</span></span></div>'+
-      '<div class="bar"><div style="width:'+(a/normExpense*100)+'%;background:'+col+'"></div></div></div>';
-    }).join("") + '</div>';
-  }
 
   h += band("明細");
   if(!me.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の記録はまだありません。右下の「＋」から追加できます。</div>';
