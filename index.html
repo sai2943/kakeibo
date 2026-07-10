@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.81 (localStorage保存・完全オフライン)
+   収支台帳 1.82 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -441,7 +441,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.81";
+const APP_VERSION = "1.82";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -550,8 +550,7 @@ function viewLedger(){
   const isNetEntry = e => NET_SRCS.includes(e.src);
   const income = me.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);
   const expense = me.filter(e=>e.type==="expense").reduce((s,e)=>s+e.amount,0);
-  const _sw = (S.bank&&S.bank.switch)||"9999-99-99";
-  const _inBank = e => (e.src==="slot"||e.src==="mahjong") && e.date>=_sw;
+  const _inBank = e => (e.src==="slot"||e.src==="mahjong");
   const bal = me.filter(e=>!_inBank(e)).reduce((s,e)=> s + (e.type==="income"?e.amount:-e.amount), 0);
   /* 内訳用: 収支カテゴリを除いた通常の収入・支出 */
   const normIncome = me.filter(e=>e.type==="income" && !isNetEntry(e)).reduce((s,e)=>s+e.amount,0);
