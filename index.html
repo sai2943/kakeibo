@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.67 (localStorage保存・完全オフライン)
+   収支台帳 1.68 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -436,7 +436,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.67";
+const APP_VERSION = "1.68";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1399,11 +1399,11 @@ function bindSavings(){
       if(a==="deposit"){ const p=prompt("先取り入金する額(円):",""); if(p===null)return; const amt=num(p); if(amt<=0)return; (sv.txns=sv.txns||[]).push({id:uid(),date:todayStr(),type:"deposit",amount:String(amt)}); save(); render(); return; }
       if(a==="withdraw"){ const p=prompt("引き出す額(円):",""); if(p===null)return; const amt=num(p); if(amt<=0)return; (sv.txns=sv.txns||[]).push({id:uid(),date:todayStr(),type:"withdraw",amount:String(amt)}); save(); render(); return; }
       if(a==="adjust"){ const p=prompt("調整額(円・マイナス可):",""); if(p===null)return; const amt=num(p); if(amt===0)return; (sv.txns=sv.txns||[]).push({id:uid(),date:todayStr(),type:"adjust",amount:String(amt)}); save(); render(); return; }
-      if(a==="achieve"){ const g=(sv.goals||[]).find(x=>x.id===v); if(g && confirm("「"+g.name+"」を達成にして次の目標へ進みます。よろしいですか?")){ g.done=true; g.doneDate=todayStr(); save(); render(); } return; }
-      if(a==="goaledit"){ const g=(sv.goals||[]).find(x=>x.id===v); if(!g)return; const name=prompt("目標の名前:",g.name||""); if(name===null)return; const tg=prompt("目標額(円):",g.target||""); if(tg===null)return; g.name=(name.trim()||g.name); g.target=String(num(tg)); save(); render(); return; }
+      if(a==="achieve"){ const g=(sv.goals||[]).find(x=>String(x.id)===String(v)); if(g && confirm("「"+g.name+"」を達成にして次の目標へ進みます。よろしいですか?")){ g.done=true; g.doneDate=todayStr(); save(); render(); } return; }
+      if(a==="goaledit"){ const g=(sv.goals||[]).find(x=>String(x.id)===String(v)); if(!g)return; const name=prompt("目標の名前:",g.name||""); if(name===null)return; const tg=prompt("目標額(円):",g.target||""); if(tg===null)return; g.name=(name.trim()||g.name); g.target=String(num(tg)); save(); render(); return; }
       if(a==="goaladd"){ const name=prompt("目標の名前:",""); if(name===null||!name.trim())return; const tg=prompt("目標額(円):",""); if(tg===null)return; (sv.goals=sv.goals||[]).push({id:uid(),name:name.trim(),target:String(num(tg)),done:false,doneDate:""}); save(); render(); return; }
-      if(a==="goaldel"){ const g=(sv.goals||[]).find(x=>x.id===v); if(g && confirm("目標「"+g.name+"」を削除?")){ sv.goals=(sv.goals||[]).filter(x=>x.id!==v); save(); render(); } return; }
-      if(a==="txndel"){ if(confirm("この記録を削除?")){ sv.txns=(sv.txns||[]).filter(t=>t.id!==v); save(); render(); } return; }
+      if(a==="goaldel"){ const g=(sv.goals||[]).find(x=>String(x.id)===String(v)); if(g && confirm("目標「"+g.name+"」を削除?")){ sv.goals=(sv.goals||[]).filter(x=>String(x.id)!==String(v)); save(); render(); } return; }
+      if(a==="txndel"){ if(confirm("この記録を削除?")){ sv.txns=(sv.txns||[]).filter(t=>String(t.id)!==String(v)); save(); render(); } return; }
     };
   });
 }
