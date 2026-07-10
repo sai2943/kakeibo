@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.72 (localStorage保存・完全オフライン)
+   収支台帳 1.73 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -437,7 +437,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.72";
+const APP_VERSION = "1.73";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -499,6 +499,13 @@ function viewMain(){
   if(UI.tab==="ledger") h += viewLedger();
   if(UI.tab==="games"){
     const gsub = UI.gameSub || "slot";
+    const gmk = monthKey();
+    const gme = S.entries.filter(e=>e.date.startsWith(gmk));
+    const gambleNet = gme.filter(e=>e.src==="slot"||e.src==="mahjong").reduce((a,e)=>a+(e.type==="income"?e.amount:-e.amount),0);
+    h += '<div class="card" style="margin-bottom:12px">'+
+      '<div class="row between" style="align-items:baseline"><span class="muted" style="font-size:11px">当月の遊技収支</span><span class="mono '+clsPM(gambleNet)+'" style="font-size:26px;font-weight:700">'+signYen(gambleNet)+'</span></div>'+
+      (S.bank && S.bank.switch ? '<div class="row between" style="border-top:1px solid var(--line);padding-top:10px;margin-top:9px;cursor:pointer" data-a="bank"><span class="muted" style="font-size:11px">軍資金残高</span><span><span class="mono teal" style="font-size:16px;font-weight:700">¥'+bankBalance().toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:10px"> / ¥'+(num(S.bank.ceiling)||300000).toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>' : '')+
+      '</div>';
     h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
       [["slot","パチスロ"],["mahjong","麻雀"]].map(([v,l])=>
         '<button class="btn '+(gsub===v?"sel":"")+'" style="flex:1;padding:8px 0;font-weight:700" data-a="gamesub" data-v="'+v+'">'+l+'</button>').join("")+
@@ -542,41 +549,6 @@ function viewLedger(){
     '<div style="width:1px;background:var(--line)"></div>'+
     '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">支出</div><div class="mono red" style="font-size:16px">'+yen(normExpense)+'</div></div></div></div>';
 
-  /* 遊技サマリー(独立・種目別+トータル) */
-  const gameNet = (src) => me.filter(e=>e.src===src).reduce((a,e)=> a + (e.type==="income"?e.amount:-e.amount), 0);
-  const gameGross = (src) => ({
-    inc: me.filter(e=>e.src===src && e.type==="income").reduce((a,e)=>a+e.amount,0),
-    exp: me.filter(e=>e.src===src && e.type==="expense").reduce((a,e)=>a+e.amount,0)
-  });
-  const hasGame = me.some(e=>e.src==="slot"||e.src==="mahjong");
-  if(hasGame){
-    const gTotal = gameNet("slot") + gameNet("mahjong");
-    const gamesList = [["slot","パチスロ"],["mahjong","麻雀"]].filter(([src])=>{ const g=gameGross(src); return !(g.inc===0 && g.exp===0); });
-    h += band("当月の遊技収支");
-    if(S.bank && S.bank.switch) h += '<div class="muted" style="font-size:10px;margin:-4px 2px 8px">'+esc(S.bank.switch)+'以降は<b style="color:var(--teal)">軍資金</b>へ(家計簿の収支には含めません)</div>';
-    h += '<div class="card">'+
-      /* 親: トータル */
-      '<div style="text-align:center;padding:2px 0 '+(gamesList.length>=2?"12px":"2px")+'">'+
-        '<div class="muted" style="font-size:11px;margin-bottom:3px;letter-spacing:.05em">遊技トータル'+(gamesList.length>=2?' <span style="opacity:.6">(パチスロ＋麻雀)</span>':'')+'</div>'+
-        '<div class="mono '+clsPM(gTotal)+'" style="font-size:30px;font-weight:700;line-height:1">'+signYen(gTotal)+'</div>'+
-      '</div>'+
-      /* 子: 種目別内訳(2種目以上のときだけ) */
-      (gamesList.length>=2
-        ? '<div class="row" style="border-top:1px solid var(--line);padding-top:11px">'+
-          gamesList.map(([src,label],idx)=>{
-            const net=gameNet(src), g=gameGross(src);
-            return '<div style="flex:1;text-align:center;padding:0 6px'+(idx>0?';border-left:1px solid var(--line)':'')+'">'+
-              '<div class="muted" style="font-size:11px;margin-bottom:3px">'+label+'</div>'+
-              '<div class="mono '+clsPM(net)+'" style="font-size:19px;font-weight:700;line-height:1.1">'+signYen(net)+'</div>'+
-              '<div class="row between" style="font-size:10px;margin-top:7px"><span class="muted">収入</span><span class="mono teal">'+yen(g.inc)+'</span></div>'+
-              '<div class="row between" style="font-size:10px;margin-top:1px"><span class="muted">支出</span><span class="mono red">'+yen(g.exp)+'</span></div>'+
-              '</div>';
-          }).join("")+
-          '</div>'
-        : '')+
-      (S.bank && S.bank.switch ? '<div class="row between" style="border-top:1px solid var(--line);padding-top:10px;margin-top:'+(gamesList.length>=2?"11":"8")+'px;cursor:pointer" data-a="bank"><span class="muted" style="font-size:11px">軍資金残高</span><span><span class="mono teal" style="font-size:16px;font-weight:700">¥'+bankBalance().toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:10px"> / ¥'+(num(S.bank.ceiling)||300000).toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>' : '')+
-      '</div>';
-  }
 
   /* 収入内訳(収支カテゴリを除く) */
   const incCats = {};
@@ -658,7 +630,7 @@ function viewSlot(){
   const daiTotal = daiSess.reduce((a,s)=>a+finalOwn(s),0);
   const exps = ms.reduce((a,s)=>a+expTotal(s),0);
   let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
-    '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月遊技収支(経費控除後)</div>'+
+    '<div style="font-size:11px;letter-spacing:.15em" class="muted">パチスロ収支(経費控除後)</div>'+
     '<div class="mono '+clsPM(total)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(total)+'</div></div>'+
     (daiTotal!==0 ? '<div class="row between" style="border-top:1px solid var(--line);padding-top:8px;margin-top:6px;font-size:12px"><span class="muted">代打ち報酬(→家計簿の収入)</span><span class="mono '+clsPM(daiTotal)+'">'+signYen(daiTotal)+'</span></div>' : '')+
     '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
@@ -689,7 +661,7 @@ function viewMahjong(){
   const total = ms.reduce((a,s)=>a+mjFinal(s),0);
   const hanchans = ms.reduce((a,s)=>a+mjHanchan(s),0);
   let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
-    '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月麻雀収支(ゲーム代込)</div>'+
+    '<div style="font-size:11px;letter-spacing:.15em" class="muted">麻雀収支(ゲーム代込)</div>'+
     '<div class="mono '+clsPM(total)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(total)+'</div></div>'+
     '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
     '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">半荘数</div><div class="mono" style="font-size:16px">'+hanchans+'</div></div>'+
