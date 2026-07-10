@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.82 (localStorage保存・完全オフライン)
+   収支台帳 1.83 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -168,6 +168,48 @@ const uid = () => Date.now() + Math.floor(Math.random()*1000);
    テンプレートが実エントリを生成する方式。日付が過去なら実績、未来なら予定。
    当年12月まで生成。停止すると未来分だけ削除し過去は残す。 */
 const daysInMonth = (y,m) => new Date(y, m, 0).getDate();  // m:1-12
+/* 日本の祝日判定(オフライン・計算式。春分/秋分は天文近似、ハッピーマンデー・振替休日・国民の休日に対応) */
+function jpEquinox(y, spring){
+  const base = spring ? 20.8431 : 23.2488;
+  return Math.floor(base + 0.242194*(y-1980) - Math.floor((y-1980)/4));
+}
+function isJpHolidayYMD(y, m, d){
+  const FIX = {1:[1], 2:[11,23], 4:[29], 5:[3,4,5], 8:[11], 11:[3,23]};
+  if(FIX[m] && FIX[m].indexOf(d)>=0) return true;
+  if(m===3 && d===jpEquinox(y,true)) return true;
+  if(m===9 && d===jpEquinox(y,false)) return true;
+  const dow = new Date(y, m-1, d).getDay();
+  if(dow===1){
+    const week = Math.floor((d-1)/7)+1;
+    if(m===1 && week===2) return true;   // 成人の日
+    if(m===7 && week===3) return true;   // 海の日
+    if(m===9 && week===3) return true;   // 敬老の日
+    if(m===10 && week===2) return true;  // スポーツの日
+  }
+  return false;
+}
+function isJpHoliday(dt){
+  const DAY=86400000;
+  const y=dt.getFullYear(), m=dt.getMonth()+1, d=dt.getDate();
+  if(isJpHolidayYMD(y,m,d)) return true;
+  let p=new Date(dt.getTime()-DAY);   // 振替休日: 直前の連続祝日が日曜まで遡れる
+  while(isJpHolidayYMD(p.getFullYear(),p.getMonth()+1,p.getDate())){
+    if(p.getDay()===0) return true;
+    p=new Date(p.getTime()-DAY);
+  }
+  if(dt.getDay()!==0 && dt.getDay()!==6){   // 国民の休日: 前後が祝日の平日
+    const pv=new Date(dt.getTime()-DAY), nx=new Date(dt.getTime()+DAY);
+    if(isJpHolidayYMD(pv.getFullYear(),pv.getMonth()+1,pv.getDate()) && isJpHolidayYMD(nx.getFullYear(),nx.getMonth()+1,nx.getDate())) return true;
+  }
+  return false;
+}
+function isNonBusinessDay(dt){ const g=dt.getDay(); return g===0 || g===6 || isJpHoliday(dt); }
+function shiftForHoliday(dt, mode){
+  const DAY=86400000; let d=new Date(dt.getTime());
+  if(mode==="before"){ while(isNonBusinessDay(d)) d=new Date(d.getTime()-DAY); }
+  else if(mode==="after"){ while(isNonBusinessDay(d)) d=new Date(d.getTime()+DAY); }
+  return d;
+}
 function fixedDateFor(tpl, y, m){
   const d = Math.min(num(tpl.day)||1, daysInMonth(y,m));
   return y + "-" + String(m).padStart(2,"0") + "-" + String(d).padStart(2,"0");
@@ -193,7 +235,8 @@ function fixedOccurrences(tpl){
       out.push(new Date(y, m, Math.min(day, daysInMonth(y, m+1))));
     }
   }
-  return out;
+  const hs = tpl.holidayShift || "none";
+  return (hs==="none") ? out : out.map(dt => shiftForHoliday(dt, hs));
 }
 function genFixedEntries(tpl){
   const skips = tpl.skips || [];
@@ -441,7 +484,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.82";
+const APP_VERSION = "1.83";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1622,6 +1665,10 @@ function viewFixed(){
           '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-day" placeholder="1-31" value="'+esc(f.day)+'"></div>')+
       '<div style="flex:1.2"><div class="muted" style="font-size:9px;margin-bottom:2px">金額</div>'+
       '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-amount" placeholder="円" value="'+esc(f.amount)+'"></div></div>'+
+      (!isWeekly ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">引き落とし日が土日祝のとき</div>'+
+        '<div class="row" style="gap:6px;margin-bottom:12px">'+
+        [["none","変わらず"],["before","前営業日"],["after","翌営業日"]].map(([v,l])=>
+          '<button class="btn '+((f.holidayShift||"none")===v?"sel":"")+'" style="flex:1;padding:9px 2px;font-size:12px" data-fa="fshift" data-v="'+v+'">'+l+'</button>').join("")+'</div>' : '')+
       '<div class="row" style="gap:8px">'+
       '<button class="btn" style="flex:1;color:var(--text)" data-fa="fcancel">やめる</button>'+
       '<button class="btn primary" style="flex:1.4;font-weight:700" data-fa="fsave">'+(f.editId?"保存する":"登録する")+'</button></div>'+
@@ -1650,9 +1697,10 @@ function bindFixed(){
       else if(a==="ftype"){ f.type=v; f.category=v==="expense"?"消費":"給与"; render(); }
       else if(a==="fcat"){ f.category=v; render(); }
       else if(a==="ffreq"){ f.freq=v; if((v==="weekly"||v==="biweekly")&&!f.start) f.start=todayStr(); render(); }
+      else if(a==="fshift"){ f.holidayShift=v; render(); }
       else if(a==="edit"){
         const t=(S.fixed||[]).find(x=>String(x.id)===String(v));
-        if(t){ UI.fixForm={editId:t.id, type:t.type, name:t.name, category:t.category, freq:t.freq||"monthly", day:t.day?String(t.day):"", start:t.start||todayStr(), amount:String(t.amount)}; render(); }
+        if(t){ UI.fixForm={editId:t.id, type:t.type, name:t.name, category:t.category, freq:t.freq||"monthly", day:t.day?String(t.day):"", start:t.start||todayStr(), amount:String(t.amount), holidayShift:t.holidayShift||"none"}; render(); }
       }
       else if(a==="stop"){
         const t=(S.fixed||[]).find(x=>String(x.id)===String(v));
@@ -1674,7 +1722,8 @@ function bindFixed(){
         if(isW && !f.start){ alert("起点日を選んでください。"); return; }
         let day = num(f.day); if(day<1) day=1; if(day>31) day=31;
         const base={name:f.name.trim(), type:f.type, category:f.category, freq,
-          day:isW?"":String(day), start:isW?f.start:"", amount:String(num(f.amount))};
+          day:isW?"":String(day), start:isW?f.start:"", amount:String(num(f.amount)),
+          holidayShift: isW ? "none" : (f.holidayShift||"none")};
         if(f.editId){
           updateFixed(Object.assign({id:f.editId}, base));
         }else{
