@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.63 (localStorage保存・完全オフライン)
+   収支台帳 1.64 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -432,7 +432,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.63";
+const APP_VERSION = "1.64";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1994,8 +1994,9 @@ function sessionSummary(s){
     h += srow("経費(自分負担分)", -expTotal(s));
     const fin = finalOwn(s);
     h += '<div style="height:1px;background:var(--line);margin:8px 0"></div>'+
-      '<div class="row between" style="align-items:baseline"><span style="font-size:12px;font-weight:700">最終収支(家計簿へ連携)</span>'+
-      '<span class="mono '+clsPM(fin)+'" style="font-size:20px;font-weight:700">'+signYen(fin)+'</span></div>';
+      '<div class="row between" style="align-items:baseline"><span style="font-size:12px;font-weight:700">代打ち報酬(家計簿の収入へ)</span>'+
+      '<span class="mono '+clsPM(fin)+'" style="font-size:20px;font-weight:700">'+signYen(fin)+'</span></div>'+
+      '<div class="muted" style="font-size:10px;margin-top:4px">労働収入なので家計簿の収入に計上(軍資金には入りません)</div>';
     return h;
   }
   if(s.mode==="nori"){
@@ -2533,11 +2534,13 @@ function saveSession(){
   /* 家計簿連携 */
   const linkId = "slot-"+s.id;
   const fin = finalOwn(cleaned);
+  const isDai = cleaned.mode==="dai";
   S.entries = S.entries.filter(e=>e.id!==linkId);
   if(fin!==0){
-    S.entries.push({id:linkId, date:cleaned.date, src:"slot",
+    S.entries.push({id:linkId, date:cleaned.date,
+      src: isDai ? "daida" : "slot",
       type: fin>0?"income":"expense",
-      category: "遊技",
+      category: isDai ? "代打ち" : "遊技",
       amount: Math.abs(fin),
       memo: modeLabel(cleaned.mode)+(cleaned.store?" @"+cleaned.store:"")});
   }
