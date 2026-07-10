@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.77 (localStorage保存・完全オフライン)
+   収支台帳 1.78 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -437,7 +437,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.77";
+const APP_VERSION = "1.78";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -602,9 +602,10 @@ function viewLedger(){
   h += '</div>';
 
   h += band("明細");
-  if(!me.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の記録はまだありません。右下の「＋」から追加できます。</div>';
+  const detEntries = me.filter(e=>!isNetEntry(e));
+  if(!detEntries.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の記録はまだありません。右下の「＋」から追加できます。</div>';
   const byDate = {};
-  me.forEach(e=>{ (byDate[e.date]=byDate[e.date]||[]).push(e); });
+  detEntries.forEach(e=>{ (byDate[e.date]=byDate[e.date]||[]).push(e); });
   Object.entries(byDate).sort((a,b)=>a[0]<b[0]?1:-1).forEach(([d,list])=>{
     h += '<div style="margin-bottom:12px"><div class="mono muted" style="font-size:11px;margin:0 4px 4px">'+
       d.slice(5).replace("-","/")+' ('+WD[new Date(d+"T00:00:00").getDay()]+')</div>'+
