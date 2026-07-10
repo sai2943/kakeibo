@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.62 (localStorage保存・完全オフライン)
+   収支台帳 1.63 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -241,7 +241,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
 let UI = {
   tab:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -267,6 +267,7 @@ function applyData(d){
   S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
   S.fixed = Array.isArray(d.fixed)?d.fixed:[];
   S.wishlist = Array.isArray(d.wishlist)?d.wishlist:[];
+  S.bank = Object.assign({switch:"",ceiling:"300000",seed:"",txns:[]}, d.bank||{});
   S.mjTables = (Array.isArray(d.mjTables)?d.mjTables:[]).map(t=>{
     const n = Object.assign({}, t);
     if(!n.rule) n.rule = "3";
@@ -431,13 +432,14 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.62";
+const APP_VERSION = "1.63";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
   if(UI.screen==="mahjong-edit"){ app.innerHTML = viewMj(); bindMj(); return; }
   if(UI.screen==="fixed"){ app.innerHTML = viewFixed(); bindFixed(); return; }
   if(UI.screen==="wishlist"){ app.innerHTML = viewWishlist(); bindWishlist(); return; }
+  if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
   if(UI.screen==="bordertool"){ app.innerHTML = viewBorderTool(); bindBorderTool(); return; }
@@ -466,6 +468,7 @@ function viewMain(){
     '<h1>収支台帳</h1><div class="row" style="gap:6px">';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="fixed">固定費</button>';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="wishlist">ほしい物</button>';
+  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="bank">軍資金</button>';
   h += '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>';
   h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="backup">backup</button></div></div>';
 
@@ -500,14 +503,16 @@ function viewLedger(){
   const isNetEntry = e => NET_SRCS.includes(e.src);
   const income = me.filter(e=>e.type==="income").reduce((s,e)=>s+e.amount,0);
   const expense = me.filter(e=>e.type==="expense").reduce((s,e)=>s+e.amount,0);
-  const bal = income-expense;
+  const _sw = (S.bank&&S.bank.switch)||"9999-99-99";
+  const _inBank = e => (e.src==="slot"||e.src==="mahjong") && e.date>=_sw;
+  const bal = me.filter(e=>!_inBank(e)).reduce((s,e)=> s + (e.type==="income"?e.amount:-e.amount), 0);
   /* 内訳用: 収支カテゴリを除いた通常の収入・支出 */
   const normIncome = me.filter(e=>e.type==="income" && !isNetEntry(e)).reduce((s,e)=>s+e.amount,0);
   const normExpense = me.filter(e=>e.type==="expense" && !isNetEntry(e)).reduce((s,e)=>s+e.amount,0);
   /* 実績/予定(案ア): 日付が今日以前=実績、未来=予定。大きい数字は予定込みの見込み */
   const todayS = todayStr();
   const hasFuture = me.some(e=>e.date>todayS);
-  const actualBal = me.filter(e=>e.date<=todayS).reduce((s,e)=> s + (e.type==="income"?e.amount:-e.amount), 0);
+  const actualBal = me.filter(e=>e.date<=todayS && !_inBank(e)).reduce((s,e)=> s + (e.type==="income"?e.amount:-e.amount), 0);
   let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
     '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月収支'+(hasFuture?'(予定込)':'')+'</div>'+
     '<div class="mono '+clsPM(bal)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(bal)+'</div>'+
@@ -528,6 +533,7 @@ function viewLedger(){
     const gTotal = gameNet("slot") + gameNet("mahjong");
     const gamesList = [["slot","パチスロ"],["mahjong","麻雀"]].filter(([src])=>{ const g=gameGross(src); return !(g.inc===0 && g.exp===0); });
     h += band("当月の遊技収支");
+    if(S.bank && S.bank.switch) h += '<div class="muted" style="font-size:10px;margin:-4px 2px 8px">'+esc(S.bank.switch)+'以降は<b style="color:var(--teal)">軍資金</b>へ(家計簿の収支には含めません)</div>';
     h += '<div class="card">'+
       /* 親: トータル */
       '<div style="text-align:center;padding:2px 0 '+(gamesList.length>=2?"12px":"2px")+'">'+
@@ -1249,6 +1255,75 @@ function saveMjt(persist){
   if(persist) save(); else saveLocal();
 }
 
+/* ---------- 軍資金(バンクロール口座) ---------- */
+function bankGameNet(){
+  const sw=(S.bank&&S.bank.switch)||"9999-99-99";
+  return (S.entries||[]).filter(e=>(e.src==="slot"||e.src==="mahjong") && e.date>=sw)
+    .reduce((a,e)=> a + (e.type==="income"?e.amount:-e.amount), 0);
+}
+function bankSaved(){ return ((S.bank&&S.bank.txns)||[]).filter(t=>t.type==="sweep").reduce((a,t)=>a+num(t.amount),0); }
+function bankBalance(){
+  const b=S.bank||{}, tx=b.txns||[];
+  const topup=tx.filter(t=>t.type==="topup").reduce((a,t)=>a+num(t.amount),0);
+  const sweep=tx.filter(t=>t.type==="sweep").reduce((a,t)=>a+num(t.amount),0);
+  const adj=tx.filter(t=>t.type==="adjust").reduce((a,t)=>a+num(t.amount),0);
+  return num(b.seed)+bankGameNet()+topup-sweep+adj;
+}
+function viewBank(){
+  const b=S.bank, bal=bankBalance(), ceil=num(b.ceiling)||300000;
+  const gnet=bankGameNet(), saved=bankSaved();
+  const pct=Math.max(0,Math.min(100, ceil>0? bal/ceil*100 : 0));
+  const over=bal-ceil, low=bal<ceil*0.15;
+  let h='<div class="hdr"><button class="navbtn" data-ba="back">‹ 戻る</button><div style="font-size:14px;font-weight:700">軍資金</div><div style="width:44px"></div></div>';
+  h+='<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">遊技専用の緩衝プール。勝ち負けはこの中だけで増減し、生活費・貯金には触れません。天井超えは貯金へ回収。負けを外の金で埋める(補充)のが漏れの正体です。</div>';
+  h+='<div class="card" style="margin-bottom:12px">'+
+    '<div class="row between" style="align-items:baseline"><span class="muted" style="font-size:11px">残高</span>'+
+    '<span class="mono '+(low?"red":"teal")+'" style="font-size:28px;font-weight:700">¥'+bal.toLocaleString("ja-JP")+'</span></div>'+
+    '<div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden;margin:9px 0 4px"><div style="height:100%;width:'+pct+'%;background:'+(low?"var(--red)":over>0?"var(--amber)":"var(--teal)")+'"></div></div>'+
+    '<div class="row between" style="font-size:10px"><span class="muted">¥0</span><span class="muted">天井 ¥'+ceil.toLocaleString("ja-JP")+'</span></div></div>';
+  if(low) h+='<div class="card" style="margin-bottom:12px;border-color:var(--red)"><div class="red" style="font-size:12px;font-weight:700">⚠ 軍資金が残りわずか</div><div class="muted" style="font-size:11px;margin-top:4px">尽きたら来月まで補充しない約束です。ここで貯金から補充するのが20年来の漏れ。</div></div>';
+  if(over>0) h+='<div class="card" style="margin-bottom:12px;border-color:var(--teal)"><div class="teal" style="font-size:12px;font-weight:700">天井超え +¥'+over.toLocaleString("ja-JP")+'</div><div class="muted" style="font-size:11px;margin:4px 0 8px">この分を貯金へ回せます(+EVの回収)。</div><button class="btn tealb full" style="padding:9px 0;font-weight:700" data-ba="sweepover">¥'+over.toLocaleString("ja-JP")+' を貯金へスイープ</button></div>';
+  h+='<div class="card2" style="margin-bottom:14px;font-size:12px;padding:12px">'+
+    '<div class="row between" style="margin-bottom:5px"><span class="muted">切替日('+esc(b.switch||"未設定")+')以降の遊技</span><span class="mono '+clsPM(gnet)+'">'+signYen(gnet)+'</span></div>'+
+    '<div class="row between" style="margin-bottom:5px"><span class="muted">シード(初期遊技資金)</span><span class="mono">¥'+num(b.seed).toLocaleString("ja-JP")+'</span></div>'+
+    '<div class="row between"><span class="muted">貯金に回した累計</span><span class="mono teal">¥'+saved.toLocaleString("ja-JP")+'</span></div></div>';
+  h+=band("操作");
+  h+='<div class="row" style="gap:8px;margin-bottom:8px">'+
+    '<button class="btn" style="flex:1;font-size:12px;padding:9px 0" data-ba="seed">シード設定</button>'+
+    '<button class="btn" style="flex:1;font-size:12px;padding:9px 0" data-ba="topup">補充</button>'+
+    '<button class="btn" style="flex:1;font-size:12px;padding:9px 0" data-ba="sweep">スイープ</button>'+
+    '<button class="btn" style="flex:1;font-size:12px;padding:9px 0" data-ba="adjust">調整</button></div>';
+  h+='<div class="card" style="margin:10px 0"><div class="row" style="gap:10px;align-items:flex-end">'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:3px">切替日(給料日推奨)</div><input class="input mono" type="date" value="'+esc(b.switch||"")+'" data-ba-in="switch" style="width:auto;min-width:150px;text-align:left;-webkit-appearance:none;height:44px;box-sizing:border-box"></div>'+
+    '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:3px">天井(円)</div><input class="input r mono" type="number" inputmode="numeric" value="'+esc(b.ceiling||"")+'" data-ba-in="ceiling" style="height:44px;box-sizing:border-box"></div></div></div>';
+  const txns=(b.txns||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  if(txns.length){
+    h+=band("記録");
+    const LBL={topup:"補充",sweep:"貯金へスイープ",adjust:"調整"};
+    txns.forEach(t=>{
+      const amt = t.type==="topup"? num(t.amount) : t.type==="sweep"? -num(t.amount) : num(t.amount);
+      h+='<div class="listitem"><div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700">'+(LBL[t.type]||t.type)+'</div><div class="muted mono" style="font-size:10px">'+esc(t.date)+'</div></div>'+
+        '<div class="mono '+clsPM(amt)+'" style="font-size:14px;font-weight:700">'+signYen(amt)+'</div>'+
+        '<button class="xbtn" style="font-size:13px;margin-left:8px;flex-shrink:0" data-ba="txndel" data-v="'+t.id+'">×</button></div>';
+    });
+  }
+  return h;
+}
+function bindBank(){
+  document.querySelectorAll("[data-ba-in]").forEach(el=>{ el.onchange=e=>{ S.bank[el.dataset.baIn]=e.target.value; save(); render(); }; });
+  document.querySelectorAll("[data-ba]").forEach(el=>{
+    const a=el.dataset.ba, v=el.dataset.v, b=S.bank;
+    el.onclick=()=>{
+      if(a==="back"){ UI.screen="main"; render(); return; }
+      if(a==="seed"){ const p=prompt("シード(今の遊技資金・円):", b.seed||""); if(p===null)return; b.seed=String(num(p)); save(); render(); return; }
+      if(a==="topup"){ const p=prompt("補充額(円):",""); if(p===null)return; const amt=num(p); if(amt<=0)return; if(!confirm("補充 ¥"+amt.toLocaleString("ja-JP")+"\n\nこれは負けを外の金(生活費/貯金)で埋める行為です。あなたの20年来の漏れそのもの。本当に補充しますか?")) return; (b.txns=b.txns||[]).push({id:uid(),date:todayStr(),type:"topup",amount:String(amt)}); save(); render(); return; }
+      if(a==="sweep"||a==="sweepover"){ const over=Math.max(0,bankBalance()-(num(b.ceiling)||300000)); const p=prompt("貯金へスイープする額(円):", String(over)); if(p===null)return; const amt=num(p); if(amt<=0)return; (b.txns=b.txns||[]).push({id:uid(),date:todayStr(),type:"sweep",amount:String(amt)}); save(); render(); return; }
+      if(a==="adjust"){ const p=prompt("調整額(円・マイナス可):",""); if(p===null)return; const amt=num(p); if(amt===0)return; (b.txns=b.txns||[]).push({id:uid(),date:todayStr(),type:"adjust",amount:String(amt)}); save(); render(); return; }
+      if(a==="txndel"){ if(confirm("この記録を削除?")){ b.txns=(b.txns||[]).filter(t=>String(t.id)!==String(v)); save(); render(); } return; }
+    };
+  });
+}
+
 /* ---------- ほしい物リスト(承認フロー) ---------- */
 function wishDaysLeft(w){
   if(!w.cooldownStart || !num(w.cooldownDays)) return 0;
@@ -1681,6 +1756,7 @@ function bindMain(){
       else if(a==="csv") exportCsv();
       else if(a==="fixed"){ UI.screen="fixed"; UI.fixForm=null; render(); }
       else if(a==="wishlist"){ UI.screen="wishlist"; render(); }
+      else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
       else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
