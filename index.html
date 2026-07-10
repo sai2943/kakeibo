@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.69 (localStorage保存・完全オフライン)
+   収支台帳 1.70 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -436,7 +436,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.69";
+const APP_VERSION = "1.70";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -472,8 +472,6 @@ function viewMain(){
   let h = '<div class="row between" style="align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:2px"><div class="row" style="gap:6px">';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="fixed">固定費</button>';
   if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="wishlist">ほしい物</button>';
-  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="bank">軍資金</button>';
-  if(UI.tab==="ledger") h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="savings">貯金</button>';
   h += '</div><div class="row" style="gap:6px">';
   h += '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>';
   h += '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="backup">backup</button></div></div>';
@@ -481,7 +479,16 @@ function viewMain(){
   if(UI.tab==="tool"){
     h += viewTool();
     h += '<div class="tabs">'+
-      [["ledger","家計簿"],["games","遊技"],["tool","ツール"]].map(([v,l])=>
+      [["ledger","家計簿"],["games","遊技"],["assets","資産"],["tool","ツール"]].map(([v,l])=>
+        '<button class="'+(UI.tab===v?"on":"")+'" data-a="tab" data-v="'+v+'">'+l+'</button>').join("")+
+      '</div>';
+    return h;
+  }
+
+  if(UI.tab==="assets"){
+    h += viewAssets();
+    h += '<div class="tabs">'+
+      [["ledger","家計簿"],["games","遊技"],["assets","資産"],["tool","ツール"]].map(([v,l])=>
         '<button class="'+(UI.tab===v?"on":"")+'" data-a="tab" data-v="'+v+'">'+l+'</button>').join("")+
       '</div>';
     return h;
@@ -500,7 +507,7 @@ function viewMain(){
 
   h += '<button class="fab" data-a="add">＋</button>';
   h += '<div class="tabs">'+
-    [["ledger","家計簿"],["games","遊技"],["tool","ツール"]].map(([v,l])=>
+    [["ledger","家計簿"],["games","遊技"],["assets","資産"],["tool","ツール"]].map(([v,l])=>
       '<button class="'+(UI.tab===v?"on":"")+'" data-a="tab" data-v="'+v+'">'+l+'</button>').join("")+
     '</div>';
   return h;
@@ -1270,6 +1277,37 @@ function saveMjt(persist){
   const i=(S.mjTables||[]).findIndex(x=>String(x.id)===String(t.id));
   if(i>=0) S.mjTables[i]=t; else (S.mjTables=S.mjTables||[]).push(t);
   if(persist) save(); else saveLocal();
+}
+
+/* ---------- 資産タブ(概観) ---------- */
+function viewAssets(){
+  const bBal=bankBalance(), ceil=num(S.bank.ceiling)||300000;
+  const sBal=savingsBalance(), goal=savingsCurGoal();
+  const total=bBal+sBal;
+  const bPct=Math.max(0,Math.min(100, ceil>0?bBal/ceil*100:0));
+  let h='';
+  h+='<div class="card" style="margin-bottom:14px;text-align:center;padding:16px">'+
+    '<div class="muted" style="font-size:11px;letter-spacing:.12em">総資産</div>'+
+    '<div class="mono teal" style="font-size:34px;font-weight:700;line-height:1.25">¥'+total.toLocaleString("ja-JP")+'</div>'+
+    '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
+    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:10px">軍資金</div><div class="mono" style="font-size:15px;font-weight:700">¥'+bBal.toLocaleString("ja-JP")+'</div></div>'+
+    '<div style="width:1px;background:var(--line)"></div>'+
+    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:10px">貯金</div><div class="mono" style="font-size:15px;font-weight:700">¥'+sBal.toLocaleString("ja-JP")+'</div></div></div></div>';
+  h+='<div class="card" style="margin-bottom:12px;cursor:pointer" data-a="bank">'+
+    '<div class="row between" style="align-items:baseline;margin-bottom:8px"><span style="font-size:13px;font-weight:700">軍資金 <span class="muted" style="font-size:10px;font-weight:400">緩衝プール</span></span><span><span class="mono '+(bBal<ceil*0.15?"red":"teal")+'" style="font-size:18px;font-weight:700">¥'+bBal.toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>'+
+    '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+bPct+'%;background:'+(bBal<ceil*0.15?"var(--red)":bBal>ceil?"var(--amber)":"var(--teal)")+'"></div></div>'+
+    '<div class="row between" style="font-size:10px;margin-top:4px"><span class="muted">天井 ¥'+ceil.toLocaleString("ja-JP")+'</span><span class="mono muted">'+Math.floor(bPct)+'%</span></div></div>';
+  h+='<div class="card" style="margin-bottom:12px;cursor:pointer" data-a="savings">'+
+    '<div class="row between" style="align-items:baseline;margin-bottom:8px"><span style="font-size:13px;font-weight:700">貯金</span><span><span class="mono teal" style="font-size:18px;font-weight:700">¥'+sBal.toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>';
+  if(goal){
+    const tgt=num(goal.target), pct=tgt>0?Math.min(100,sBal/tgt*100):0;
+    h+='<div class="row between" style="font-size:11px;margin-bottom:4px"><span class="muted">目標: '+esc(goal.name)+'</span><span class="mono muted">¥'+tgt.toLocaleString("ja-JP")+'</span></div>'+
+      '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:var(--amber)"></div></div>'+
+      '<div class="row between" style="font-size:10px;margin-top:4px"><span class="muted">'+(tgt>0&&sBal>=tgt?"達成!":tgt>0?"あと ¥"+Math.max(0,tgt-sBal).toLocaleString("ja-JP"):"目標額 未設定")+'</span><span class="mono muted">'+(tgt>0?Math.floor(pct):0)+'%</span></div>';
+  } else h+='<div class="muted" style="font-size:11px">全目標 達成</div>';
+  h+='</div>';
+  h+='<div class="muted" style="font-size:10px;text-align:center;margin-top:12px">浪費枠・ポートフォリオは今後ここに追加</div>';
+  return h;
 }
 
 /* ---------- 軍資金(バンクロール口座) ---------- */
