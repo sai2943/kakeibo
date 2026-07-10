@@ -35,6 +35,7 @@
     color:var(--text); padding:10px 12px; font-size:14px; outline:none; width:100%;}
   .input.sm{padding:6px 8px; font-size:13px;}
   .input.r{text-align:right;}
+  input[type="date"].input{ -webkit-appearance:none; appearance:none; }
   .btn{border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--muted);
     font-size:13px; padding:9px 12px; cursor:pointer; font-family:inherit;}
   .btn.primary{background:var(--amber); color:#1a1508; border:none; font-weight:700;}
@@ -144,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.59 (localStorage保存・完全オフライン)
+   収支台帳 1.60 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","自己投資"];
@@ -429,7 +430,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.59";
+const APP_VERSION = "1.60";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
