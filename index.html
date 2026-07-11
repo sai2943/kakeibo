@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.21 (localStorage保存・完全オフライン)
+   Tally 2.22 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.21";
+const APP_VERSION = "2.22";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -726,21 +726,27 @@ function viewSlot(foot){
   const exps = ms.reduce((a,s)=>a+expTotal(s),0);
   let h = band("セッション");
   if(!ms.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の稼働記録はありません。右下の「＋」から追加できます。</div>';
-  ms.forEach(s=>{
-    const fin = finalOwn(s);
-    const bc = s.mode==="nori"?"var(--teal)":s.mode==="dai"?"var(--amber)":"var(--muted)";
-    const mnames = [...new Set((s.machines||[]).map(m=>(m.name||"").trim()).filter(Boolean))];
-    const machLine = mnames.length ? mnames.join("・") : ((s.machines||[]).length ? (s.machines||[]).length+"台" : "");
-    h += '<div class="listitem" data-a="sedit" data-v="'+s.id+'">'+
-      '<div style="flex:1;min-width:0">'+
-      '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
-      '<span class="mono muted" style="font-size:11px">'+s.date.slice(5).replace("-","/")+'</span>'+
-      '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span>'+
-      ((s.partnerName||"").trim()?'<span style="display:inline-flex;align-items:center;gap:3px;min-width:0;color:var(--muted);font-size:12px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 19.5c0-3.9 3.1-6 7-6s7 2.1 7 6"/></svg><span class="ellip" style="min-width:0">'+esc(s.partnerName.trim())+'</span></span>':'')+'</div>'+
-      '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
-      (machLine?'<div class="muted" style="font-size:11px;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35">'+esc(machLine)+'</div>':'')+
-      '</div>'+
-      '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
+  const byDate = {};
+  ms.forEach(s=>{ (byDate[s.date]=byDate[s.date]||[]).push(s); });
+  Object.entries(byDate).sort((a,b)=>a[0]<b[0]?1:-1).forEach(([d,list])=>{
+    h += '<div style="margin-bottom:12px"><div class="mono muted" style="font-size:11px;margin:0 4px 4px">'+
+      d.slice(5).replace("-","/")+' ('+WD[new Date(d+"T00:00:00").getDay()]+')</div>'+
+      '<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
+      list.map((s,i)=>{
+        const fin = finalOwn(s);
+        const bc = s.mode==="nori"?"var(--teal)":s.mode==="dai"?"var(--amber)":"var(--muted)";
+        const mnames = [...new Set((s.machines||[]).map(m=>(m.name||"").trim()).filter(Boolean))];
+        const machLine = mnames.length ? mnames.join("・") : ((s.machines||[]).length ? (s.machines||[]).length+"台" : "");
+        return '<div class="row" style="padding:11px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="sedit" data-v="'+s.id+'">'+
+          '<div style="flex:1;min-width:0">'+
+          '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
+          '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span>'+
+          ((s.partnerName||"").trim()?'<span style="display:inline-flex;align-items:center;gap:3px;min-width:0;color:var(--muted);font-size:12px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 19.5c0-3.9 3.1-6 7-6s7 2.1 7 6"/></svg><span class="ellip" style="min-width:0">'+esc(s.partnerName.trim())+'</span></span>':'')+'</div>'+
+          '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
+          (machLine?'<div class="muted" style="font-size:11px;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35">'+esc(machLine)+'</div>':'')+
+          '</div>'+
+          '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
+      }).join("")+'</div></div>';
   });
   return h;
 }
@@ -756,18 +762,25 @@ function viewMahjong(foot){
   /* 当月セッション一覧 */
   h += band("セッション");
   if(!ms.length) h += '<div style="text-align:center;padding:28px 0;font-size:13px" class="muted">この月の記録はありません。右下の「＋」から追加できます。</div>';
-  ms.forEach(s=>{
-    const fin = mjFinal(s);
-    const av = mjAvgRank(s);
-    const catC = s.category==="free"?"var(--teal)":"var(--amber)";
-    h += '<div class="listitem" data-a="mjedit" data-v="'+s.id+'">'+
-      '<div style="flex:1;min-width:0">'+
-      '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
-      '<span class="mono muted" style="font-size:11px">'+s.date.slice(5).replace("-","/")+'</span>'+
-      '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span></div>'+
-      '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
-      '<div class="muted" style="font-size:11px;margin-top:2px">'+s.rule+'麻 / '+mjHanchan(s)+'半荘'+(av!==null?' / 平均'+av.toFixed(2)+'着':'')+'</div></div>'+
-      '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
+  const byDate = {};
+  ms.forEach(s=>{ (byDate[s.date]=byDate[s.date]||[]).push(s); });
+  Object.entries(byDate).sort((a,b)=>a[0]<b[0]?1:-1).forEach(([d,list])=>{
+    h += '<div style="margin-bottom:12px"><div class="mono muted" style="font-size:11px;margin:0 4px 4px">'+
+      d.slice(5).replace("-","/")+' ('+WD[new Date(d+"T00:00:00").getDay()]+')</div>'+
+      '<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
+      list.map((s,i)=>{
+        const fin = mjFinal(s);
+        const av = mjAvgRank(s);
+        const catC = s.category==="free"?"var(--teal)":"var(--amber)";
+        return '<div class="row" style="padding:11px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="mjedit" data-v="'+s.id+'">'+
+          '<div style="flex:1;min-width:0">'+
+          '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
+          '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span></div>'+
+          '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
+          '<div class="muted" style="font-size:11px;margin-top:2px">'+s.rule+'麻 / '+mjHanchan(s)+'半荘'+(av!==null?' / 平均'+av.toFixed(2)+'着':'')+'</div>'+
+          '</div>'+
+          '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
+      }).join("")+'</div></div>';
   });
   return h;
 }
