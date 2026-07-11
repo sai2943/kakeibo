@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.33 (localStorage保存・完全オフライン)
+   Tally 2.34 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.33";
+const APP_VERSION = "2.34";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -781,7 +781,7 @@ function viewMahjong(foot){
           '<span class="tag" style="border:1px solid var(--muted);color:var(--muted)">'+s.rule+'麻</span>'+
           (s.players||[]).filter(Boolean).map(personTag).join('')+'</div>'+
           '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
-          '<div class="muted" style="font-size:11px;margin-top:2px">'+mjHanchan(s)+'半荘 ・ 平均'+(av!==null?av.toFixed(2):"—")+'着 ・ トップ'+topPct+'%</div>'+
+          '<div class="muted" style="font-size:11px;margin-top:4px;line-height:1.4">'+mjHanchan(s)+'半荘 ・ 平均'+(av!==null?av.toFixed(2):"—")+'着 ・ トップ'+topPct+'%</div>'+
           '</div>'+
           '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
       }).join("")+'</div></div>';
@@ -842,7 +842,7 @@ function viewMjStats(){
           '<div style="height:8px;background:var(--surface2);border-radius:4px;overflow:hidden">'+
           '<div style="height:100%;width:'+pct+'%;background:'+cols[i]+';border-radius:4px"></div></div></div>';
       }).join("")+'</div>'+
-      '<div style="border-top:1px solid var(--line);padding-top:8px">'+
+      '<div style="border-top:1px solid var(--line);padding-top:10px;margin-top:2px">'+
       mjStatRow("平均収支(ゲーム代込)", Math.round(sumFinal/H), true)+
       mjStatRow("平均収支(ゲーム代抜)", Math.round(sumRaw/H), true)+
       mjStatRow("平均ゲーム代", -Math.round(sumFee/H), true)+
@@ -859,7 +859,7 @@ function mjStatRow(label, val, isYen, raw, unit){
   else if(isYen) disp = signYen(val);
   else disp = "¥"+Math.abs(val).toLocaleString("ja-JP");
   const col = isYen ? clsPM(val) : (raw ? (val>=0?"blue":"red") : "");
-  return '<div class="row between" style="font-size:12px;margin:3px 0"><span class="muted">'+label+'</span>'+
+  return '<div class="row between" style="font-size:12px;margin:5px 0"><span class="muted">'+label+'</span>'+
     '<span class="mono '+col+'">'+disp+'</span></div>';
 }
 
