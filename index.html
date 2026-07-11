@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.32 (localStorage保存・完全オフライン)
+   Tally 2.33 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.32";
+const APP_VERSION = "2.33";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -739,7 +739,7 @@ function viewSlot(foot){
           '<div style="flex:1;min-width:0">'+
           '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
           '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span>'+
-          ((s.partnerName||"").trim()?'<span style="display:inline-flex;align-items:center;gap:3px;min-width:0;color:var(--muted);font-size:12px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 19.5c0-3.9 3.1-6 7-6s7 2.1 7 6"/></svg><span class="ellip" style="min-width:0">'+esc(s.partnerName.trim())+'</span></span>':'')+'</div>'+
+          ((s.partnerName||"").trim()?personTag(s.partnerName.trim()):'')+'</div>'+
           '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
           (machLine?'<div class="muted" style="font-size:11px;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35">'+esc(machLine)+'</div>':'')+
           '</div>'+
@@ -749,6 +749,9 @@ function viewSlot(foot){
   return h;
 }
 
+function personTag(name){
+  return '<span class="tag" style="border:1px solid var(--muted);color:var(--muted);display:inline-flex;align-items:center;gap:2px;min-width:0;max-width:130px;padding:1px 6px 1px 4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 19.5c0-3.9 3.1-6 7-6s7 2.1 7 6"/></svg><span class="ellip" style="min-width:0">'+esc(name)+'</span></span>';
+}
 function viewMahjong(foot){
   const mk = monthKey();
   const ms = (S.mjSessions||[]).filter(s=>s.date.startsWith(mk)).sort((a,b)=>a.date<b.date?1:-1);
@@ -770,14 +773,13 @@ function viewMahjong(foot){
         const fin = mjFinal(s);
         const av = mjAvgRank(s);
         const catC = s.category==="free"?"var(--teal)":"var(--amber)";
-        const pl = (s.players||[]).filter(Boolean).join("・");
         const topPct = mjHanchan(s)>0 ? Math.round((mjRanks(s)[0]||0)/mjHanchan(s)*100) : 0;
         return '<div class="row" style="padding:11px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="mjedit" data-v="'+s.id+'">'+
           '<div style="flex:1;min-width:0">'+
-          '<div class="row" style="gap:5px;align-items:center;margin-bottom:3px">'+
+          '<div class="row" style="gap:5px;align-items:center;margin-bottom:3px;flex-wrap:wrap">'+
           '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span>'+
           '<span class="tag" style="border:1px solid var(--muted);color:var(--muted)">'+s.rule+'麻</span>'+
-          (pl?'<span style="display:inline-flex;align-items:center;gap:3px;min-width:0;color:var(--muted);font-size:12px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 19.5c0-3.9 3.1-6 7-6s7 2.1 7 6"/></svg><span class="ellip" style="min-width:0">'+esc(pl)+'</span></span>':'')+'</div>'+
+          (s.players||[]).filter(Boolean).map(personTag).join('')+'</div>'+
           '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
           '<div class="muted" style="font-size:11px;margin-top:2px">'+mjHanchan(s)+'半荘 ・ 平均'+(av!==null?av.toFixed(2):"—")+'着 ・ トップ'+topPct+'%</div>'+
           '</div>'+
