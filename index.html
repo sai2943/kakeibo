@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.23 (localStorage保存・完全オフライン)
+   Tally 2.24 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.23";
+const APP_VERSION = "2.24";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -772,12 +772,16 @@ function viewMahjong(foot){
         const fin = mjFinal(s);
         const av = mjAvgRank(s);
         const catC = s.category==="free"?"var(--teal)":"var(--amber)";
+        const pl = (s.players||[]).filter(Boolean).join("・");
+        const topPct = mjHanchan(s)>0 ? Math.round((mjRanks(s)[0]||0)/mjHanchan(s)*100) : 0;
         return '<div class="row" style="padding:11px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="mjedit" data-v="'+s.id+'">'+
           '<div style="flex:1;min-width:0">'+
-          '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
-          '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span></div>'+
+          '<div class="row" style="gap:5px;align-items:center;margin-bottom:3px">'+
+          '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span>'+
+          '<span class="tag" style="border:1px solid var(--line);color:var(--muted);font-size:9px;padding:1px 5px">'+s.rule+'麻</span>'+
+          (pl?'<span style="display:inline-flex;align-items:center;gap:3px;min-width:0;color:var(--muted);font-size:12px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 19.5c0-3.9 3.1-6 7-6s7 2.1 7 6"/></svg><span class="ellip" style="min-width:0">'+esc(pl)+'</span></span>':'')+'</div>'+
           '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
-          '<div class="muted" style="font-size:11px;margin-top:2px">'+s.rule+'麻 / '+mjHanchan(s)+'半荘'+(av!==null?' / 平均'+av.toFixed(2)+'着':'')+'</div>'+
+          '<div class="muted" style="font-size:11px;margin-top:2px">'+mjHanchan(s)+'半荘 ・ 平均'+(av!==null?av.toFixed(2):"—")+'着 ・ トップ'+topPct+'%</div>'+
           '</div>'+
           '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
       }).join("")+'</div></div>';
@@ -827,10 +831,10 @@ function viewMjStats(){
       '<div class="row" style="gap:6px;margin-bottom:10px">'+
       Array.from({length:rc}).map((_,i)=>{
         const pct = H>0 ? Math.round(rankSums[i]/H*100) : 0;
-        return '<div style="flex:1;background:var(--surface2);border-radius:8px;padding:9px 6px;display:flex;align-items:baseline;justify-content:center;gap:5px">'+
-          '<span class="muted" style="font-size:10px;flex-shrink:0">'+(i+1)+'着</span>'+
-          '<span class="mono" style="font-size:18px;font-weight:700;line-height:1">'+rankSums[i]+'</span>'+
-          '<span class="muted mono" style="font-size:10px;flex-shrink:0">'+pct+'%</span></div>';
+        return '<div style="flex:1;text-align:center;background:var(--surface2);border-radius:8px;padding:8px 4px">'+
+          '<div class="muted" style="font-size:10px;margin-bottom:3px">'+(i+1)+'着</div>'+
+          '<div class="mono" style="font-size:17px;font-weight:700;line-height:1.05">'+rankSums[i]+'<span class="muted" style="font-size:10px;font-weight:400"> 回</span></div>'+
+          '<div class="muted mono" style="font-size:10px;margin-top:2px">'+pct+'%</div></div>';
       }).join("")+'</div>'+
       '<div style="border-top:1px solid var(--line);padding-top:8px">'+
       mjStatRow("平均収支(ゲーム代込)", Math.round(sumFinal/H), true)+
@@ -1331,6 +1335,7 @@ function mjtToKakei(){
     chips:String(c.chipNet), chipRate:String(num(t.chipRate)||0),
     setFee:String(num((t.fees||[])[pi])||0),
     ranks:[String(rc[0]),String(rc[1]),String(rc[2]),String(rc[3])].slice(0,mjtSeats(t)),
+    players:(t.players||[]).map((p,i)=> i===pi ? "" : (p||"").trim()).filter(Boolean).slice(0,5),
     fromTable:t.id };
   S.mjSessions.push(sess);
   const fin=mjFinal(sess);
@@ -1865,6 +1870,15 @@ function viewMj(){
   h += '</div>';
   h += '<div class="muted mono" style="font-size:11px;text-align:right" id="mj-hanchan">半荘数 '+mjHanchan(m)+(mjAvgRank(m)!==null?' / 平均着順 '+mjAvgRank(m).toFixed(2):'')+'</div>';
 
+  h += band("同卓者(自分以外・任意)");
+  h += '<div class="muted" style="font-size:10px;margin:0 2px 8px;line-height:1.6">最大5名。スコア表から反映した記録は自動で入ります。カードに表示されます。</div>';
+  (m.players||[]).forEach((p,i)=>{
+    h += '<div class="row" style="gap:8px;margin-bottom:6px;align-items:center">'+
+      '<input class="input" placeholder="プレイヤー名" value="'+esc(p||"")+'" data-in="mjp" data-v="'+i+'" style="flex:1">'+
+      '<button class="btn" style="padding:9px 13px;color:var(--red);border-color:var(--red);flex-shrink:0" data-a="mjpdel" data-v="'+i+'">×</button></div>';
+  });
+  if((m.players||[]).length<5) h += '<button class="btn dash full" style="padding:10px 0;margin-bottom:6px" data-a="mjpadd">＋ 同卓者を追加</button>';
+
   if(isFree){
     h += band("ゲーム代(フリー・自動計算)");
     h += '<div class="grid2" style="margin-bottom:6px">'+
@@ -1940,6 +1954,7 @@ function bindMj(){
         refreshMj();
       }
       else if(kind==="mjrank"){ (m.ranks=m.ranks||["","","",""])[num(v)]=el.value; refreshMj(); }
+      else if(kind==="mjp"){ (m.players=m.players||[])[num(v)]=el.value; }
     };
   });
   document.querySelectorAll("[data-a]").forEach(el=>{
@@ -1958,6 +1973,8 @@ function bindMj(){
         let cur=num(m.ranks[i]); cur += (a==="rankup"?1:-1); if(cur<0) cur=0;
         m.ranks[i]=String(cur); render();
       }
+      else if(a==="mjpadd"){ (m.players=m.players||[]).push(""); render(); }
+      else if(a==="mjpdel"){ (m.players=m.players||[]).splice(num(v),1); render(); }
       else if(a==="mjdel"){
         if(!confirm("この麻雀記録を削除しますか?")) return;
         S.entries = S.entries.filter(e=>e.id!=="mj-"+m.id);
@@ -1983,6 +2000,7 @@ function saveMj(){
   const cleaned = Object.assign({}, m);
   const rc = mjRankCount(cleaned);
   cleaned.ranks = (cleaned.ranks||["","","",""]).slice(0,4).map((x,i)=> i<rc ? x : "");
+  cleaned.players = (cleaned.players||[]).map(p=>(p||"").trim()).filter(Boolean).slice(0,5);
   if(UI.mjIsNew) S.mjSessions.push(cleaned);
   else S.mjSessions = S.mjSessions.map(x=>x.id===m.id?cleaned:x);
   if(fnum(cleaned.scoreRate)) S.rates.mjScore = cleaned.scoreRate;
@@ -2033,7 +2051,7 @@ function bindMain(){
           UI.mjDraft={id:uid(),date:todayStr(),store:"",category:"free",rule:"4",
             score:S.rates.mjScore!==undefined?"":"", chips:"",
             scoreRate:S.rates.mjScore||"", chipRate:S.rates.mjChip||"",
-            ranks:["","","",""], baseFee:S.rates.mjBase||"", topBonus:S.rates.mjTop||"", drinkFee:S.rates.mjDrink||"",
+            ranks:["","","",""], players:[], baseFee:S.rates.mjBase||"", topBonus:S.rates.mjTop||"", drinkFee:S.rates.mjDrink||"",
             setFee:"", memo:""};
           UI.mjIsNew=true; UI.screen="mahjong-edit"; render();
         } else {
