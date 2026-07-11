@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.41 (localStorage保存・完全オフライン)
+   Tally 2.42 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -541,7 +541,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.41";
+const APP_VERSION = "2.42";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -3113,7 +3113,9 @@ function viewBackup(){
     band("自己診断")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">保存領域・収支計算・書き出し→再取込の整合を検査します。</div>'+
     '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="btest">自己診断を実行</button>'+
-    (UI.msg?'<div class="mono teal" style="font-size:11px;margin-top:10px;line-height:1.8;white-space:pre-wrap">'+esc(UI.msg)+'</div>':'')+
+    (UI.msg?'<div class="row" style="align-items:flex-start;gap:6px;margin-top:10px">'+
+      '<div class="mono teal" style="flex:1;font-size:11px;line-height:1.8;white-space:pre-wrap">'+esc(UI.msg)+'</div>'+
+      '<button class="navbtn" data-a="msgclose" aria-label="閉じる" style="font-size:18px;padding:0 8px;line-height:1.4">×</button></div>':'')+
     band("エクスポート(全データ)")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
     '家計簿・稼働記録・機種データ・レート設定の全てをJSONファイルとして書き出します。日常のバックアップは自動(スナップショット+クラウド)で行われるため、書き出しは機種変更やiOSの大型更新の前だけで十分です。</div>'+
@@ -3134,6 +3136,7 @@ function bindBackup(){
     el.onclick = ()=>{
       const a=el.dataset.a;
       if(a==="back"){ UI.screen="main"; render(); }
+      else if(a==="msgclose"){ UI.msg=""; renderKeepScroll(); }
       else if(a==="csv"){ exportCsv(); }
       else if(a==="bexport"){
         dl(JSON.stringify(Object.assign({exportedAt:new Date().toISOString()},S), null, 1),
@@ -3177,7 +3180,7 @@ function bindBackup(){
         applyData(s.d);
         save();
         UI.msg = "スナップショットから復元しました(記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件)";
-        render();
+        renderKeepScroll();
       }
       else if(a==="btest"){
         const log=[];
@@ -3212,7 +3215,7 @@ function bindBackup(){
         }catch(e){ log.push("✗ 再取込検査: "+e.message); }
         log.push("スナップショット: "+loadSnaps().length+"世代保持中");
         UI.msg = log.join("\n");
-        render();
+        renderKeepScroll();
       }
     };
   });
