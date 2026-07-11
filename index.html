@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.15 (localStorage保存・完全オフライン)
+   Tally 2.16 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -305,7 +305,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, budgets:{}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], stores:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, budgets:{}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
 let UI = {
   tab:"games", gameSub:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -332,6 +332,7 @@ function applyData(d){
   S.sessions = (d.sessions||[]).map(migrateSession);
   S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
   S.mdb = Array.isArray(d.mdb)?d.mdb:[];
+  S.stores = Array.isArray(d.stores)?d.stores:[];
   S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
   S.fixed = Array.isArray(d.fixed)?d.fixed:[];
   S.wishlist = Array.isArray(d.wishlist)?d.wishlist:[];
@@ -505,7 +506,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.15";
+const APP_VERSION = "2.16";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -522,6 +523,7 @@ function render(){
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mjtlist"){ app.innerHTML = viewMjtList(); bindMjtList(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
+  if(UI.screen==="stores"){ app.innerHTML = viewStores(); bindStores(); return; }
   if(UI.screen==="bordertool"){ app.innerHTML = viewBorderTool(); bindBorderTool(); return; }
   if(UI.screen==="backup"){ app.innerHTML = viewBackup(); bindBackup(); return; }
   if(UI.screen==="entry"){ app.innerHTML = viewEntry(); bindEntry(); return; }
@@ -872,6 +874,8 @@ function viewTool(){
     '<div class="muted" style="font-size:11px;margin-top:2px">この台を続けるか判断(収支の記録とは別)</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
   h += '<div class="card" data-a="mdb" style="cursor:pointer;margin-top:8px"><div class="row between" style="align-items:center"><div><div style="font-size:13px;font-weight:600">機種データ</div>'+
     '<div class="muted" style="font-size:11px;margin-top:2px">分母・理論TYを登録(ボーダー試算と機種名サジェストで使用)</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
+  h += '<div class="card" data-a="stores" style="cursor:pointer;margin-top:8px"><div class="row between" style="align-items:center"><div><div style="font-size:13px;font-weight:600">店舗データ</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:2px">換金率・貸出・貯玉レートを店ごとに登録(交換設定/ボーダーで選択)</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
   /* 投資 */
   h += band("投資");
   h += '<div class="card" style="opacity:.6"><div style="font-size:13px">準備中</div>'+
@@ -1985,6 +1989,7 @@ function bindMain(){
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
       else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
       else if(a==="mdb"){ UI.screen="mdb"; UI.mdbForm=null; render(); }
+      else if(a==="stores"){ UI.screen="stores"; UI.storeForm=null; render(); }
       else if(a==="mjtlist"){ UI.screen="mjtlist"; render(); }
       else if(a==="syncnow"){ checkForUpdate(true); if(sb && sbSession) cloudSync(); }
       else if(a==="backup"){ UI.screen="backup"; UI.msg=""; render(); }
@@ -2199,6 +2204,8 @@ function viewSession(){
 
   /* ----- 交換設定(セッション共通) ----- */
   h += band("交換設定");
+  if((S.stores||[]).length) h += '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">'+
+    (S.stores||[]).map(st=>'<button class="chip" data-a="applystore" data-v="'+st.id+'">'+esc(st.name)+'</button>').join("")+'</div>';
   h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
     '<span class="muted" style="font-size:12px;width:74px">スロット</span>'+
     '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 50" value="'+esc(s.exchange||"")+'" style="flex:1" data-in="exchange">'+
@@ -2516,6 +2523,8 @@ function viewBorderTool(){
   h += '<div class="muted" style="font-size:11px;margin-bottom:12px">この台を続けるか判断するための試算です(収支の記録とは別)。着席時・当たり後の再開時・現金追加時に区間を足していくと、回転率とボーダー乖離が出ます。</div>';
 
   /* 貯玉プッシュ レート */
+  if((S.stores||[]).length) h += band("店を選ぶ")+'<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
+    (S.stores||[]).map(st=>'<button class="chip" data-a="btstore" data-v="'+st.id+'">'+esc(st.name)+'</button>').join("")+'</div>';
   h += band("貯玉プッシュ(玉/回)");
   h += '<div class="card" style="margin-bottom:12px"><div class="grid2">'+
     '<div><div class="muted" style="font-size:9px;margin-bottom:2px">払出(出玉計算用)</div>'+
@@ -2616,6 +2625,16 @@ function bindBorderTool(){
       else if(a==="btgdel"){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(v)); save(); render(); }
       else if(a==="startnow"){ m.startedAt=Date.now(); save(); render(); }
       else if(a==="btpick"){ const x=(S.mdb||[]).find(z=>String(z.id)===String(v)); if(x){ m.name=x.name; save(); render(); } }
+      else if(a==="btstore"){
+        const x=(S.stores||[]).find(z=>String(z.id)===String(v));
+        if(x){
+          if((x.pachiEx||"").trim()!=="" && num(x.pachiEx)>0){ m.kachi=String(num(x.pachiEx)/10); }
+          if((x.pachiGenkin||"").trim()!==""){ m.genkin=x.pachiGenkin; }
+          if((x.pachiPay||"").trim()!==""){ m.pushPayout=x.pachiPay; }
+          if((x.pachiDraw||"").trim()!==""){ m.pushDraw=x.pachiDraw; }
+          save(); render();
+        }
+      }
     };
   });
 }</script>
@@ -2744,6 +2763,14 @@ function bindSessionActions(){
       if(a==="back"){ UI.screen="main"; UI.draft=null; render(); }
       else if(a==="mode"){ s.mode=v; render(); }
       else if(a==="pname"){ s.partnerName=v; render(); }
+      else if(a==="applystore"){
+        const st=(S.stores||[]).find(x=>String(x.id)===String(v));
+        if(st){
+          if((st.slotEx||"").trim()!==""){ s.exchange=st.slotEx; S.rates.exchange=st.slotEx; }
+          if((st.pachiEx||"").trim()!==""){ s.pExchange=st.pachiEx; S.rates.pExchange=st.pachiEx; }
+          render();
+        }
+      }
       else if(a==="whotab"){ UI.whoTab=v; render(); }
       else if(a==="madd"){
         const nm = {id:uid(),kind:v,name:"",memo:"",who:"me",startStock:"",endStock:"",holdBalls:"",cash:[]};
@@ -2833,6 +2860,69 @@ function saveSession(){
 /* ============================================================
    機種マスタ画面
    ============================================================ */
+/* ---------- 店舗データ(プリセット) ---------- */
+function viewStores(){
+  let h = '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
+    '<div style="font-size:14px;font-weight:700">店舗データ</div><div style="width:44px"></div></div>';
+  h += '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">店ごとの換金率・貸出・貯玉レートを登録。交換設定やボーダー試算で「店を選ぶ」と自動で入ります。スロットは換金率のみ(設定と収支が全てのため)。</div>';
+  const f = UI.storeForm;
+  (S.stores||[]).forEach(st=>{
+    h += '<div class="card" style="margin-bottom:8px"><div class="row between" style="align-items:center">'+
+      '<div style="min-width:0;flex:1"><div style="font-size:14px;font-weight:700" class="ellip">'+esc(st.name)+'</div>'+
+      '<div class="muted" style="font-size:10px;margin-top:3px;line-height:1.5">S換金 '+(st.slotEx||"—")+'枚 ・ P換金 '+(st.pachiEx||"—")+'玉/貸出 '+(st.pachiGenkin||"—")+'玉/貯玉 '+(st.pachiPay||"—")+'-'+(st.pachiDraw||"—")+'</div></div>'+
+      '<div class="row" style="gap:6px;flex-shrink:0;margin-left:8px"><button class="btn" style="font-size:10px;padding:3px 12px" data-a="stedit" data-v="'+st.id+'">編集</button>'+
+      '<button class="btn" style="font-size:10px;padding:3px 12px;color:var(--red);border-color:var(--red)" data-a="stdel" data-v="'+st.id+'">削除</button></div></div></div>';
+  });
+  h += band(f?(f.editId?"店舗を編集":"新しい店舗"):"追加");
+  if(!f){
+    h += '<button class="btn dash full" style="padding:14px 0" data-a="stnew">＋ 店舗を追加</button>';
+  } else {
+    h += '<div class="card">'+
+      '<div class="muted" style="font-size:11px;margin:0 2px 4px">店名</div>'+
+      '<input class="input" id="st-name" placeholder="例: マルハン◯◯店" value="'+esc(f.name||"")+'" style="margin-bottom:14px">'+
+      '<div class="muted" style="font-size:11px;margin:0 2px 6px;font-weight:700;color:var(--text)">スロット</div>'+
+      '<div class="row" style="gap:8px;align-items:center;margin-bottom:14px"><span class="muted" style="font-size:11px;width:58px">換金率</span>'+
+      '<input class="input mono r" type="number" inputmode="numeric" placeholder="50" value="'+esc(f.slotEx||"")+'" style="flex:1" data-sf="slotEx"><span class="muted" style="font-size:11px">枚=1000円</span></div>'+
+      '<div class="muted" style="font-size:11px;margin:0 2px 6px;font-weight:700;color:var(--text)">パチンコ</div>'+
+      '<div class="row" style="gap:8px;align-items:center;margin-bottom:8px"><span class="muted" style="font-size:11px;width:58px">換金率</span>'+
+      '<input class="input mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(f.pachiEx||"")+'" style="flex:1" data-sf="pachiEx"><span class="muted" style="font-size:11px">玉=1000円</span></div>'+
+      '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px"><span class="muted" style="font-size:11px;width:58px">現金貸出</span>'+
+      '<input class="input mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(f.pachiGenkin||"")+'" style="flex:1" data-sf="pachiGenkin"><span class="muted" style="font-size:11px">玉=1000円</span></div>'+
+      '<div class="grid2">'+
+      '<div><div class="muted" style="font-size:10px;margin-bottom:2px">貯玉払出(玉/回)</div><input class="input sm mono r" type="number" inputmode="numeric" placeholder="230" value="'+esc(f.pachiPay||"")+'" data-sf="pachiPay"></div>'+
+      '<div><div class="muted" style="font-size:10px;margin-bottom:2px">貯玉引落(玉/回)</div><input class="input sm mono r" type="number" inputmode="numeric" placeholder="245" value="'+esc(f.pachiDraw||"")+'" data-sf="pachiDraw"></div></div>'+
+      '<div class="muted" style="font-size:10px;margin-top:6px;line-height:1.6">換金率=出玉の価値。現金貸出=貸出で削られた実玉数。貯玉払出/引落=貯玉プッシュ1回あたりの玉数。使う項目だけ入れればOK。</div>'+
+      '<div class="row" style="gap:8px;margin-top:12px">'+
+      '<button class="btn" data-a="stcancel">キャンセル</button>'+
+      '<button class="btn primary" style="flex:1" data-a="stsave">'+(f.editId?"更新する":"追加する")+'</button></div></div>';
+  }
+  return h;
+}
+function bindStores(){
+  const f = UI.storeForm;
+  if(f){
+    const nm=document.getElementById("st-name"); if(nm) nm.oninput=e=>f.name=e.target.value;
+    document.querySelectorAll("[data-sf]").forEach(el=>{ el.oninput=e=>{ f[el.dataset.sf]=e.target.value; }; });
+  }
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    const a=el.dataset.a, v=el.dataset.v;
+    el.onclick=()=>{
+      if(a==="back"){ UI.screen="main"; UI.tab="tool"; UI.storeForm=null; render(); }
+      else if(a==="stnew"){ UI.storeForm={name:"",slotEx:"",pachiEx:"",pachiGenkin:"",pachiPay:"",pachiDraw:""}; render(); }
+      else if(a==="stedit"){ const st=(S.stores||[]).find(x=>String(x.id)===String(v)); if(st){ UI.storeForm=Object.assign({editId:st.id},st); render(); } }
+      else if(a==="stcancel"){ UI.storeForm=null; render(); }
+      else if(a==="stdel"){ if(confirm("この店舗を削除しますか?")){ S.stores=(S.stores||[]).filter(x=>String(x.id)!==String(v)); save(); render(); } }
+      else if(a==="stsave"){
+        const nm=(f.name||"").trim(); if(!nm){ alert("店名を入力してください。"); return; }
+        const rec={name:nm, slotEx:(f.slotEx||"").trim(), pachiEx:(f.pachiEx||"").trim(), pachiGenkin:(f.pachiGenkin||"").trim(), pachiPay:(f.pachiPay||"").trim(), pachiDraw:(f.pachiDraw||"").trim()};
+        if(f.editId){ S.stores=(S.stores||[]).map(x=>String(x.id)===String(f.editId)?Object.assign({},x,rec):x); }
+        else { (S.stores=S.stores||[]).push(Object.assign({id:uid()},rec)); }
+        save(); UI.storeForm=null; render();
+      }
+    };
+  });
+}
+
 function viewMdb(){
   let h = '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
     '<div style="font-size:14px;font-weight:700">機種データ</div><div style="width:44px"></div></div>';
