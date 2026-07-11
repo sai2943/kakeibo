@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.26 (localStorage保存・完全オフライン)
+   Tally 2.27 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.26";
+const APP_VERSION = "2.27";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -823,8 +823,10 @@ function viewMjStats(){
     const sumChips = list.reduce((a,s)=>a+fnum(s.chips),0);
     const catC = G.category==="free"?"var(--teal)":"var(--amber)";
     h += '<div class="card" style="margin-bottom:8px">'+
-      '<div class="row between" style="margin-bottom:8px;align-items:center"><span style="font-weight:700;font-size:13px" class="ellip">'+
-      '<span class="tag" style="border:1px solid '+catC+';color:'+catC+';margin-right:6px">'+(G.category==="free"?"フリー":"セット")+'</span>'+esc(G.store)+'</span>'+
+      '<div class="row between" style="margin-bottom:8px;align-items:center;gap:8px">'+
+      '<div class="row" style="align-items:center;gap:6px;min-width:0">'+
+      '<span class="tag" style="border:1px solid '+catC+';color:'+catC+';flex-shrink:0">'+(G.category==="free"?"フリー":"セット")+'</span>'+
+      '<span class="ellip" style="font-weight:700;font-size:13px">'+esc(G.store)+'</span></div>'+
       '<span class="muted" style="font-size:11px;flex-shrink:0">'+H+'半荘 / '+list.length+'日</span></div>'+
       '<div class="row between" style="align-items:baseline;margin-bottom:8px"><span class="muted" style="font-size:12px">平均着順</span>'+
       '<span class="mono amber" style="font-size:18px;font-weight:700">'+avgRank.toFixed(2)+'</span></div>'+
