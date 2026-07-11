@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.44 (localStorage保存・完全オフライン)
+   Tally 2.45 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -541,7 +541,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.44";
+const APP_VERSION = "2.45";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -3230,6 +3230,17 @@ function bindBackup(){
           chk("再取込:稼働件数", (p.sessions||[]).length, S.sessions.length);
           chk("再取込:麻雀件数", (p.mjSessions||[]).length, S.mjSessions.length);
         }catch(e){ log.push("✗ 再取込検査: "+e.message); }
+        try{
+          const de = document.documentElement, vv = window.visualViewport;
+          const p1 = document.createElement("div");
+          p1.style.cssText = "position:fixed;bottom:0;left:0;width:1px;height:env(safe-area-inset-bottom,0px);visibility:hidden";
+          document.body.appendChild(p1);
+          const sab = Math.round(p1.getBoundingClientRect().height);
+          const fixBtm = Math.round(p1.getBoundingClientRect().bottom + sab); /* probe自体の下端=fixed座標系の底 */
+          p1.remove();
+          const bodyBtm = Math.round(document.body.getBoundingClientRect().bottom);
+          log.push("画面計測: inner="+window.innerHeight+" client="+de.clientHeight+" vv="+(vv?Math.round(vv.height):"-")+" scr="+screen.height+" sab="+sab+" fixBtm="+fixBtm+" bodyBtm="+bodyBtm+" dpr="+window.devicePixelRatio);
+        }catch(e){ log.push("画面計測: エラー "+e.message); }
         log.push("スナップショット: "+loadSnaps().length+"世代保持中");
         UI.msg = log.join("\n");
         renderKeepScroll();
