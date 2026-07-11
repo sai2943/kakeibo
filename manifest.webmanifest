@@ -1,6 +1,6 @@
 {
-  "name": "収支台帳",
-  "short_name": "台帳",
+  "name": "Tally",
+  "short_name": "Tally",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
