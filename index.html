@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.28 (localStorage保存・完全オフライン)
+   Tally 2.29 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.28";
+const APP_VERSION = "2.29";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -704,12 +704,12 @@ function viewLedger(){
       list.map((e,i)=>{
         const signedAmt = e.type==="income" ? e.amount : -e.amount;
         const isFuture = e.date > todayS;
-        const cc = e.type==="income" ? "var(--teal)" : (e.category==="娯楽" ? "var(--amber)" : "var(--muted)");
+        const catStyle = e.type==="income" ? "background:rgba(45,212,191,.16);color:var(--teal)" : (e.category==="娯楽" ? "background:rgba(242,179,61,.16);color:var(--amber)" : "background:rgba(143,170,167,.20);color:var(--text)");
         return '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+(isFuture?'opacity:.62;':'')+'" data-a="eedit" data-v="'+e.id+'">'+
-        '<div style="flex:1;min-width:0"><div class="row" style="gap:5px;align-items:center;flex-wrap:wrap">'+
-        '<span class="tag" style="border:1px solid '+cc+';color:'+cc+'">'+esc(e.category)+'</span>'+
-        (e.src==="slot"||e.src==="mahjong"?'<span class="tag amber" style="border:1px solid var(--amber);font-size:9px">連携</span>':'')+
-        (e.src==="fixed"?'<span class="tag" style="border:1px solid var(--line);color:var(--muted);font-size:9px">定期</span>':'')+
+        '<div style="flex:1;min-width:0"><div class="row" style="gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:4px">'+
+        '<span class="tag" style="'+catStyle+'">'+esc(e.category)+'</span>'+
+        (e.src==="slot"||e.src==="mahjong"?'<span class="tag" style="border:1px solid var(--amber);color:var(--amber);font-size:9px">連携</span>':'')+
+        (e.src==="fixed"?'<span class="tag" style="border:1px solid var(--muted);color:var(--muted);font-size:9px">定期</span>':'')+
         (isFuture?'<span class="tag" style="border:1px solid var(--blue);color:var(--blue);font-size:9px">予定</span>':'')+'</div>'+
         entryDetailHtml(e)+'</div>'+
         '<div class="mono '+clsPM(signedAmt)+'" style="font-size:14px">'+signYen(signedAmt)+'</div></div>';
