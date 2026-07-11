@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.18 (localStorage保存・完全オフライン)
+   Tally 2.19 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.18";
+const APP_VERSION = "2.19";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -730,14 +730,15 @@ function viewSlot(foot){
     const fin = finalOwn(s);
     const bc = s.mode==="nori"?"var(--teal)":s.mode==="dai"?"var(--amber)":"var(--muted)";
     h += '<div class="listitem" data-a="sedit" data-v="'+s.id+'">'+
-      '<div style="flex:1;min-width:0"><div class="row" style="font-size:13px;gap:6px">'+
+      '<div style="flex:1;min-width:0">'+
+      '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
       '<span class="mono muted" style="font-size:11px">'+s.date.slice(5).replace("-","/")+'</span>'+
-      '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span>'+
-      '<span class="ellip">'+esc(s.store||"店名未入力")+'</span></div>'+
+      '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span></div>'+
+      '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
       '<div class="muted" style="font-size:11px;margin-top:2px">'+
       ((s.partnerName||"").trim()? esc((s.mode==="nori"?"相方":"依頼主")+": "+s.partnerName.trim())+" / " : "")+
       (s.machines||[]).length+'台'+(expTotal(s)>0?' / 経費'+yen(expTotal(s)):'')+'</div></div>'+
-      '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700">'+signYen(fin)+'</div></div>';
+      '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
   });
   return h;
 }
@@ -758,12 +759,13 @@ function viewMahjong(foot){
     const av = mjAvgRank(s);
     const catC = s.category==="free"?"var(--teal)":"var(--amber)";
     h += '<div class="listitem" data-a="mjedit" data-v="'+s.id+'">'+
-      '<div style="flex:1;min-width:0"><div class="row" style="font-size:13px;gap:6px">'+
+      '<div style="flex:1;min-width:0">'+
+      '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
       '<span class="mono muted" style="font-size:11px">'+s.date.slice(5).replace("-","/")+'</span>'+
-      '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span>'+
-      '<span class="ellip">'+esc(s.store||"")+'</span></div>'+
+      '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span></div>'+
+      '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
       '<div class="muted" style="font-size:11px;margin-top:2px">'+s.rule+'麻 / '+mjHanchan(s)+'半荘'+(av!==null?' / 平均'+av.toFixed(2)+'着':'')+'</div></div>'+
-      '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700">'+signYen(fin)+'</div></div>';
+      '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
   });
   return h;
 }
@@ -2967,12 +2969,14 @@ function viewMdb(){
         'まだ登録がありません。パチンコは確率分母と理論TYを登録すると、セッションの台に機種名を入れるだけでボーダー分析が自動適用されます。</div>';
     S.mdb.slice().sort((a,b)=>a.name>b.name?1:-1).forEach(x=>{
       h += '<div class="listitem" data-a="fedit" data-v="'+x.id+'">'+
-        '<div style="flex:1;min-width:0"><div class="row" style="font-size:13px;gap:6px">'+
+        '<div style="flex:1;min-width:0">'+
+        '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
         '<span class="tag" style="background:var(--surface2);font-weight:700;color:'+(x.kind==="slot"?"var(--teal)":"var(--amber)")+'">'+
-        (x.kind==="slot"?"スロ":"パチ")+'</span><span class="ellip">'+esc(x.name)+'</span></div>'+
+        (x.kind==="slot"?"スロ":"パチ")+'</span></div>'+
+        '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(x.name)+'</div>'+
         (x.kind==="pachi"&&fnum(x.denom)>0?'<div class="mono muted" style="font-size:11px;margin-top:2px">1/'+fnum(x.denom)+
           (fnum(x.ty)>0?' / TY'+fnum(x.ty)+' / B'+(fnum(x.denom)*250/fnum(x.ty)).toFixed(1):'')+'</div>':'')+
-        '</div><span class="muted" style="font-size:14px">›</span></div>';
+        '</div><span class="muted" style="font-size:14px;flex-shrink:0;margin-left:8px">›</span></div>';
     });
   }
   return h;
