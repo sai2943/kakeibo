@@ -91,6 +91,7 @@
     display:flex; flex-direction:column; align-items:center; gap:3px;}
   .tabs button.on{color:var(--amber); font-weight:700;}
   .tabs button svg{width:22px; height:22px;}
+  body::after{content:''; position:fixed; left:0; right:0; bottom:0; height:calc(72px + env(safe-area-inset-bottom,0px)); background:var(--bg); z-index:9; pointer-events:none;}
   .toast{position:fixed; bottom:calc(84px + env(safe-area-inset-bottom,0px)); left:50%; transform:translateX(-50%); background:var(--surface2);
     border:1px solid var(--teal); color:var(--teal); font-size:12px; padding:6px 16px; border-radius:16px;
     z-index:60; opacity:0; transition:opacity .25s; pointer-events:none;}
@@ -123,6 +124,7 @@
   @media print{
     html, body{ background:#fff !important; color:#000 !important; }
     body > *:not(#print-area){ display:none !important; }
+    body::after{ display:none !important; }
     #print-area{ display:block !important; background:#fff !important; color:#000 !important; }
     #print-area *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
     .pr-wrap{ color:#000 !important; background:#fff !important; font-family:-apple-system,sans-serif; padding:2px; }
@@ -148,7 +150,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.89 (localStorage保存・完全オフライン)
+   収支台帳 1.90 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -487,7 +489,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.89";
+const APP_VERSION = "1.90";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
