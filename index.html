@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.43 (localStorage保存・完全オフライン)
+   Tally 2.44 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -541,8 +541,19 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.43";
+const APP_VERSION = "2.44";
+let _renderLoc = "";
 function render(){
+  _renderBody();
+  /* タブ・画面・遊技サブタブが変わった時だけ先頭へ。同一画面の再描画は位置を保持 */
+  const loc = UI.tab + "/" + UI.screen + "/" + (UI.gameSub||"");
+  if(loc !== _renderLoc){
+    const app = document.getElementById("app");
+    if(app) app.scrollTop = 0;
+    _renderLoc = loc;
+  }
+}
+function _renderBody(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
   if(navbar){
