@@ -84,7 +84,8 @@
     background:var(--amber); color:#1a1508; font-size:28px; border:none; cursor:pointer;
     box-shadow:0 4px 16px rgba(0,0,0,.4); line-height:0; z-index:5;}
   .tabs{position:fixed; bottom:0; left:0; right:0; background:var(--surface);
-    border-top:1px solid var(--line); display:flex; z-index:10; padding-bottom:env(safe-area-inset-bottom);}
+    border-top:1px solid var(--line); display:flex; z-index:10;
+    padding-left:calc(16px + env(safe-area-inset-left,0px)); padding-right:calc(16px + env(safe-area-inset-right,0px)); padding-bottom:env(safe-area-inset-bottom);}
   .tabs button{flex:1; padding:15px 0 14px; background:none; border:none;
     cursor:pointer; font-size:13px; color:var(--muted); border-top:2px solid transparent; font-family:inherit;}
   .tabs button.on{color:var(--amber); font-weight:700; border-top-color:var(--amber);}
@@ -145,7 +146,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.87 (localStorage保存・完全オフライン)
+   収支台帳 1.88 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -484,7 +485,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.87";
+const APP_VERSION = "1.88";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -494,6 +495,7 @@ function render(){
   if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
   if(UI.screen==="savings"){ app.innerHTML = viewSavings(); bindSavings(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
+  if(UI.screen==="mjtlist"){ app.innerHTML = viewMjtList(); bindMjtList(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
   if(UI.screen==="bordertool"){ app.innerHTML = viewBorderTool(); bindBorderTool(); return; }
   if(UI.screen==="backup"){ app.innerHTML = viewBackup(); bindBackup(); return; }
@@ -796,11 +798,13 @@ function mjStatRow(label, val, isYen, raw){
 
 /* ========================= ツール ========================= */
 /* カテゴリ別ツールの受け皿。将来 投資 のツールもここに追加する。 */
-function viewTool(){
-  if(UI.screen==="mjtable") return "";  // 別画面で描画
-  let h = band("麻雀 — スコア表");
-  h += '<div class="muted" style="font-size:11px;margin:0 2px 8px">当日のセットの半荘ごとのスコアを記録・集計します。</div>';
-  (S.mjTables||[]).slice().sort((a,b)=>a.date<b.date?1:-1).forEach(t=>{
+/* ---------- 麻雀スコア表 一覧(専用画面) ---------- */
+function viewMjtList(){
+  let h = '<div class="hdr"><button class="navbtn" data-a="mjtlback">‹ 戻る</button><div style="font-size:14px;font-weight:700">麻雀 スコア表</div><div style="width:44px"></div></div>';
+  h += '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">当日のセットの半荘ごとのスコアを記録・集計します。</div>';
+  const tables = (S.mjTables||[]).slice().sort((a,b)=>a.date<b.date?1:-1);
+  if(!tables.length) h += '<div class="muted" style="text-align:center;padding:22px 0;font-size:13px">まだスコア表がありません。下から作成できます。</div>';
+  tables.forEach(t=>{
     const names = (t.players||[]).map((p,i)=>p||("P"+(i+1))).join("・");
     const rounds = (t.rows||[]).filter(r=>r.some(x=>x!=="")).length;
     const seats = num(t.rule)||3;
@@ -818,7 +822,27 @@ function viewTool(){
         : '<span style="font-size:18px;color:var(--muted);flex-shrink:0;margin-left:8px">›</span>')+
       '</div>';
   });
-  h += '<button class="btn dash full" style="padding:13px 0" data-a="mjtnew">＋ 新しいスコア表</button>';
+  h += '<button class="btn dash full" style="padding:13px 0;margin-top:4px" data-a="mjtnew">＋ 新しいスコア表</button>';
+  return h;
+}
+function bindMjtList(){
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    const a=el.dataset.a, v=el.dataset.v;
+    el.onclick=()=>{
+      if(a==="mjtlback"){ UI.screen="main"; UI.tab="tool"; render(); return; }
+      if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); return; }
+      if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } return; }
+    };
+  });
+}
+
+function viewTool(){
+  if(UI.screen==="mjtable") return "";  // 別画面で描画
+  let h = band("麻雀");
+  h += '<div class="card" data-a="mjtlist" style="cursor:pointer"><div class="row between" style="align-items:center"><div>'+
+    '<div style="font-size:13px;font-weight:600">スコア表</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:2px">半荘ごとのスコアを記録・集計'+((S.mjTables||[]).length?'（'+(S.mjTables||[]).length+'件）':'')+'</div></div>'+
+    '<span style="font-size:18px;color:var(--muted)">›</span></div></div>';
   /* パチスロ */
   h += band("パチスロ");
   h += '<div class="card" data-a="opentool" data-v="bordertool" style="cursor:pointer"><div class="row between" style="align-items:center"><div><div style="font-size:13px;font-weight:600">回転数・ボーダー試算</div>'+
@@ -1192,9 +1216,9 @@ function bindMjTable(){
       if(a==="editpresets"){ UI.mjtEditPresets = !UI.mjtEditPresets; render(); return; }
       if(a==="applypreset"){ mjtApplyPreset(el.dataset.v); return; }
       if(a==="delpreset"){ mjtDelPreset(el.dataset.v); return; }
-      if(a==="back"){ saveMjt(true); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); }
+      if(a==="back"){ saveMjt(true); UI.screen="mjtlist"; UI.mjt=null; UI.mjtCell=null; render(); }
       else if(a==="pdf"){ mjtPrint(); }
-      else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="main"; UI.tab="tool"; UI.mjt=null; UI.mjtCell=null; render(); } }
+      else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="mjtlist"; UI.mjt=null; UI.mjtCell=null; render(); } }
       else if(a==="rule"){ const nv=el.dataset.v; if(nv!==t.rule && confirm((nv==="3"?"3麻":"4麻")+"に変更しますか?\nウマ・着順計算が"+(nv==="3"?"3人":"4人")+"用に変わります(スコアのデータは消えません)。")){ t.rule=nv; const seats=num(t.rule)||3; while(t.players.length<seats){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); } UI.mjtCell=null; saveMjt(false); render(); } }
       else if(a==="setme"){ const i=num(el.dataset.v); t.meIdx = (t.meIdx===i?null:i); saveMjt(false); render(); }
       else if(a==="addp"){ if(t.players.length<6){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); UI.mjtCell=null; saveMjt(false); render(); } }
@@ -1929,6 +1953,7 @@ function bindMain(){
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
       else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
       else if(a==="mdb"){ UI.screen="mdb"; UI.mdbForm=null; render(); }
+      else if(a==="mjtlist"){ UI.screen="mjtlist"; render(); }
       else if(a==="backup"){ UI.screen="backup"; UI.msg=""; render(); }
       else if(a==="add"){
         if(UI.tab==="ledger"){ UI.editEntryId=null;
