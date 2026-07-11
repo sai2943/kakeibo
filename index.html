@@ -150,7 +150,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.90 (localStorage保存・完全オフライン)
+   収支台帳 1.91 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -489,7 +489,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.90";
+const APP_VERSION = "1.91";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -522,10 +522,10 @@ const monthNav = () =>
   '<button class="navbtn" style="font-size:22px;padding:0 12px" data-a="mnext">›</button></div>';
 
 const TAB_ICONS = {
-  ledger: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/><circle cx="16.5" cy="14.7" r="1.3" fill="currentColor" stroke="none"/></svg>',
+  ledger: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-1.5-3 1.5-3-1.5-3 1.5V3z"/><path d="M9 8h6M9 11.5h6"/></svg>',
   games: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="9" cy="9" r="1.15" fill="currentColor" stroke="none"/><circle cx="15" cy="9" r="1.15" fill="currentColor" stroke="none"/><circle cx="9" cy="15" r="1.15" fill="currentColor" stroke="none"/><circle cx="15" cy="15" r="1.15" fill="currentColor" stroke="none"/></svg>',
-  assets: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.66 3.13 3 7 3s7-1.34 7-3V6"/><path d="M5 12v6c0 1.66 3.13 3 7 3s7-1.34 7-3v-6"/></svg>',
-  tool: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"/></svg>'
+  assets: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6l1.2-2.5h5.6L16 6"/><path d="M8 6c-1.8 1.6-3 4.2-3 7a7 7 0 0 0 14 0c0-2.8-1.2-5.4-3-7z"/><path d="M12 11v4.6M10.2 12.9h3.6M10.2 14.7h3.6"/></svg>',
+  tool: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><rect x="8" y="6" width="8" height="3" rx="0.6"/><circle cx="9" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="15" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="9" cy="16.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="15" cy="16.6" r="0.9" fill="currentColor" stroke="none"/></svg>'
 };
 function tabBar(){
   return '<div class="tabs">'+
@@ -611,11 +611,7 @@ function viewLedger(){
   const todayS = todayStr();
   const hasFuture = me.some(e=>e.date>todayS);
   const actualBal = me.filter(e=>e.date<=todayS && !_inBank(e)).reduce((s,e)=> s + (e.type==="income"?e.amount:-e.amount), 0);
-  let h = '<div class="row" style="gap:8px;margin:10px 0 0">'+
-    '<button class="btn" style="flex:1;font-size:12px;padding:7px 0" data-a="fixed">固定費</button>'+
-    '<button class="btn" style="flex:1;font-size:12px;padding:7px 0" data-a="wishlist">ほしい物</button>'+
-    '</div>';
-  h += '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
+  let h = '<div class="card" style="margin-top:10px"><div style="text-align:center;margin:4px 0 6px">'+
     '<div style="font-size:11px;letter-spacing:.15em" class="muted">当月収支'+(hasFuture?'(予定込)':'')+'</div>'+
     '<div class="mono '+clsPM(bal)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(bal)+'</div>'+
     (hasFuture?'<div class="muted" style="font-size:11px;margin-top:3px">実績 <span class="mono '+clsPM(actualBal)+'">'+signYen(actualBal)+'</span>　予定 <span class="mono '+clsPM(bal-actualBal)+'">'+signYen(bal-actualBal)+'</span></div>':'')+'</div>'+
@@ -658,6 +654,8 @@ function viewLedger(){
     }
     h += '</div>';
   });
+  h += '<div class="row between" style="align-items:center;margin-top:14px;padding-top:13px;border-top:1px solid var(--line);cursor:pointer" data-a="fixed"><span style="font-size:12px;font-weight:700">固定費</span><span class="muted">›</span></div>';
+  h += '<div class="row between" style="align-items:center;margin-top:12px;cursor:pointer" data-a="wishlist"><span style="font-size:12px;font-weight:700">ほしい物</span><span class="muted">›</span></div>';
   h += '</div>';
 
   h += band("明細");
