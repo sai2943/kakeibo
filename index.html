@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.30 (localStorage保存・完全オフライン)
+   Tally 2.31 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -307,7 +307,7 @@ function deleteFixed(id){
 /* ---------- state ---------- */
 let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], stores:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, budgets:{}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"250",genkin:"250",rph:"750",startedAt:0,breakMin:""}, schemaV:3, updatedAt:0 };
 let UI = {
-  tab:"games", gameSub:"slot", screen:"main",           // main | session | mdb | backup | entry
+  tab:"ledger", gameSub:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
   draft:null, isNewSess:false,         // セッションドラフト
   entryForm:null, editEntryId:null,    // 家計簿ドラフト
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.30";
+const APP_VERSION = "2.31";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -704,10 +704,10 @@ function viewLedger(){
       list.map((e,i)=>{
         const signedAmt = e.type==="income" ? e.amount : -e.amount;
         const isFuture = e.date > todayS;
-        const catStyle = e.type==="income" ? "background:rgba(45,212,191,.16);color:var(--teal)" : (e.category==="娯楽" ? "background:rgba(242,179,61,.16);color:var(--amber)" : "background:rgba(229,115,115,.16);color:var(--red)");
+        const cc = e.type==="income" ? "var(--teal)" : (e.category==="娯楽" ? "var(--amber)" : "var(--red)");
         return '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+(isFuture?'opacity:.62;':'')+'" data-a="eedit" data-v="'+e.id+'">'+
         '<div style="flex:1;min-width:0"><div class="row" style="gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:4px">'+
-        '<span class="tag" style="'+catStyle+'">'+esc(e.category)+'</span>'+
+        '<span class="tag" style="border:1px solid '+cc+';color:'+cc+'">'+esc(e.category)+'</span>'+
         (e.src==="slot"||e.src==="mahjong"?'<span class="tag" style="border:1px solid var(--amber);color:var(--amber);font-size:9px">連携</span>':'')+
         (e.src==="fixed"?'<span class="tag" style="border:1px solid var(--muted);color:var(--muted);font-size:9px">定期</span>':'')+
         (isFuture?'<span class="tag" style="border:1px solid var(--blue);color:var(--blue);font-size:9px">予定</span>':'')+'</div>'+
