@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.40 (localStorage保存・完全オフライン)
+   Tally 2.41 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -541,7 +541,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.40";
+const APP_VERSION = "2.41";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -3106,6 +3106,14 @@ function viewBackup(){
     '<div style="font-size:14px;font-weight:700">バックアップ</div><div style="width:44px"></div></div>'+
     band("クラウド同期")+
     '<div id="syncbox">'+syncBoxHtml()+'</div>'+
+    band("自動スナップショット(3世代)")+
+    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:6px">'+
+    '起動時(日次)と、復元・同期での上書き前に、この端末内へ自動退避されます。誤操作時はここから戻せます。</div>'+
+    snapListHtml()+
+    band("自己診断")+
+    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">保存領域・収支計算・書き出し→再取込の整合を検査します。</div>'+
+    '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="btest">自己診断を実行</button>'+
+    (UI.msg?'<div class="mono teal" style="font-size:11px;margin-top:10px;line-height:1.8;white-space:pre-wrap">'+esc(UI.msg)+'</div>':'')+
     band("エクスポート(全データ)")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
     '家計簿・稼働記録・機種データ・レート設定の全てをJSONファイルとして書き出します。日常のバックアップは自動(スナップショット+クラウド)で行われるため、書き出しは機種変更やiOSの大型更新の前だけで十分です。</div>'+
@@ -3118,17 +3126,6 @@ function viewBackup(){
     'バックアップJSONの中身を下に貼り付けて取り込みます。<span class="red">現在のデータは貼り付けた内容で完全に置き換わります。</span></div>'+
     '<textarea class="input mono" id="b-import" placeholder=\'{"entries":[...],"sessions":[...]}\'></textarea>'+
     '<button class="btn danger full" style="margin-top:8px;font-weight:700;padding:11px 0" data-a="bimport">このデータで置き換えて復元する</button>'+
-    band("自動スナップショット(3世代)")+
-    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:6px">'+
-    '起動時(日次)と、復元・同期での上書き前に、この端末内へ自動退避されます。誤操作時はここから戻せます。</div>'+
-    snapListHtml()+
-    band("自己診断")+
-    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">保存領域・収支計算・書き出し→再取込の整合を検査します。</div>'+
-    '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="btest">自己診断を実行</button>'+
-    (UI.msg?'<div class="mono teal" style="font-size:11px;margin-top:10px;line-height:1.8;white-space:pre-wrap">'+esc(UI.msg)+'</div>':'')+
-    band("アプリの更新")+
-    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">最新版が公開されているか確認し、あれば再読み込みして取り込みます(オンライン時のみ)。</div>'+
-    '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="chkupd">更新を確認して再読み込み</button>'+
     '<div class="muted" style="text-align:center;font-size:11px;margin-top:24px;opacity:.7">Tally バージョン '+APP_VERSION+'</div>';
 }
 function bindBackup(){
@@ -3137,7 +3134,6 @@ function bindBackup(){
     el.onclick = ()=>{
       const a=el.dataset.a;
       if(a==="back"){ UI.screen="main"; render(); }
-      else if(a==="chkupd"){ checkForUpdate(true); }
       else if(a==="csv"){ exportCsv(); }
       else if(a==="bexport"){
         dl(JSON.stringify(Object.assign({exportedAt:new Date().toISOString()},S), null, 1),
