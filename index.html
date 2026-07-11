@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.19 (localStorage保存・完全オフライン)
+   Tally 2.20 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.19";
+const APP_VERSION = "2.20";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -729,15 +729,17 @@ function viewSlot(foot){
   ms.forEach(s=>{
     const fin = finalOwn(s);
     const bc = s.mode==="nori"?"var(--teal)":s.mode==="dai"?"var(--amber)":"var(--muted)";
+    const mnames = [...new Set((s.machines||[]).map(m=>(m.name||"").trim()).filter(Boolean))];
+    const machLine = mnames.length ? mnames.join("・") : ((s.machines||[]).length ? (s.machines||[]).length+"台" : "");
     h += '<div class="listitem" data-a="sedit" data-v="'+s.id+'">'+
       '<div style="flex:1;min-width:0">'+
       '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
       '<span class="mono muted" style="font-size:11px">'+s.date.slice(5).replace("-","/")+'</span>'+
-      '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span></div>'+
+      '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span>'+
+      ((s.partnerName||"").trim()?'<span class="muted ellip" style="font-size:12px;min-width:0">'+esc(s.partnerName.trim())+'</span>':'')+'</div>'+
       '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
-      '<div class="muted" style="font-size:11px;margin-top:2px">'+
-      ((s.partnerName||"").trim()? esc((s.mode==="nori"?"相方":"依頼主")+": "+s.partnerName.trim())+" / " : "")+
-      (s.machines||[]).length+'台'+(expTotal(s)>0?' / 経費'+yen(expTotal(s)):'')+'</div></div>'+
+      (machLine?'<div class="muted" style="font-size:11px;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35">'+esc(machLine)+'</div>':'')+
+      '</div>'+
       '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
   });
   return h;
