@@ -158,7 +158,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.01 (localStorage保存・完全オフライン)
+   Tally 2.02 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -501,7 +501,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.01";
+const APP_VERSION = "2.02";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -1974,7 +1974,7 @@ function bindMain(){
       else if(a==="backup"){ UI.screen="backup"; UI.msg=""; render(); }
       else if(a==="add"){
         if(UI.tab==="ledger"){ UI.editEntryId=null;
-          UI.entryForm={date:todayStr(),type:"expense",category:"消費",amount:"",memo:""};
+          UI.entryForm={date:todayStr(),type:"expense",category:"消費",amount:"",store:"",item:"",memo:""};
           UI.screen="entry"; render();
         } else if(UI.tab==="games" && (UI.gameSub||"slot")==="mahjong"){
           UI.mjDraft={id:uid(),date:todayStr(),store:"",category:"free",rule:"4",
@@ -2007,7 +2007,7 @@ function bindMain(){
           if(s){ UI.mjDraft=JSON.parse(JSON.stringify(s)); UI.mjIsNew=false; UI.tab="games"; UI.gameSub="mahjong"; UI.screen="mahjong-edit"; render(); return; }
         }
         UI.editEntryId=e.id;
-        UI.entryForm={date:e.date,type:e.type,category:e.category,amount:String(e.amount),memo:e.memo||""};
+        UI.entryForm={date:e.date,type:e.type,category:e.category,amount:String(e.amount),store:e.store||"",item:(e.item!=null?e.item:(e.memo||"")),memo:e.memo||""};
         UI.screen="entry"; render();
       }
       else if(a==="sedit"){
@@ -2040,9 +2040,44 @@ function dl(content, name, type){
 /* ============================================================
    家計簿 入力画面
    ============================================================ */
+function entryStoreHints(){
+  const m={};
+  (S.entries||[]).forEach(e=>{ const s=(e.store||"").trim(); if(s) m[s]=(m[s]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+}
+function entryItemHints(){
+  const m={};
+  (S.entries||[]).forEach(e=>{ const v=(e.item!=null?String(e.item):String(e.memo||"")).trim(); if(v) m[v]=(m[v]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+}
+function entryUsualChips(type){
+  const map={};
+  (S.entries||[]).filter(e=>e.type===type && e.src!=="slot" && e.src!=="mahjong" && e.src!=="fixed").forEach(e=>{
+    const store=(e.store||"").trim();
+    const item=(e.item!=null?String(e.item):String(e.memo||"")).trim();
+    const label=[store,item].filter(Boolean).join(" "); if(!label) return;
+    const k=store+"\u0001"+item;
+    if(!map[k]) map[k]={store,item,label,count:0,cats:{}};
+    map[k].count++; map[k].cats[e.category]=(map[k].cats[e.category]||0)+1;
+  });
+  return Object.values(map).sort((a,b)=>b.count-a.count).slice(0,6).map(o=>({
+    store:o.store,item:o.item,label:o.label,
+    cat:Object.entries(o.cats).sort((a,b)=>b[1]-a[1])[0][0]
+  }));
+}
 function viewEntry(){
   const f = UI.entryForm;
-  
+  const chips = entryUsualChips(f.type); UI._usualChips = chips;
+  const sh = entryStoreHints(), ih = entryItemHints();
+  const chipsHtml = chips.length
+    ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">よく使う</div>'+
+      '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
+      chips.map((c,i)=>'<button class="chip" data-a="usual" data-i="'+i+'">'+esc(c.label)+'</button>').join("")+'</div>'
+    : '';
+  const fieldsHtml = '<input class="input" id="e-store" list="e-storelist" placeholder="店名(任意)" value="'+esc(f.store||"")+'" autocomplete="off" style="margin-bottom:8px">'+
+    '<datalist id="e-storelist">'+sh.map(v=>'<option value="'+esc(v)+'"></option>').join("")+'</datalist>'+
+    '<input class="input" id="e-item" list="e-itemlist" placeholder="品目(任意)" value="'+esc(f.item||"")+'" autocomplete="off" style="margin-bottom:14px">'+
+    '<datalist id="e-itemlist">'+ih.map(v=>'<option value="'+esc(v)+'"></option>').join("")+'</datalist>';
   return '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
     '<div style="font-size:14px;font-weight:700">'+(UI.editEntryId!==null?"記録を編集":"記録を追加")+'</div><div style="width:44px"></div></div>'+
     '<div class="row" style="gap:8px;margin-bottom:12px">'+
@@ -2057,7 +2092,7 @@ function viewEntry(){
         EXPENSE_CATS.map(c=>'<button class="btn '+(f.category===c?"sel":"")+'" style="flex:1;padding:12px 2px;font-size:13px" data-a="ecat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>'
       : '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
         INCOME_CATS.map(c=>'<button class="chip '+(f.category===c?"sel":"")+'" data-a="ecat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>')+
-    '<input class="input" id="e-memo" placeholder="メモ・店名など(任意)" value="'+esc(f.memo)+'" style="margin-bottom:14px">'+
+    chipsHtml + fieldsHtml +
     '<div class="row" style="gap:8px">'+
     (UI.editEntryId!==null?'<button class="btn danger" data-a="edel">削除</button>':'')+
     '<button class="btn primary" style="flex:1" data-a="esave">'+(UI.editEntryId!==null?"更新する":"追加する")+'</button></div>';
@@ -2066,13 +2101,15 @@ function bindEntry(){
   const f = UI.entryForm;
   document.getElementById("e-date").oninput = e=>f.date=e.target.value;
   document.getElementById("e-amount").oninput = e=>f.amount=e.target.value;
-  document.getElementById("e-memo").oninput = e=>f.memo=e.target.value;
+  const es=document.getElementById("e-store"); if(es) es.oninput = e=>f.store=e.target.value;
+  const ei=document.getElementById("e-item"); if(ei) ei.oninput = e=>f.item=e.target.value;
   document.querySelectorAll("[data-a]").forEach(el=>{
     el.onclick = ()=>{
       const a=el.dataset.a, v=el.dataset.v;
       if(a==="back"){ UI.screen="main"; render(); }
       else if(a==="etype"){ f.type=v; f.category = v==="expense"?"消費":"給与"; render(); }
       else if(a==="ecat"){ f.category=v; render(); }
+      else if(a==="usual"){ const c=(UI._usualChips||[])[num(el.dataset.i)]; if(c){ f.store=c.store; f.item=c.item; f.category=c.cat; render(); const amt=document.getElementById("e-amount"); if(amt) amt.focus(); } }
       else if(a==="edel"){
         const ent = S.entries.find(x=>x.id===UI.editEntryId);
         const isFixed = ent && ent.fixedId;
@@ -2087,11 +2124,13 @@ function bindEntry(){
       else if(a==="esave"){
         const amt = num(f.amount);
         if(!f.date || amt<=0) return;
+        const store=(f.store||"").trim(), item=(f.item||"").trim();
+        const memo=[store,item].filter(Boolean).join(" ");
         if(UI.editEntryId!==null){
           S.entries = S.entries.map(x=>x.id===UI.editEntryId ?
-            Object.assign({},x,{date:f.date,type:f.type,category:f.category,amount:amt,memo:f.memo}) : x);
+            Object.assign({},x,{date:f.date,type:f.type,category:f.category,amount:amt,store,item,memo}) : x);
         } else {
-          S.entries.push({id:uid(),date:f.date,type:f.type,category:f.category,amount:amt,memo:f.memo});
+          S.entries.push({id:uid(),date:f.date,type:f.type,category:f.category,amount:amt,store,item,memo});
         }
         save(); UI.screen="main"; render();
       }
