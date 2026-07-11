@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.17 (localStorage保存・完全オフライン)
+   Tally 2.18 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -305,7 +305,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"5", pExchange:"25", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], stores:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, budgets:{}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, schemaV:2, updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], stores:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, budgets:{}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"250",genkin:"250",rph:"750",startedAt:0,breakMin:""}, schemaV:3, updatedAt:0 };
 let UI = {
   tab:"games", gameSub:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -328,20 +328,13 @@ function migrateEntry(e){
   return ne;
 }
 function applyData(d){
-  const _migRate = !!(d && (d.schemaV===undefined || Number(d.schemaV)<2));
+  const _sv = Number(d && d.schemaV) || 0;
+  let _migRate = false;
   S.entries = (d.entries||[]).map(migrateEntry);
   S.sessions = (d.sessions||[]).map(migrateSession);
-  S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
+  S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"5",pExchange:"25",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
   S.mdb = Array.isArray(d.mdb)?d.mdb:[];
   S.stores = Array.isArray(d.stores)?d.stores:[];
-  if(_migRate){
-    /* 換金率を「◯=1000円」→「◯=100円」に統一(÷10)。schemaVで1回だけ実行 */
-    const _h = x => (x==="" || x==null) ? x : String(num(x)/10);
-    S.rates.exchange = _h(S.rates.exchange); S.rates.pExchange = _h(S.rates.pExchange);
-    (S.sessions||[]).forEach(se=>{ if(se && se.exchange!==undefined) se.exchange=_h(se.exchange); if(se && se.pExchange!==undefined) se.pExchange=_h(se.pExchange); });
-    (S.stores||[]).forEach(st=>{ if(st){ st.slotEx=_h(st.slotEx); st.pachiEx=_h(st.pachiEx); } });
-  }
-  S.schemaV = 2;
   S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
   S.fixed = Array.isArray(d.fixed)?d.fixed:[];
   S.wishlist = Array.isArray(d.wishlist)?d.wishlist:[];
@@ -369,6 +362,18 @@ function applyData(d){
   S.mjPresets = Array.isArray(d.mjPresets)?d.mjPresets:[];
   S.borderTool = Object.assign({id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, d.borderTool||{});
   (S.borderTool.segments||[]).forEach(g=>{ delete g.kind; }); /* 貯玉プッシュ一本化: 旧区間の kind は不要 */
+  if(_sv < 3){
+    /* 換金率を全て1000円基準に統一。v2.17で100円にした分(schemaV=2)は×10で戻す。ボーダーの換金率(kachi)は元々100円基準なので全ケースで×10。1回のみ実行し保存 */
+    const _x10 = x => (x==="" || x==null) ? x : String(num(x)*10);
+    if(_sv >= 2){
+      S.rates.exchange = _x10(S.rates.exchange); S.rates.pExchange = _x10(S.rates.pExchange);
+      (S.sessions||[]).forEach(se=>{ if(se){ if(se.exchange!==undefined) se.exchange=_x10(se.exchange); if(se.pExchange!==undefined) se.pExchange=_x10(se.pExchange); } });
+      (S.stores||[]).forEach(st=>{ if(st){ st.slotEx=_x10(st.slotEx); st.pachiEx=_x10(st.pachiEx); } });
+    }
+    if(S.borderTool){ S.borderTool.kachi = _x10(S.borderTool.kachi); }
+    S.schemaV = 3;
+    _migRate = true;
+  } else { S.schemaV = _sv; }
   S.updatedAt = d.updatedAt || 0;
   if(_migRate){ try{ saveLocal(); }catch(e){} }
 }
@@ -427,7 +432,7 @@ const machCash = m => (m.cash||[]).reduce((a,c)=>a+num(c.amount),0);
 const machSabai = m => num(m.endStock) - num(m.startStock) + num(m.holdBalls);
 const machYen = (m, exch) => {
   const ex = num(exch);
-  const gross = ex>0 ? Math.round(machSabai(m)/ex*100) : 0;
+  const gross = ex>0 ? Math.round(machSabai(m)/ex*1000) : 0;
   return gross - machCash(m);
 };
 const machHasData = m => m.startStock!=="" || m.endStock!=="" || m.holdBalls!=="" || machCash(m)>0;
@@ -516,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.17";
+const APP_VERSION = "2.18";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -2218,12 +2223,12 @@ function viewSession(){
     (S.stores||[]).map(st=>'<button class="chip" data-a="applystore" data-v="'+st.id+'">'+esc(st.name)+'</button>').join("")+'</div>';
   h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
     '<span class="muted" style="font-size:12px;width:74px">スロット</span>'+
-    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 5" value="'+esc(s.exchange||"")+'" style="flex:1" data-in="exchange">'+
-    '<span class="muted" style="font-size:12px">枚=100円</span></div>'+
+    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 50" value="'+esc(s.exchange||"")+'" style="flex:1" data-in="exchange">'+
+    '<span class="muted" style="font-size:12px">枚=1000円</span></div>'+
     '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
     '<span class="muted" style="font-size:12px;width:74px">パチンコ</span>'+
-    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 25" value="'+esc(s.pExchange||"")+'" style="flex:1" data-in="pexchange">'+
-    '<span class="muted" style="font-size:12px">玉=100円</span></div>'+
+    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 250" value="'+esc(s.pExchange||"")+'" style="flex:1" data-in="pexchange">'+
+    '<span class="muted" style="font-size:12px">玉=1000円</span></div>'+
     '<div class="muted" style="font-size:10px">使う方だけ入力。前回値を記憶します。貯玉プッシュのレートは「ツール」タブのボーダー試算で設定します。</div>';
 
   /* ----- 代打ち: 報酬 ----- */
@@ -2498,7 +2503,7 @@ function borderPanel(m, s){
     if(elapsedH >= 5/60 && elapsedH <= 18 && t.spins>0){ rphMeasured = t.spins/elapsedH; rphUsed = rphMeasured; }
   }
   if(bJudge!==null && rphUsed>0 && kachi>0 && t.rate250>0){
-    const uK = 100/kachi;   // 換金単価(円/玉)
+    const uK = 1000/kachi;   // 換金単価(円/玉)
     const uC = fnum(m.genkin)>0 ? 1000/fnum(m.genkin) : uK;   // 現金貸出単価(円/玉、貸出削り込み)
     const hedari = (fnum(m.pushDraw)>0 && fnum(m.pushPayout)>0) ? fnum(m.pushDraw)/fnum(m.pushPayout) : 245/230;  // 貯玉プッシュ手数料比
     const wMochi   = rphUsed*250*uK*(1/bJudge - 1/t.rate250);            // 持玉:換金単価・手数料なし
@@ -2565,8 +2570,8 @@ function viewBorderTool(){
   h += band("時給の設定");
   const _hm = ts => { const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   h += '<div class="card" style="margin-bottom:12px"><div class="grid2">'+
-    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">換金率(100円=◯玉)</div>'+
-    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="25" value="'+esc(m.kachi||"")+'" data-bi="kachi"></div>'+
+    '<div><div class="muted" style="font-size:9px;margin-bottom:2px">換金率(1000円=◯玉)</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(m.kachi||"")+'" data-bi="kachi"></div>'+
     '<div><div class="muted" style="font-size:9px;margin-bottom:2px">現金貸出(1000円=◯玉)</div>'+
     '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(m.genkin||"")+'" data-bi="genkin"></div></div>'+
     '<div style="margin-top:6px"><div class="muted" style="font-size:9px;margin-bottom:2px">回転数/時(仮定値・実測が出るまで使用)</div>'+
@@ -2580,7 +2585,7 @@ function viewBorderTool(){
       '<div class="row" style="gap:8px;align-items:center"><span class="muted" style="font-size:9px;width:28px">休憩</span>'+
         '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="0" value="'+esc(m.breakMin||"")+'" style="width:80px" data-bi="breakMin">'+
         '<span class="muted" style="font-size:11px">分(昼休憩など経過から除く)</span></div></div>'+
-    '<div class="muted" style="font-size:10px;margin-top:8px;line-height:1.6">換金率=出玉の価値(等価4円なら25玉)。現金貸出=貸出で削る店の実玉数。開始時刻は初回区間の入力で自動記録、ズレたら修正/リセット可。前回値を記憶(開始・休憩はクリアで初期化)。</div></div>';
+    '<div class="muted" style="font-size:10px;margin-top:8px;line-height:1.6">換金率=出玉の価値(等価4円なら250玉)。現金貸出=貸出で削る店の実玉数。開始時刻は初回区間の入力で自動記録、ズレたら修正/リセット可。前回値を記憶(開始・休憩はクリアで初期化)。</div></div>';
 
   /* 通常時区間(貯玉プッシュ一本化) */
   h += band("通常時 区間");
@@ -2892,10 +2897,10 @@ function viewStores(){
       '<input class="input" id="st-name" placeholder="例: マルハン◯◯店" value="'+esc(f.name||"")+'" style="margin-bottom:14px">'+
       '<div class="muted" style="font-size:11px;margin:0 2px 6px;font-weight:700;color:var(--text)">スロット</div>'+
       '<div class="row" style="gap:8px;align-items:center;margin-bottom:14px"><span class="muted" style="font-size:11px;width:58px">換金率</span>'+
-      '<input class="input mono r" type="number" inputmode="numeric" placeholder="5" value="'+esc(f.slotEx||"")+'" style="flex:1" data-sf="slotEx"><span class="muted" style="font-size:11px">枚=100円</span></div>'+
+      '<input class="input mono r" type="number" inputmode="numeric" placeholder="50" value="'+esc(f.slotEx||"")+'" style="flex:1" data-sf="slotEx"><span class="muted" style="font-size:11px">枚=1000円</span></div>'+
       '<div class="muted" style="font-size:11px;margin:0 2px 6px;font-weight:700;color:var(--text)">パチンコ</div>'+
       '<div class="row" style="gap:8px;align-items:center;margin-bottom:8px"><span class="muted" style="font-size:11px;width:58px">換金率</span>'+
-      '<input class="input mono r" type="number" inputmode="numeric" placeholder="25" value="'+esc(f.pachiEx||"")+'" style="flex:1" data-sf="pachiEx"><span class="muted" style="font-size:11px">玉=100円</span></div>'+
+      '<input class="input mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(f.pachiEx||"")+'" style="flex:1" data-sf="pachiEx"><span class="muted" style="font-size:11px">玉=1000円</span></div>'+
       '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px"><span class="muted" style="font-size:11px;width:58px">現金貸出</span>'+
       '<input class="input mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(f.pachiGenkin||"")+'" style="flex:1" data-sf="pachiGenkin"><span class="muted" style="font-size:11px">玉=1000円</span></div>'+
       '<div class="grid2">'+
