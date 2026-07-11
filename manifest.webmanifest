@@ -1,7 +1,7 @@
 {
   "name": "Tally",
   "short_name": "Tally",
-  "display": "fullscreen",
+  "display": "standalone",
   "start_url": ".",
   "scope": ".",
   "background_color": "#0B1F1E",
