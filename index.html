@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.31 (localStorage保存・完全オフライン)
+   Tally 2.32 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.31";
+const APP_VERSION = "2.32";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -686,10 +686,6 @@ function viewLedger(){
     }
     h += '</div>';
   });
-  h += '<div class="row" style="gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)">'+
-    '<button class="btn" style="flex:1;padding:11px 0;font-size:12.5px;font-weight:700;color:var(--text);background:var(--surface2);border-color:transparent" data-a="fixed">固定費</button>'+
-    '<button class="btn" style="flex:1;padding:11px 0;font-size:12.5px;font-weight:700;color:var(--text);background:var(--surface2);border-color:transparent" data-a="wishlist">ほしい物</button>'+
-    '</div>';
   h += '</div>';
 
   h += band("明細");
@@ -907,7 +903,12 @@ function bindMjtList(){
 
 function viewTool(){
   if(UI.screen==="mjtable") return "";  // 別画面で描画
-  let h = band("麻雀");
+  let h = band("家計簿");
+  h += '<div class="card" data-a="fixed" style="cursor:pointer"><div class="row between" style="align-items:center"><div><div style="font-size:13px;font-weight:600">固定費</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:2px">毎月の定期支出を登録(家計簿に自動計上)</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
+  h += '<div class="card" data-a="wishlist" style="cursor:pointer;margin-top:8px"><div class="row between" style="align-items:center"><div><div style="font-size:13px;font-weight:600">ほしい物</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:2px">買いたい物・欲しい物リスト</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
+  h += band("麻雀");
   h += '<div class="card" data-a="mjtlist" style="cursor:pointer"><div class="row between" style="align-items:center"><div>'+
     '<div style="font-size:13px;font-weight:600">スコア表</div>'+
     '<div class="muted" style="font-size:11px;margin-top:2px">半荘ごとのスコアを記録・集計'+((S.mjTables||[]).length?'（'+(S.mjTables||[]).length+'件）':'')+'</div></div>'+
