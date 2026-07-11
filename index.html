@@ -158,7 +158,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.02 (localStorage保存・完全オフライン)
+   Tally 2.03 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -501,7 +501,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.02";
+const APP_VERSION = "2.03";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -685,7 +685,7 @@ function viewLedger(){
         (e.src==="slot"||e.src==="mahjong"?' <span class="tag amber" style="border:1px solid var(--amber);font-size:9px">連携</span>':'')+
         (e.src==="fixed"?' <span class="tag" style="border:1px solid var(--line);color:var(--muted);font-size:9px">定期</span>':'')+
         (isFuture?' <span class="tag" style="border:1px solid var(--blue);color:var(--blue);font-size:9px">予定</span>':'')+'</div>'+
-        (e.memo?'<div class="muted ellip" style="font-size:11px">'+esc(e.memo)+'</div>':'')+'</div>'+
+        entryDetailHtml(e)+'</div>'+
         '<div class="mono '+clsPM(signedAmt)+'" style="font-size:14px">'+signYen(signedAmt)+'</div></div>';
       }).join("")+'</div></div>';
   });
@@ -2064,6 +2064,17 @@ function entryUsualChips(type){
     store:o.store,item:o.item,label:o.label,
     cat:Object.entries(o.cats).sort((a,b)=>b[1]-a[1])[0][0]
   }));
+}
+function entryDetailHtml(e){
+  const st=(e.store!=null?String(e.store):"").trim();
+  const it=(e.item!=null?String(e.item):"").trim();
+  if(st && it)
+    return '<div class="muted ellip" style="font-size:11px">'+esc(it)+'</div>'+
+           '<div class="ellip" style="font-size:11px;color:var(--muted);opacity:.7;margin-top:1px">'+esc(st)+'</div>';
+  if(it) return '<div class="muted ellip" style="font-size:11px">'+esc(it)+'</div>';
+  if(st) return '<div class="muted ellip" style="font-size:11px">'+esc(st)+'</div>';
+  if(e.memo) return '<div class="muted ellip" style="font-size:11px">'+esc(e.memo)+'</div>';
+  return '';
 }
 function viewEntry(){
   const f = UI.entryForm;
