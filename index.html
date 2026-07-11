@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.35 (localStorage保存・完全オフライン)
+   Tally 2.36 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.35";
+const APP_VERSION = "2.36";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -735,15 +735,15 @@ function viewSlot(foot){
         const bc = s.mode==="nori"?"var(--amber)":s.mode==="dai"?"var(--teal)":"var(--red)";
         const mnames = [...new Set((s.machines||[]).map(m=>(m.name||"").trim()).filter(Boolean))];
         const machLine = mnames.length ? mnames.join("・") : ((s.machines||[]).length ? (s.machines||[]).length+"台" : "");
-        return '<div class="row" style="padding:11px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="sedit" data-v="'+s.id+'">'+
+        return '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="sedit" data-v="'+s.id+'">'+
           '<div style="flex:1;min-width:0">'+
-          '<div class="row" style="gap:6px;align-items:center;margin-bottom:3px">'+
+          '<div class="row" style="gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:4px">'+
           '<span class="tag" style="border:1px solid '+bc+';color:'+bc+'">'+modeShort(s.mode)+'</span>'+
           ((s.partnerName||"").trim()?personTag(s.partnerName.trim()):'')+'</div>'+
-          '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
-          (machLine?'<div class="muted" style="font-size:11px;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.35">'+esc(machLine)+'</div>':'')+
+          '<div class="muted ellip" style="font-size:11px">'+esc(s.store||"店名未入力")+'</div>'+
+          (machLine?'<div class="ellip" style="font-size:11px;color:var(--muted);opacity:.7;margin-top:1px">'+esc(machLine)+'</div>':'')+
           '</div>'+
-          '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
+          '<div class="mono '+clsPM(fin)+'" style="font-size:14px;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
       }).join("")+'</div></div>';
   });
   return h;
@@ -774,16 +774,16 @@ function viewMahjong(foot){
         const av = mjAvgRank(s);
         const catC = s.category==="free"?"var(--red)":"var(--amber)";
         const topPct = mjHanchan(s)>0 ? Math.round((mjRanks(s)[0]||0)/mjHanchan(s)*100) : 0;
-        return '<div class="row" style="padding:11px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="mjedit" data-v="'+s.id+'">'+
+        return '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="mjedit" data-v="'+s.id+'">'+
           '<div style="flex:1;min-width:0">'+
-          '<div class="row" style="gap:5px;align-items:center;margin-bottom:3px;flex-wrap:wrap">'+
+          '<div class="row" style="gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:4px">'+
           '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span>'+
           '<span class="tag" style="border:1px solid var(--muted);color:var(--muted)">'+s.rule+'麻</span>'+
           (s.players||[]).filter(Boolean).map(personTag).join('')+'</div>'+
-          '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
-          '<div class="muted" style="font-size:11px;margin-top:4px;line-height:1.4">'+mjHanchan(s)+'半荘 ・ 平均'+(av!==null?av.toFixed(2):"—")+'着 ・ トップ'+topPct+'%</div>'+
+          '<div class="muted ellip" style="font-size:11px">'+esc(s.store||"店名未入力")+'</div>'+
+          '<div class="ellip" style="font-size:11px;color:var(--muted);opacity:.7;margin-top:1px">'+mjHanchan(s)+'半荘 ・ 平均'+(av!==null?av.toFixed(2):"—")+'着 ・ トップ'+topPct+'%</div>'+
           '</div>'+
-          '<div class="mono '+clsPM(fin)+'" style="font-size:16px;font-weight:700;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
+          '<div class="mono '+clsPM(fin)+'" style="font-size:14px;flex-shrink:0;margin-left:8px">'+signYen(fin)+'</div></div>';
       }).join("")+'</div></div>';
   });
   return h;
