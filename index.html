@@ -9,8 +9,8 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=3">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="台帳">
-<title>収支台帳</title>
+<meta name="apple-mobile-web-app-title" content="Tally">
+<title>Tally</title>
 <style>
   :root{
     --bg:#0B1F1E; --surface:#12302E; --surface2:#1A3E3B; --line:#24504C;
@@ -158,7 +158,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.94 (localStorage保存・完全オフライン)
+   Tally 1.96 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -497,7 +497,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.94";
+const APP_VERSION = "1.96";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -582,13 +582,6 @@ function viewMain(){
         '<div style="width:1px;background:var(--line)"></div>'+
         '<div style="flex:1;text-align:center"><div class="muted" style="font-size:11px;margin-bottom:3px">麻雀</div><div class="mono '+clsPM(mjNet)+'" style="font-size:18px;font-weight:700">'+signYen(mjNet)+'</div></div></div>' : '')+
       '</div>';
-    if(S.bank&&S.bank.switch){
-      const bBal=bankBalance(), bCeil=num(S.bank.ceiling)||300000, bPct=Math.max(0,Math.min(100,bCeil>0?bBal/bCeil*100:0)), bLow=bBal<bCeil*0.15;
-      h += '<div class="card" style="margin-bottom:12px;cursor:pointer;padding:12px 14px" data-a="bank">'+
-        '<div class="row between" style="align-items:baseline;margin-bottom:7px"><span style="font-size:12px;font-weight:700">軍資金</span><span><span class="mono '+(bLow?"red":"teal")+'" style="font-size:17px;font-weight:700">¥'+bBal.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:10px"> / ¥'+bCeil.toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>'+
-        '<div style="height:6px;background:var(--surface2);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+bPct+'%;background:'+(bLow?"var(--red)":bBal>bCeil?"var(--amber)":"var(--teal)")+'"></div></div>'+
-        '</div>';
-    }
     h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
       [["slot","パチスロ"],["mahjong","麻雀"]].map(([v,l])=>
         '<button class="btn '+(gsub===v?"sel":"")+'" style="flex:1;padding:8px 0;font-weight:700" data-a="gamesub" data-v="'+v+'">'+l+'</button>').join("")+
@@ -662,10 +655,9 @@ function viewLedger(){
     }
     h += '</div>';
   });
-  h += '<div class="row" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line)">'+
-    '<div style="flex:1;text-align:center;cursor:pointer;font-size:12px;font-weight:700" data-a="fixed">固定費</div>'+
-    '<div style="width:1px;background:var(--line)"></div>'+
-    '<div style="flex:1;text-align:center;cursor:pointer;font-size:12px;font-weight:700" data-a="wishlist">ほしい物</div>'+
+  h += '<div class="row" style="gap:10px;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)">'+
+    '<button class="btn" style="flex:1;padding:11px 0;font-size:12.5px;font-weight:700;color:var(--text);background:var(--surface2);border-color:transparent" data-a="fixed">固定費</button>'+
+    '<button class="btn" style="flex:1;padding:11px 0;font-size:12.5px;font-weight:700;color:var(--text);background:var(--surface2);border-color:transparent" data-a="wishlist">ほしい物</button>'+
     '</div>';
   h += '</div>';
 
@@ -970,7 +962,7 @@ function mjtPrintHtml(t){
     h+='<tr class="pr-final"><td class="pr-lbl">支払</td>'+calcs.map(c=>'<td class="'+(c.net<0?"pr-neg":"")+'">'+money(c.net)+'</td>').join("")+'</tr>';
   }
   h+='</tbody></table>';
-  h+='<div class="pr-foot">スコア1点=¥'+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ 収支台帳</div>";
+  h+='<div class="pr-foot">スコア1点=¥'+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ Tally</div>";
   h+='</div>';
   return h;
 }
@@ -1543,7 +1535,7 @@ function wishPrintHtml(){
   const active=list.filter(w=>["consult","cooldown","ready","approved"].includes(wishEff(w)));
   const money=n=>"¥"+num(n).toLocaleString("ja-JP");
   let h='<div class="pr-wrap"><div class="pr-title">ほしい物リスト(相談用)</div>'+
-    '<div class="pr-sub">'+todayStr()+' ・ 収支台帳</div>';
+    '<div class="pr-sub">'+todayStr()+' ・ Tally</div>';
   if(active.length){
     h+='<table class="pr-tbl"><thead><tr><th>品目</th><th>見積り</th><th>状態</th><th>理由</th></tr></thead><tbody>';
     active.forEach(w=>{
@@ -1554,7 +1546,7 @@ function wishPrintHtml(){
     h+='</tbody></table>';
   } else h+='<div style="font-size:12px">検討中の品目はありません。</div>';
   const resisted=list.filter(w=>w.status==="rejected").reduce((a,w)=>a+num(w.est),0);
-  h+='<div class="pr-foot">我慢した合計 '+money(resisted)+' ・ 収支台帳</div></div>';
+  h+='<div class="pr-foot">我慢した合計 '+money(resisted)+' ・ Tally</div></div>';
   return h;
 }
 function wishPrint(){
@@ -2870,7 +2862,7 @@ function viewBackup(){
     band("アプリの更新")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">最新版が公開されているか確認し、あれば再読み込みして取り込みます(オンライン時のみ)。</div>'+
     '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="chkupd">更新を確認して再読み込み</button>'+
-    '<div class="muted" style="text-align:center;font-size:11px;margin-top:24px;opacity:.7">収支台帳 バージョン '+APP_VERSION+'</div>';
+    '<div class="muted" style="text-align:center;font-size:11px;margin-top:24px;opacity:.7">Tally バージョン '+APP_VERSION+'</div>';
 }
 function bindBackup(){
   bindSyncBox();
