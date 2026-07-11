@@ -21,7 +21,7 @@
     display:flex; flex-direction:column; overflow:hidden;
     font-family:'Hiragino Sans','Noto Sans JP',sans-serif; font-size:14px;}
   #app{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; width:100%; max-width:560px; margin:0 auto; padding:calc(16px + env(safe-area-inset-top,0px)) 16px 80px;}
-  #navbar{flex:0 0 auto; width:100%; padding:0 16px max(6px, calc(env(safe-area-inset-bottom,0px) - 20px));}
+  #navbar{flex:0 0 auto; width:100%; padding:0 16px max(4px, calc(env(safe-area-inset-bottom,0px) - 24px));}
   .mono{font-family:ui-monospace,'SF Mono',Menlo,monospace; font-variant-numeric:tabular-nums;}
   .muted{color:var(--muted);}
   .teal{color:var(--teal);} .red{color:var(--red);} .amber{color:var(--amber);} .blue{color:var(--blue);}
@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.11 (localStorage保存・完全オフライン)
+   Tally 2.12 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -505,7 +505,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.11";
+const APP_VERSION = "2.12";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -545,7 +545,7 @@ const monthNav = () =>
 
 const TAB_ICONS = {
   ledger: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-1.5-3 1.5-3-1.5-3 1.5V3z"/><path d="M9 8h6M9 11.5h6"/></svg>',
-  games: '<svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 3.8 19.45 8.1 19.45 16.7 12 21 4.55 16.7 4.55 8.1Z" fill="currentColor"/><path d="M12 12.4 19.45 8.1M12 12.4 12 21M12 12.4 4.55 8.1" fill="none" stroke="var(--surface)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><g fill="var(--surface)"><circle cx="12" cy="6.21" r="0.9"/><circle cx="8.72" cy="8.1" r="0.9"/><circle cx="15.28" cy="8.1" r="0.9"/><circle cx="12" cy="9.99" r="0.9"/><circle cx="17.59" cy="11.33" r="0.9"/><circle cx="15.73" cy="14.55" r="0.9"/><circle cx="13.86" cy="17.78" r="0.9"/><circle cx="6.64" cy="11.71" r="0.9"/><circle cx="9.91" cy="17.39" r="0.9"/></g></svg>',
+  games: '<svg width="22" height="22" viewBox="0 0 24 24"><path d="M12 2.8 19.97 7.4 19.97 16.6 12 21.2 4.03 16.6 4.03 7.4Z" fill="currentColor"/><path d="M12 12 12 2.8M12 12 19.97 16.6M12 12 4.03 16.6" fill="none" stroke="var(--surface)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><g fill="var(--surface)"><circle cx="12" cy="16.6" r="1"/><circle cx="17.58" cy="8.78" r="1"/><circle cx="14.39" cy="10.62" r="1"/><circle cx="6.02" cy="8.55" r="1"/><circle cx="8.02" cy="9.7" r="1"/><circle cx="10.01" cy="10.85" r="1"/></g></svg>',
   assets: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6l1.2-2.5h5.6L16 6"/><path d="M8 6c-1.8 1.6-3 4.2-3 7a7 7 0 0 0 14 0c0-2.8-1.2-5.4-3-7z"/><path d="M12 11v4.6M10.2 12.9h3.6M10.2 14.7h3.6"/></svg>',
   tool: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><rect x="8" y="6" width="8" height="3" rx="0.6"/><circle cx="9" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="15" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="9" cy="16.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="15" cy="16.6" r="0.9" fill="currentColor" stroke="none"/></svg>'
 };
