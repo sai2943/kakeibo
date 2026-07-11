@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.16 (localStorage保存・完全オフライン)
+   Tally 2.17 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -305,7 +305,7 @@ function deleteFixed(id){
 }
 
 /* ---------- state ---------- */
-let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"50", pExchange:"250", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], stores:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, budgets:{}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, updatedAt:0 };
+let S = { entries:[], sessions:[], rates:{medal:"20", ball:"4", push:"245", exchange:"5", pExchange:"25", pushPayout:"230", pushDraw:"245", mjScore:"", mjChip:"", mjBase:"", mjTop:"", mjDrink:""}, mdb:[], stores:[], mjSessions:[], fixed:[], mjTables:[], mjPresets:[], wishlist:[], bank:{switch:"",ceiling:"300000",seed:"",txns:[]}, savings:{goals:[],txns:[]}, budgets:{}, borderTool:{id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, schemaV:2, updatedAt:0 };
 let UI = {
   tab:"games", gameSub:"slot", screen:"main",           // main | session | mdb | backup | entry
   y:new Date().getFullYear(), m:new Date().getMonth()+1,
@@ -328,11 +328,20 @@ function migrateEntry(e){
   return ne;
 }
 function applyData(d){
+  const _migRate = !!(d && (d.schemaV===undefined || Number(d.schemaV)<2));
   S.entries = (d.entries||[]).map(migrateEntry);
   S.sessions = (d.sessions||[]).map(migrateSession);
   S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
   S.mdb = Array.isArray(d.mdb)?d.mdb:[];
   S.stores = Array.isArray(d.stores)?d.stores:[];
+  if(_migRate){
+    /* 換金率を「◯=1000円」→「◯=100円」に統一(÷10)。schemaVで1回だけ実行 */
+    const _h = x => (x==="" || x==null) ? x : String(num(x)/10);
+    S.rates.exchange = _h(S.rates.exchange); S.rates.pExchange = _h(S.rates.pExchange);
+    (S.sessions||[]).forEach(se=>{ if(se && se.exchange!==undefined) se.exchange=_h(se.exchange); if(se && se.pExchange!==undefined) se.pExchange=_h(se.pExchange); });
+    (S.stores||[]).forEach(st=>{ if(st){ st.slotEx=_h(st.slotEx); st.pachiEx=_h(st.pachiEx); } });
+  }
+  S.schemaV = 2;
   S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
   S.fixed = Array.isArray(d.fixed)?d.fixed:[];
   S.wishlist = Array.isArray(d.wishlist)?d.wishlist:[];
@@ -361,6 +370,7 @@ function applyData(d){
   S.borderTool = Object.assign({id:"bt",kind:"pachi",name:"",segments:[],border:"",ty:"",pushPayout:"",pushDraw:"",kezuri:"5",kachi:"25",genkin:"250",rph:"750",startedAt:0,breakMin:""}, d.borderTool||{});
   (S.borderTool.segments||[]).forEach(g=>{ delete g.kind; }); /* 貯玉プッシュ一本化: 旧区間の kind は不要 */
   S.updatedAt = d.updatedAt || 0;
+  if(_migRate){ try{ saveLocal(); }catch(e){} }
 }
 function load(){
   try{
@@ -417,7 +427,7 @@ const machCash = m => (m.cash||[]).reduce((a,c)=>a+num(c.amount),0);
 const machSabai = m => num(m.endStock) - num(m.startStock) + num(m.holdBalls);
 const machYen = (m, exch) => {
   const ex = num(exch);
-  const gross = ex>0 ? Math.round(machSabai(m)/ex*1000) : 0;
+  const gross = ex>0 ? Math.round(machSabai(m)/ex*100) : 0;
   return gross - machCash(m);
 };
 const machHasData = m => m.startStock!=="" || m.endStock!=="" || m.holdBalls!=="" || machCash(m)>0;
@@ -506,7 +516,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.16";
+const APP_VERSION = "2.17";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -2208,12 +2218,12 @@ function viewSession(){
     (S.stores||[]).map(st=>'<button class="chip" data-a="applystore" data-v="'+st.id+'">'+esc(st.name)+'</button>').join("")+'</div>';
   h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
     '<span class="muted" style="font-size:12px;width:74px">スロット</span>'+
-    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 50" value="'+esc(s.exchange||"")+'" style="flex:1" data-in="exchange">'+
-    '<span class="muted" style="font-size:12px">枚=1000円</span></div>'+
+    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 5" value="'+esc(s.exchange||"")+'" style="flex:1" data-in="exchange">'+
+    '<span class="muted" style="font-size:12px">枚=100円</span></div>'+
     '<div class="row" style="gap:8px;align-items:center;margin-bottom:6px">'+
     '<span class="muted" style="font-size:12px;width:74px">パチンコ</span>'+
-    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 250" value="'+esc(s.pExchange||"")+'" style="flex:1" data-in="pexchange">'+
-    '<span class="muted" style="font-size:12px">玉=1000円</span></div>'+
+    '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 25" value="'+esc(s.pExchange||"")+'" style="flex:1" data-in="pexchange">'+
+    '<span class="muted" style="font-size:12px">玉=100円</span></div>'+
     '<div class="muted" style="font-size:10px">使う方だけ入力。前回値を記憶します。貯玉プッシュのレートは「ツール」タブのボーダー試算で設定します。</div>';
 
   /* ----- 代打ち: 報酬 ----- */
@@ -2628,7 +2638,7 @@ function bindBorderTool(){
       else if(a==="btstore"){
         const x=(S.stores||[]).find(z=>String(z.id)===String(v));
         if(x){
-          if((x.pachiEx||"").trim()!=="" && num(x.pachiEx)>0){ m.kachi=String(num(x.pachiEx)/10); }
+          if((x.pachiEx||"").trim()!==""){ m.kachi=x.pachiEx; }
           if((x.pachiGenkin||"").trim()!==""){ m.genkin=x.pachiGenkin; }
           if((x.pachiPay||"").trim()!==""){ m.pushPayout=x.pachiPay; }
           if((x.pachiDraw||"").trim()!==""){ m.pushDraw=x.pachiDraw; }
@@ -2882,10 +2892,10 @@ function viewStores(){
       '<input class="input" id="st-name" placeholder="例: マルハン◯◯店" value="'+esc(f.name||"")+'" style="margin-bottom:14px">'+
       '<div class="muted" style="font-size:11px;margin:0 2px 6px;font-weight:700;color:var(--text)">スロット</div>'+
       '<div class="row" style="gap:8px;align-items:center;margin-bottom:14px"><span class="muted" style="font-size:11px;width:58px">換金率</span>'+
-      '<input class="input mono r" type="number" inputmode="numeric" placeholder="50" value="'+esc(f.slotEx||"")+'" style="flex:1" data-sf="slotEx"><span class="muted" style="font-size:11px">枚=1000円</span></div>'+
+      '<input class="input mono r" type="number" inputmode="numeric" placeholder="5" value="'+esc(f.slotEx||"")+'" style="flex:1" data-sf="slotEx"><span class="muted" style="font-size:11px">枚=100円</span></div>'+
       '<div class="muted" style="font-size:11px;margin:0 2px 6px;font-weight:700;color:var(--text)">パチンコ</div>'+
       '<div class="row" style="gap:8px;align-items:center;margin-bottom:8px"><span class="muted" style="font-size:11px;width:58px">換金率</span>'+
-      '<input class="input mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(f.pachiEx||"")+'" style="flex:1" data-sf="pachiEx"><span class="muted" style="font-size:11px">玉=1000円</span></div>'+
+      '<input class="input mono r" type="number" inputmode="numeric" placeholder="25" value="'+esc(f.pachiEx||"")+'" style="flex:1" data-sf="pachiEx"><span class="muted" style="font-size:11px">玉=100円</span></div>'+
       '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px"><span class="muted" style="font-size:11px;width:58px">現金貸出</span>'+
       '<input class="input mono r" type="number" inputmode="numeric" placeholder="250" value="'+esc(f.pachiGenkin||"")+'" style="flex:1" data-sf="pachiGenkin"><span class="muted" style="font-size:11px">玉=1000円</span></div>'+
       '<div class="grid2">'+
