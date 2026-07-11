@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.34 (localStorage保存・完全オフライン)
+   Tally 2.35 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.34";
+const APP_VERSION = "2.35";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -732,7 +732,7 @@ function viewSlot(foot){
       '<div style="background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden">'+
       list.map((s,i)=>{
         const fin = finalOwn(s);
-        const bc = s.mode==="nori"?"var(--teal)":s.mode==="dai"?"var(--amber)":"var(--muted)";
+        const bc = s.mode==="nori"?"var(--amber)":s.mode==="dai"?"var(--teal)":"var(--red)";
         const mnames = [...new Set((s.machines||[]).map(m=>(m.name||"").trim()).filter(Boolean))];
         const machLine = mnames.length ? mnames.join("・") : ((s.machines||[]).length ? (s.machines||[]).length+"台" : "");
         return '<div class="row" style="padding:11px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="sedit" data-v="'+s.id+'">'+
@@ -772,7 +772,7 @@ function viewMahjong(foot){
       list.map((s,i)=>{
         const fin = mjFinal(s);
         const av = mjAvgRank(s);
-        const catC = s.category==="free"?"var(--teal)":"var(--amber)";
+        const catC = s.category==="free"?"var(--red)":"var(--amber)";
         const topPct = mjHanchan(s)>0 ? Math.round((mjRanks(s)[0]||0)/mjHanchan(s)*100) : 0;
         return '<div class="row" style="padding:11px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+'" data-a="mjedit" data-v="'+s.id+'">'+
           '<div style="flex:1;min-width:0">'+
@@ -821,7 +821,7 @@ function viewMjStats(){
     const sumFee = list.reduce((a,s)=>a+mjGameFee(s),0);
     const sumScore = list.reduce((a,s)=>a+fnum(s.score),0);
     const sumChips = list.reduce((a,s)=>a+fnum(s.chips),0);
-    const catC = G.category==="free"?"var(--teal)":"var(--amber)";
+    const catC = G.category==="free"?"var(--red)":"var(--amber)";
     h += '<div class="card" style="margin-bottom:8px">'+
       '<div class="row between" style="margin-bottom:8px;align-items:center;gap:8px">'+
       '<div class="row" style="align-items:center;gap:6px;min-width:0">'+
