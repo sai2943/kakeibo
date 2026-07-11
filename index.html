@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.42 (localStorage保存・完全オフライン)
+   Tally 2.43 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -541,7 +541,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.42";
+const APP_VERSION = "2.43";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -3090,25 +3090,30 @@ function bindMdb(){
    ============================================================ */
 function snapListHtml(){
   const sn = loadSnaps();
+  const fmt = ts => { const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate()+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); };
   if(!sn.length) return '<div class="muted" style="font-size:12px;margin-bottom:4px">まだありません(次回起動時に自動取得されます)</div>';
-  return '<div class="card" style="padding:2px 14px;margin-bottom:4px">'+sn.map((s,i)=>{
-    const d = new Date(s.ts);
-    const dt = (d.getMonth()+1)+"/"+d.getDate()+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
-    const c1 = ((s.d&&s.d.entries)||[]).length, c2 = ((s.d&&s.d.sessions)||[]).length, c3 = ((s.d&&s.d.mjSessions)||[]).length;
-    return '<div class="row" style="align-items:center;gap:8px;padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
-      '<div style="flex:1"><div style="font-size:12px">'+dt+' <span class="tag" style="color:var(--muted);border:1px solid var(--muted)">'+esc(s.label)+'</span></div>'+
-      '<div class="muted" style="font-size:11px;margin-top:1px">記録'+c1+'件 / 稼働'+c2+'件 / 麻雀'+c3+'件</div></div>'+
-      '<button class="btn" style="padding:7px 12px;font-size:12px;color:var(--text)" data-a="snaprestore" data-v="'+i+'">戻す</button></div>';
-  }).join("")+'</div>';
+  let h = '<div class="card" style="padding:2px 14px;margin-bottom:4px">'+
+    '<div class="row" style="align-items:center;gap:8px;padding:9px 0">'+
+    '<div style="flex:1;font-size:12px">'+sn.length+'世代保持中 <span class="muted" style="font-size:11px">・最新 '+fmt(sn[0].ts)+'</span></div>'+
+    '<button class="btn" style="padding:7px 12px;font-size:12px;color:var(--text)" data-a="snaptoggle">'+(UI.snapOpen?"閉じる":"表示")+'</button></div>';
+  if(UI.snapOpen){
+    h += '<div class="muted" style="font-size:11px;line-height:1.7;padding:2px 0 8px">起動時(日次)と、復元・同期での上書き前に、この端末内へ自動退避されます。</div>'+
+      sn.map((s,i)=>{
+        const c1 = ((s.d&&s.d.entries)||[]).length, c2 = ((s.d&&s.d.sessions)||[]).length, c3 = ((s.d&&s.d.mjSessions)||[]).length;
+        return '<div class="row" style="align-items:center;gap:8px;padding:9px 0;border-top:1px solid var(--line)">'+
+          '<div style="flex:1"><div style="font-size:12px">'+fmt(s.ts)+' <span class="tag" style="color:var(--muted);border:1px solid var(--muted)">'+esc(s.label)+'</span></div>'+
+          '<div class="muted" style="font-size:11px;margin-top:1px">記録'+c1+'件 / 稼働'+c2+'件 / 麻雀'+c3+'件</div></div>'+
+          '<button class="btn" style="padding:7px 12px;font-size:12px;color:var(--text)" data-a="snaprestore" data-v="'+i+'">戻す</button></div>';
+      }).join("");
+  }
+  return h+'</div>';
 }
 function viewBackup(){
   return '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
     '<div style="font-size:14px;font-weight:700">バックアップ</div><div style="width:44px"></div></div>'+
     band("クラウド同期")+
     '<div id="syncbox">'+syncBoxHtml()+'</div>'+
-    band("自動スナップショット(3世代)")+
-    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:6px">'+
-    '起動時(日次)と、復元・同期での上書き前に、この端末内へ自動退避されます。誤操作時はここから戻せます。</div>'+
+    band("自動スナップショット")+
     snapListHtml()+
     band("自己診断")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">保存領域・収支計算・書き出し→再取込の整合を検査します。</div>'+
@@ -3137,6 +3142,7 @@ function bindBackup(){
       const a=el.dataset.a;
       if(a==="back"){ UI.screen="main"; render(); }
       else if(a==="msgclose"){ UI.msg=""; renderKeepScroll(); }
+      else if(a==="snaptoggle"){ UI.snapOpen=!UI.snapOpen; renderKeepScroll(); }
       else if(a==="csv"){ exportCsv(); }
       else if(a==="bexport"){
         dl(JSON.stringify(Object.assign({exportedAt:new Date().toISOString()},S), null, 1),
