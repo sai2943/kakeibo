@@ -145,7 +145,7 @@
 <script>
 "use strict";
 /* ============================================================
-   収支台帳 1.86 (localStorage保存・完全オフライン)
+   収支台帳 1.87 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -484,7 +484,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.86";
+const APP_VERSION = "1.87";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -520,10 +520,8 @@ function viewMain(){
   const TABNAMES = {ledger:"家計簿", games:"遊技", assets:"資産", tool:"ツール"};
   let h = '<div class="row between" style="align-items:center;gap:6px;margin-bottom:6px">'+
     '<div style="font-size:18px;font-weight:700;letter-spacing:.02em">'+(TABNAMES[UI.tab]||"")+'</div>'+
-    '<div class="row" style="gap:6px">'+
     '<span class="syncbadge '+syncState+'" id="syncbadge">'+syncLabel()+'</span>'+
-    '<button class="btn" style="font-size:11px;padding:4px 10px;white-space:nowrap" data-a="backup">backup</button>'+
-    '</div></div>';
+    '</div>';
 
   if(UI.tab==="tool"){
     h += viewTool();
@@ -831,6 +829,10 @@ function viewTool(){
   h += band("投資");
   h += '<div class="card" style="opacity:.6"><div style="font-size:13px">準備中</div>'+
     '<div class="muted" style="font-size:11px;margin-top:2px">ポートフォリオ管理は今後追加予定</div></div>';
+  h += band("データ");
+  h += '<div class="card" style="cursor:pointer" data-a="backup"><div class="row between" style="align-items:center">'+
+    '<div><div style="font-size:13px;font-weight:700">バックアップ・同期</div><div class="muted" style="font-size:11px;margin-top:2px">データの書き出し・復元・同期設定</div></div>'+
+    '<span class="muted">›</span></div></div>';
   return h;
 }
 
