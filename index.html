@@ -158,7 +158,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 1.96 (localStorage保存・完全オフライン)
+   Tally 1.97 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -497,7 +497,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "1.96";
+const APP_VERSION = "1.97";
 function render(){
   const app = document.getElementById("app");
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -545,8 +545,9 @@ function tabBar(){
 /* ---------- メイン画面 ---------- */
 function viewMain(){
   const TABNAMES = {ledger:"家計簿", games:"遊技", assets:"資産", tool:"ツール"};
-  let h = '<div class="row between" style="align-items:center;gap:6px;margin-bottom:6px">'+
-    '<div style="font-size:18px;font-weight:700;letter-spacing:.02em">'+(TABNAMES[UI.tab]||"")+'</div>'+
+  let h = '<div class="row" style="align-items:center;margin-bottom:6px">'+
+    '<div style="width:34px;flex-shrink:0"></div>'+
+    '<div style="flex:1;text-align:center;font-size:18px;font-weight:700;letter-spacing:.02em">'+(TABNAMES[UI.tab]||"")+'</div>'+
     '<button class="syncbtn '+syncState+'" id="syncbadge" data-a="syncnow" title="同期"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg></button>'+
     '</div>';
 
