@@ -167,7 +167,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.47 (localStorage保存・完全オフライン)
+   Tally 2.48 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -548,7 +548,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.47";
+const APP_VERSION = "2.48";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1898,6 +1898,11 @@ function viewMj(){
   h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
     '<input class="input" type="date" id="mj-date" value="'+esc(m.date)+'" style="flex:1">'+
     '<input class="input" id="mj-store" placeholder="ルール名(例:4麻赤有)" value="'+esc(m.store)+'" style="flex:1.4"></div>';
+  h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px">'+
+    '<span class="muted" style="font-size:12px;width:74px">実働</span>'+
+    '<input class="input mono" type="time" id="mj-tstart" value="'+esc(m.startAt||"")+'" style="flex:1">'+
+    '<span class="muted" style="font-size:12px">〜</span>'+
+    '<input class="input mono" type="time" id="mj-tend" value="'+esc(m.endAt||"")+'" style="flex:1"></div>';
   h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
     [["free","フリー"],["set","セット"]].map(([v,l])=>
       '<button class="btn '+(m.category===v?"sel":"")+'" style="flex:1" data-a="mjcat" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
@@ -1996,6 +2001,8 @@ function bindMj(){
   const m = UI.mjDraft;
   document.getElementById("mj-date").oninput = e=>m.date=e.target.value;
   document.getElementById("mj-store").oninput = e=>m.store=e.target.value;
+  const mts=document.getElementById("mj-tstart"); if(mts) mts.oninput = e=>m.startAt=e.target.value;
+  const mte=document.getElementById("mj-tend"); if(mte) mte.oninput = e=>m.endAt=e.target.value;
   document.querySelectorAll("[data-in]").forEach(el=>{
     const kind=el.dataset.in, v=el.dataset.v;
     el.oninput = ()=>{
@@ -2100,14 +2107,14 @@ function bindMain(){
           UI.entryForm={date:todayStr(),type:"expense",category:"消費",amount:"",store:"",item:"",memo:""};
           UI.screen="entry"; render();
         } else if(UI.tab==="games" && (UI.gameSub||"slot")==="mahjong"){
-          UI.mjDraft={id:uid(),date:todayStr(),store:"",category:"free",rule:"4",
+          UI.mjDraft={id:uid(),date:todayStr(),store:"",category:"free",rule:"4",startAt:"",endAt:"",
             score:S.rates.mjScore!==undefined?"":"", chips:"",
             scoreRate:S.rates.mjScore||"", chipRate:S.rates.mjChip||"",
             ranks:["","","",""], players:[], baseFee:S.rates.mjBase||"", topBonus:S.rates.mjTop||"", drinkFee:S.rates.mjDrink||"",
             setFee:"", memo:""};
           UI.mjIsNew=true; UI.screen="mahjong-edit"; render();
         } else {
-          UI.draft={id:uid(),date:todayStr(),store:"",mode:"nori",partnerName:"",fee:"",
+          UI.draft={id:uid(),date:todayStr(),store:"",mode:"nori",partnerName:"",fee:"",startAt:"",endAt:"",
             exchange:S.rates.exchange||"",pExchange:S.rates.pExchange||"",pushPayout:S.rates.pushPayout||"",pushDraw:S.rates.pushDraw||"",machines:[],expenses:[],memo:""};
           UI.whoTab="me";
           UI.isNewSess=true; UI.screen="session"; render();
@@ -2292,6 +2299,11 @@ function viewSession(){
   h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
     '<input class="input" type="date" id="s-date" value="'+esc(s.date)+'" style="flex:1">'+
     '<input class="input" id="s-store" placeholder="店名" value="'+esc(s.store)+'" style="flex:1.4"></div>';
+  h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px">'+
+    '<span class="muted" style="font-size:12px;width:74px">実働</span>'+
+    '<input class="input mono" type="time" id="s-tstart" value="'+esc(s.startAt||"")+'" style="flex:1">'+
+    '<span class="muted" style="font-size:12px">〜</span>'+
+    '<input class="input mono" type="time" id="s-tend" value="'+esc(s.endAt||"")+'" style="flex:1"></div>';
   h += '<div class="row" style="gap:8px;margin-bottom:10px">'+
     [["nori","乗打"],["dai","代打"],["solo","単独"]].map(([v,l])=>
       '<button class="btn '+(s.mode===v?"sel":"")+'" style="flex:1" data-a="mode" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
@@ -2803,6 +2815,8 @@ function bindSession(){
   });
   document.getElementById("s-date").oninput = e=>s.date=e.target.value;
   document.getElementById("s-store").oninput = e=>s.store=e.target.value;
+  const ts0=document.getElementById("s-tstart"); if(ts0) ts0.oninput = e=>s.startAt=e.target.value;
+  const te0=document.getElementById("s-tend"); if(te0) te0.oninput = e=>s.endAt=e.target.value;
   const pn = document.getElementById("s-pname");
   if(pn) pn.oninput = e=>s.partnerName=e.target.value;
 
