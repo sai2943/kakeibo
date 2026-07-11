@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.29 (localStorage保存・完全オフライン)
+   Tally 2.30 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -521,7 +521,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.29";
+const APP_VERSION = "2.30";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -673,16 +673,16 @@ function viewLedger(){
     const spent = me.filter(e=>e.type==="expense" && e.category===cat && !isNetEntry(e)).reduce((a,e)=>a+e.amount,0);
     const pct = cap>0 ? Math.min(100, spent/cap*100) : 0;
     const over = spent - cap;
-    const near = cap>0 && spent >= cap*0.8 && spent < cap;
-    const col = cap>0 ? (over>0?"var(--red)":near?"var(--amber)":"var(--teal)") : "var(--muted)";
+    const col = over>0 ? "var(--red)" : (cat==="娯楽" ? "var(--amber)" : "var(--red)");
+    const colCls = over>0 ? "red" : (cat==="娯楽" ? "amber" : "red");
     h += '<div style="cursor:pointer'+(i>0?";margin-top:13px;padding-top:13px;border-top:1px solid var(--line)":"")+'" data-a="setbudget" data-v="'+cat+'">';
     if(cap>0){
       h += '<div class="row between" style="align-items:baseline;margin-bottom:6px"><span style="font-size:12px;font-weight:700">今月の'+cat+'</span>'+
-        '<span><span class="mono '+(over>0?"red":near?"amber":"teal")+'" style="font-size:15px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:11px"> / ¥'+cap.toLocaleString("ja-JP")+'</span></span></div>'+
+        '<span><span class="mono '+colCls+'" style="font-size:15px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:11px"> / ¥'+cap.toLocaleString("ja-JP")+'</span></span></div>'+
         '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
         '<div class="row between" style="font-size:10px;margin-top:5px">'+(over>0?'<span class="red" style="font-weight:700">超過 ¥'+over.toLocaleString("ja-JP")+'</span>':'<span class="muted">残り ¥'+Math.max(0,cap-spent).toLocaleString("ja-JP")+'</span>')+'<span class="mono muted">'+Math.floor(pct)+'% ・ タップで変更</span></div>';
     } else {
-      h += '<div class="row between" style="align-items:center"><span style="font-size:12px"><span style="font-weight:700">今月の'+cat+'</span> <span class="mono muted">¥'+spent.toLocaleString("ja-JP")+'</span></span><span class="teal" style="font-size:11px">＋ 上限を設定</span></div>';
+      h += '<div class="row between" style="align-items:center"><span style="font-size:12px"><span style="font-weight:700">今月の'+cat+'</span> <span class="mono muted">¥'+spent.toLocaleString("ja-JP")+'</span></span><span class="amber" style="font-size:11px">＋ 上限を設定</span></div>';
     }
     h += '</div>';
   });
@@ -704,7 +704,7 @@ function viewLedger(){
       list.map((e,i)=>{
         const signedAmt = e.type==="income" ? e.amount : -e.amount;
         const isFuture = e.date > todayS;
-        const catStyle = e.type==="income" ? "background:rgba(45,212,191,.16);color:var(--teal)" : (e.category==="娯楽" ? "background:rgba(242,179,61,.16);color:var(--amber)" : "background:rgba(143,170,167,.20);color:var(--text)");
+        const catStyle = e.type==="income" ? "background:rgba(45,212,191,.16);color:var(--teal)" : (e.category==="娯楽" ? "background:rgba(242,179,61,.16);color:var(--amber)" : "background:rgba(229,115,115,.16);color:var(--red)");
         return '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+(isFuture?'opacity:.62;':'')+'" data-a="eedit" data-v="'+e.id+'">'+
         '<div style="flex:1;min-width:0"><div class="row" style="gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:4px">'+
         '<span class="tag" style="'+catStyle+'">'+esc(e.category)+'</span>'+
@@ -780,7 +780,7 @@ function viewMahjong(foot){
           '<div style="flex:1;min-width:0">'+
           '<div class="row" style="gap:5px;align-items:center;margin-bottom:3px">'+
           '<span class="tag" style="border:1px solid '+catC+';color:'+catC+'">'+(s.category==="free"?"フリー":"セット")+'</span>'+
-          '<span class="tag" style="border:1px solid var(--line);color:var(--muted);font-size:9px;padding:1px 5px">'+s.rule+'麻</span>'+
+          '<span class="tag" style="border:1px solid var(--muted);color:var(--muted)">'+s.rule+'麻</span>'+
           (pl?'<span style="display:inline-flex;align-items:center;gap:3px;min-width:0;color:var(--muted);font-size:12px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="7.5" r="3.5"/><path d="M5 19.5c0-3.9 3.1-6 7-6s7 2.1 7 6"/></svg><span class="ellip" style="min-width:0">'+esc(pl)+'</span></span>':'')+'</div>'+
           '<div class="ellip" style="font-size:13px;font-weight:600;line-height:1.3">'+esc(s.store||"店名未入力")+'</div>'+
           '<div class="muted" style="font-size:11px;margin-top:2px">'+mjHanchan(s)+'半荘 ・ 平均'+(av!==null?av.toFixed(2):"—")+'着 ・ トップ'+topPct+'%</div>'+
