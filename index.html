@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0B1F1E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
-<link rel="manifest" href="manifest.webmanifest">
+<link rel="manifest" href="manifest.webmanifest?v=2">
 <link rel="apple-touch-icon" href="apple-touch-icon.png?v=4">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -167,7 +167,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.46 (localStorage保存・完全オフライン)
+   Tally 2.47 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -399,6 +399,8 @@ function loadSnaps(){
   catch(e){ return []; }
 }
 function takeSnap(label){
+  /* 空データは退避しない(再インストール直後の無意味な0件世代を防ぐ) */
+  if(!S.entries.length && !S.sessions.length && !S.mjSessions.length && !(S.mjTables||[]).length) return false;
   const item = {ts: Date.now(), label: label, d: JSON.parse(JSON.stringify(S))};
   try{
     const snaps = loadSnaps();
@@ -546,7 +548,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.46";
+const APP_VERSION = "2.47";
 let _renderLoc = "";
 function render(){
   _renderBody();
