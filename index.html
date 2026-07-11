@@ -162,7 +162,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.39 (localStorage保存・完全オフライン)
+   Tally 2.40 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -386,6 +386,26 @@ function load(){
 function saveLocal(){
   localStorage.setItem(KEY, JSON.stringify(S));
 }
+/* ---------- 自動スナップショット(ローカル3世代) ----------
+   起動時(日次)・復元前・同期上書き前に全データを退避。誤操作からの復旧用 */
+const SNAP_KEY = KEY + ":snaps";
+function loadSnaps(){
+  try{ const a = JSON.parse(localStorage.getItem(SNAP_KEY)); return Array.isArray(a)?a:[]; }
+  catch(e){ return []; }
+}
+function takeSnap(label){
+  const item = {ts: Date.now(), label: label, d: JSON.parse(JSON.stringify(S))};
+  try{
+    const snaps = loadSnaps();
+    snaps.unshift(item);
+    while(snaps.length > 3) snaps.pop();
+    localStorage.setItem(SNAP_KEY, JSON.stringify(snaps));
+    return true;
+  }catch(e){
+    /* 容量不足時は最新1世代のみで再試行 */
+    try{ localStorage.setItem(SNAP_KEY, JSON.stringify([item])); return true; }catch(_){ return false; }
+  }
+}
 function save(){
   try{
     S.updatedAt = Date.now();
@@ -521,7 +541,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.39";
+const APP_VERSION = "2.40";
 function render(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
@@ -3068,6 +3088,19 @@ function bindMdb(){
 /* ============================================================
    バックアップ画面
    ============================================================ */
+function snapListHtml(){
+  const sn = loadSnaps();
+  if(!sn.length) return '<div class="muted" style="font-size:12px;margin-bottom:4px">まだありません(次回起動時に自動取得されます)</div>';
+  return '<div class="card" style="padding:2px 14px;margin-bottom:4px">'+sn.map((s,i)=>{
+    const d = new Date(s.ts);
+    const dt = (d.getMonth()+1)+"/"+d.getDate()+" "+("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2);
+    const c1 = ((s.d&&s.d.entries)||[]).length, c2 = ((s.d&&s.d.sessions)||[]).length, c3 = ((s.d&&s.d.mjSessions)||[]).length;
+    return '<div class="row" style="align-items:center;gap:8px;padding:9px 0'+(i?';border-top:1px solid var(--line)':'')+'">'+
+      '<div style="flex:1"><div style="font-size:12px">'+dt+' <span class="tag" style="color:var(--muted);border:1px solid var(--muted)">'+esc(s.label)+'</span></div>'+
+      '<div class="muted" style="font-size:11px;margin-top:1px">記録'+c1+'件 / 稼働'+c2+'件 / 麻雀'+c3+'件</div></div>'+
+      '<button class="btn" style="padding:7px 12px;font-size:12px;color:var(--text)" data-a="snaprestore" data-v="'+i+'">戻す</button></div>';
+  }).join("")+'</div>';
+}
 function viewBackup(){
   return '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
     '<div style="font-size:14px;font-weight:700">バックアップ</div><div style="width:44px"></div></div>'+
@@ -3075,7 +3108,7 @@ function viewBackup(){
     '<div id="syncbox">'+syncBoxHtml()+'</div>'+
     band("エクスポート(全データ)")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
-    '家計簿・稼働記録・機種データ・レート設定の全てをJSONファイルとして書き出します。データはこの端末のブラウザ内に保存されているため、ブラウザのデータ消去で消えます。定期的に書き出してください。</div>'+
+    '家計簿・稼働記録・機種データ・レート設定の全てをJSONファイルとして書き出します。日常のバックアップは自動(スナップショット+クラウド)で行われるため、書き出しは機種変更やiOSの大型更新の前だけで十分です。</div>'+
     '<div class="row" style="gap:8px;margin-bottom:8px">'+
     '<button class="btn primary" style="flex:1;padding:11px 0" data-a="bexport">ファイルに書き出す</button>'+
     '<button class="btn" style="flex:1;padding:11px 0;color:var(--text)" data-a="bcopy">コピー</button></div>'+
@@ -3085,8 +3118,13 @@ function viewBackup(){
     'バックアップJSONの中身を下に貼り付けて取り込みます。<span class="red">現在のデータは貼り付けた内容で完全に置き換わります。</span></div>'+
     '<textarea class="input mono" id="b-import" placeholder=\'{"entries":[...],"sessions":[...]}\'></textarea>'+
     '<button class="btn danger full" style="margin-top:8px;font-weight:700;padding:11px 0" data-a="bimport">このデータで置き換えて復元する</button>'+
-    band("保存の診断")+
-    '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="btest">保存テストを実行</button>'+
+    band("自動スナップショット(3世代)")+
+    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:6px">'+
+    '起動時(日次)と、復元・同期での上書き前に、この端末内へ自動退避されます。誤操作時はここから戻せます。</div>'+
+    snapListHtml()+
+    band("自己診断")+
+    '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">保存領域・収支計算・書き出し→再取込の整合を検査します。</div>'+
+    '<button class="btn tealb full" style="font-weight:700;padding:11px 0" data-a="btest">自己診断を実行</button>'+
     (UI.msg?'<div class="mono teal" style="font-size:11px;margin-top:10px;line-height:1.8;white-space:pre-wrap">'+esc(UI.msg)+'</div>':'')+
     band("アプリの更新")+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">最新版が公開されているか確認し、あれば再読み込みして取り込みます(オンライン時のみ)。</div>'+
@@ -3122,33 +3160,61 @@ function bindBackup(){
         try{
           const d = JSON.parse(txt);
           if(!Array.isArray(d.entries)||!Array.isArray(d.sessions)) throw new Error("形式不正");
-          if(!confirm("現在のデータを完全に置き換えます。よろしいですか?")) return;
-          S.entries = d.entries;
-          S.sessions = d.sessions.map(migrateSession);
-          S.rates = Object.assign({medal:"20",ball:"4",push:"245",exchange:"50",pExchange:"250",pushPayout:"230",pushDraw:"245",mjScore:"",mjChip:"",mjBase:"",mjTop:"",mjDrink:""}, d.rates||{});
-          S.mdb = Array.isArray(d.mdb)?d.mdb:[];
-          S.mjSessions = Array.isArray(d.mjSessions)?d.mjSessions:[];
+          if(!confirm("現在のデータを完全に置き換えます。よろしいですか?\n(直前の状態は自動退避され、「自動スナップショット」から戻せます)")) return;
+          takeSnap("復元前");
+          applyData(d);   /* 全フィールドの復元+スキーマ移行を一括処理 */
           save();
-          UI.msg = "復元しました(記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件 / 機種"+S.mdb.length+"件)";
+          UI.msg = "復元しました(記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件 / 麻雀"+S.mjSessions.length+"件 / 機種"+S.mdb.length+"件)";
           render();
         }catch(e){
           UI.msg = "取り込めませんでした。JSON全体(先頭の{から末尾の}まで)を貼り付けているか確認してください。";
           render();
         }
       }
+      else if(a==="snaprestore"){
+        const sn = loadSnaps(); const s = sn[Number(el.dataset.v)];
+        if(!s || !s.d) return;
+        const d0 = new Date(s.ts);
+        const dt = (d0.getMonth()+1)+"/"+d0.getDate()+" "+("0"+d0.getHours()).slice(-2)+":"+("0"+d0.getMinutes()).slice(-2);
+        if(!confirm(dt+" 時点の状態に戻します。よろしいですか?\n(現在の状態は「復元前」として退避されます)")) return;
+        takeSnap("復元前");
+        applyData(s.d);
+        save();
+        UI.msg = "スナップショットから復元しました(記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件)";
+        render();
+      }
       else if(a==="btest"){
         const log=[];
-        try{ localStorage.setItem("diag:test", JSON.stringify({t:Date.now()})); log.push("1. テスト書込: OK"); }
-        catch(e){ log.push("1. テスト書込: エラー "+e.message); }
-        try{ const r=localStorage.getItem("diag:test"); log.push(r?"2. テスト読出: OK":"2. テスト読出: 失敗(値なし)"); }
-        catch(e){ log.push("2. テスト読出: エラー "+e.message); }
+        const chk=(name,got,want)=>log.push((String(got)===String(want)?"✓ ":"✗ ")+name+": "+got+(String(got)===String(want)?"":" (期待値 "+want+")"));
+        try{ localStorage.setItem("diag:test", JSON.stringify({t:Date.now()})); log.push("✓ 保存領域の書込: OK"); }
+        catch(e){ log.push("✗ 保存領域の書込: "+e.message); }
+        try{ const r=localStorage.getItem("diag:test"); log.push(r?"✓ 保存領域の読出: OK":"✗ 保存領域の読出: 値なし"); }
+        catch(e){ log.push("✗ 保存領域の読出: "+e.message); }
         try{
           const m=localStorage.getItem(KEY);
           if(m){ const d=JSON.parse(m);
-            log.push("3. 本体データ読出: OK(記録"+(d.entries||[]).length+"件 / 稼働"+(d.sessions||[]).length+"件 / 機種"+(d.mdb||[]).length+"件)");
-          } else log.push("3. 本体データ読出: 値なし(未保存)");
-        }catch(e){ log.push("3. 本体データ読出: エラー "+e.message); }
-        log.push("4. 画面上の現在値: 記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件 / 機種"+S.mdb.length+"件");
+            log.push("✓ 本体データ: 記録"+(d.entries||[]).length+"件 / 稼働"+(d.sessions||[]).length+"件 / 麻雀"+(d.mjSessions||[]).length+"件");
+          } else log.push("✗ 本体データ: 値なし(未保存)");
+        }catch(e){ log.push("✗ 本体データ: "+e.message); }
+        try{
+          const tm={kind:"slot",who:"me",startStock:"1000",endStock:"1200",holdBalls:"300",cash:[{amount:"20000"}]};
+          chk("差枚計算", machSabai(tm), 500);
+          chk("スロ収支計算", machYen(tm,"50"), -10000);
+          chk("セッション収支", finalOwn({mode:"tan",exchange:"50",pExchange:"250",machines:[tm],expenses:[{amount:"1500"}]}), -11500);
+          const tmj={rule:"3",category:"free",score:"25",scoreRate:"100",chips:"4",chipRate:"500",baseFee:"400",topBonus:"100",drinkFee:"300",ranks:["2","1","1"]};
+          chk("麻雀収支", mjFinal(tmj), 2400);
+          chk("麻雀平均着順", mjAvgRank(tmj), 1.75);
+          chk("スキーマ版", S.schemaV, 3);
+        }catch(e){ log.push("✗ 計算検証: "+e.message); }
+        try{
+          const p = JSON.parse(JSON.stringify(S));
+          const sum = a => (a||[]).reduce((x,e)=>x+num(e.amount),0);
+          chk("再取込:記録件数", (p.entries||[]).length, S.entries.length);
+          chk("再取込:金額合計", sum(p.entries), sum(S.entries));
+          chk("再取込:稼働件数", (p.sessions||[]).length, S.sessions.length);
+          chk("再取込:麻雀件数", (p.mjSessions||[]).length, S.mjSessions.length);
+        }catch(e){ log.push("✗ 再取込検査: "+e.message); }
+        log.push("スナップショット: "+loadSnaps().length+"世代保持中");
         UI.msg = log.join("\n");
         render();
       }
@@ -3222,6 +3288,7 @@ async function cloudSync(){
     const localTs = S.updatedAt || 0;
     const cloudTs = cloud ? (cloud.updatedAt || 0) : -1;
     if(cloud && cloudTs > localTs){
+      takeSnap("同期前");       // 上書き前にローカルを退避
       applyData(cloud);         // クラウドが新しい→採用
       saveLocal();
       render();
@@ -3318,6 +3385,11 @@ function bindSyncBox(){
 
 /* ---------- 起動 ---------- */
 load();
+/* 日付が変わって最初の起動時に、読み込んだ状態(=前日終了時点)を日次退避 */
+(function(){
+  const sn = loadSnaps();
+  if(!sn.length || new Date(sn[0].ts).toDateString() !== new Date().toDateString()) takeSnap("日次");
+})();
 ensureFixedEntries();
 render();
 if ("serviceWorker" in navigator) {
