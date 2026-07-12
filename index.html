@@ -45,6 +45,7 @@
      appearanceを剥がして日付と同じ「ただの箱」として描画させる */
   input[type="time"]{-webkit-appearance:none; appearance:none;}
   /* スコア表=共有ドキュメントは白基調(同卓者への視認性優先)。変数差し替えで一括再テーマ */
+  body.sheet-light #app{ padding-top:0; }
   body.sheet-light{
     --bg:#F4F6F6; --surface:#FFFFFF; --surface2:#E9EEED; --line:#C2CFCD;
     --amber:#A9780E; --teal:#0E8C7A; --red:#C0392B; --text:#1B2E2C; --muted:#5E7573; --blue:#2E6DA4;
@@ -143,7 +144,7 @@
   .amberpanel{background:rgba(242,179,61,.08); border:1px solid rgba(242,179,61,.35); border-radius:8px; padding:9px 10px;}
   textarea.input{height:120px; resize:vertical; font-size:11px;}
   #print-area{ display:none; }
-  @page{ margin:10mm; }
+  @page{ margin:0; }  /* 余白0=Safariが余白に刷るURL/日付を出さない。内側余白は.pr-wrapで確保 */
   @media print{
     html, body{ background:#fff !important; color:#000 !important; display:block !important; height:auto !important; overflow:visible !important; }
     #app{ overflow:visible !important; height:auto !important; }
@@ -151,7 +152,8 @@
     body::after{ display:none !important; }
     #print-area{ display:block !important; background:#fff !important; color:#000 !important; }
     #print-area *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-    .pr-wrap{ color:#000 !important; background:#fff !important; font-family:-apple-system,sans-serif; padding:2px; }
+    .pr-wrap{ color:#000 !important; background:#fff !important; font-family:-apple-system,sans-serif; padding:10mm; }
+    .pr-break{ page-break-before:always; break-before:page; }
     .pr-title{ font-size:18px; font-weight:700; color:#000 !important; }
     .pr-sub{ font-size:11px; color:#333 !important; margin:2px 0 10px; }
     .pr-tbl{ border-collapse:collapse; width:100%; margin-bottom:10px; background:#fff !important; }
@@ -175,7 +177,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.62 (localStorage保存・完全オフライン)
+   Tally 2.63 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -583,7 +585,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.62";
+const APP_VERSION = "2.63";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1119,7 +1121,7 @@ function mjtPrintHtml(t){
     }).join("")+'</tr>';
   });
   h+='</tbody></table>';
-  h+=mjtChartSvg(t);
+  h+='<div class="pr-break"></div>'+mjtChartSvg(t);
   /* 集計(アプリの成績表と同じ値) */
   h+='<table class="pr-tbl pr-sum"><tbody>';
   h+='<tr><td class="pr-lbl">平均着順</td>'+P.map((p,ci)=>{const av=mjtAvgRank(t,ci);return '<td>'+(av===null?"–":av.toFixed(2))+'</td>';}).join("")+'</tr>';
@@ -1388,15 +1390,13 @@ function mjtKeypadHtml(t){
 
 function viewMjPlay(){
   const t = UI.mjt, P = t.players, rows = (t.rows||[]);
-  let h = '<div class="row" style="align-items:center;margin-bottom:10px">'+
-    '<button class="navbtn" data-mt="toTable" style="font-size:14px">‹ 設定・精算</button>'+
-    '<div style="flex:1;text-align:center;font-weight:700;font-size:15px">対局モード</div>'+
-    '<div style="width:86px;text-align:right"><span class="muted" style="font-size:11px">'+rows.length+'半荘</span></div></div>';
-  /* プレイヤー名+経過合計(大) */
-  h += '<div class="muted" style="font-size:10px;text-align:right;margin-bottom:4px">上段=合計 / 下段=1着·2着·3着'+(mjtSeats(t)>3?'·4着':'')+'の回数</div>';
-  const stTh='position:sticky;top:0;background:var(--bg);z-index:5;';
-  h += '<table class="mono" style="width:100%;border-collapse:collapse;table-layout:fixed">'+
-    '<thead><tr><th style="width:32px;'+stTh+'"></th>'+P.map((p,ci)=>{
+  /* stickyは親のpadding領域へ入れないため、この画面は#appの上padding無し(CSS)。
+     キャップ行がsafe-area分を不透明に塞ぎ、行がヘッダーの上へ透けるのを防ぐ */
+  const stTh='position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5;';
+  let h = '<table class="mono" style="width:100%;border-collapse:collapse;table-layout:fixed">'+
+    '<thead>'+
+    '<tr><th colspan="'+(P.length+1)+'" style="position:sticky;top:0;z-index:6;background:var(--bg);height:env(safe-area-inset-top,0px);padding:0;border:0"></th></tr>'+
+    '<tr><th style="width:34px;'+stTh+'padding:0;vertical-align:middle"><button class="navbtn" data-mt="toTable" aria-label="設定・精算へ" style="font-size:19px;padding:6px 10px">‹</button></th>'+P.map((p,ci)=>{
       const c=mjtCalc(t,ci);
       const rc=mjtRankCounts(t,ci).slice(0,mjtSeats(t));
       return '<th style="padding:4px 2px 7px;border-bottom:2px solid var(--line);'+stTh+'">'+
@@ -1417,10 +1417,14 @@ function viewMjPlay(){
         }
         return '<td data-mt="cell" data-r="'+ri+'" data-c="'+ci+'" style="text-align:center;padding:14px 2px;border-bottom:1px solid var(--line);font-size:19px;font-weight:700;color:'+col+';'+(sel?"background:rgba(242,179,61,.16);outline:2px solid var(--amber);border-radius:8px":"")+'">'+esc(d)+'</td>';
       }).join("")+'</tr>';
+    /* 選択中の半荘の直下にキーパッドを展開 */
+    if(UI.mjtCell && UI.mjtCell.k==="s" && UI.mjtCell.r===ri){
+      h += '<tr><td colspan="'+(P.length+1)+'" style="padding:4px 0 2px;border-bottom:1px solid var(--line)">'+mjtKeypadHtml(t)+'</td></tr>';
+    }
   });
   h += '</tbody></table>';
   h += '<button class="btn dash full" data-mt="addrow" style="margin-top:12px;padding:13px 0;font-size:15px;font-weight:700">＋ 半荘を追加</button>';
-  h += mjtKeypadHtml(t);
+  h += '<div class="muted" style="font-size:10px;text-align:right;margin-top:6px">ヘッダー: 上段=合計 / 下段=1着·2着·3着'+(mjtSeats(t)>3?"·4着":"")+'の回数</div>';
   h += '<div style="height:40px"></div>';
   return h;
 }
