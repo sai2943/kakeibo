@@ -175,7 +175,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.58 (localStorage保存・完全オフライン)
+   Tally 2.59 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -583,7 +583,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.58";
+const APP_VERSION = "2.59";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1216,7 +1216,7 @@ function viewMjTable(){
     '<tr><td class="mjt-no" style="font-size:10px">ゲーム代</td>'+
     P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell muted" id="mjt-fee-'+ci+'" style="font-size:11px">'+(c.fee?"−¥"+c.fee.toLocaleString("ja-JP"):"–")+'</td>'; }).join("")+'</tr>'+
     '<tr><td class="mjt-no" style="color:var(--amber)">支払</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); const pay=c.net; const feeIn=c.fee>0; return '<td class="mjt-cell" id="mjt-pay-'+ci+'" style="font-size:14px;font-weight:700;color:'+(!feeIn?"var(--muted)":pay<0?"var(--red)":pay>0?"var(--blue)":"var(--muted)")+'">'+(!feeIn?"–":(pay<0?"¥"+Math.abs(pay).toLocaleString("ja-JP"):(pay>0?"+¥"+pay.toLocaleString("ja-JP"):"±0")))+'</td>'; }).join("")+'</tr>'+
+    P.map((p,ci)=>{ const c=mjtCalc(t,ci); const pay=c.net; const feeIn=P.some((q,k)=>num((t.fees||[])[k])>0); return '<td class="mjt-cell" id="mjt-pay-'+ci+'" style="font-size:14px;font-weight:700;color:'+(!feeIn?"var(--muted)":pay<0?"var(--red)":pay>0?"var(--blue)":"var(--muted)")+'">'+(!feeIn?"–":(pay<0?"¥"+Math.abs(pay).toLocaleString("ja-JP"):(pay>0?"+¥"+pay.toLocaleString("ja-JP"):"±0")))+'</td>'; }).join("")+'</tr>'+
     '</tbody></table></div>'+
     (function(){ const fs=P.reduce((a,p,ci)=>a+(num((t.fees||[])[ci])||0),0); return fs>0?'<div style="text-align:center;font-size:12px;margin-top:6px" class="muted">店に払うゲーム代 合計 <span class="mono" style="color:var(--amber);font-weight:700">¥'+fs.toLocaleString("ja-JP")+'</span></div>':''; })()+
     '</div>';
@@ -1418,7 +1418,11 @@ function updateMjtSummary(){
     const se=document.getElementById("mjt-sum-"+ci); if(se) se.textContent=c.sum.toFixed(1);
     const ne=document.getElementById("mjt-net-"+ci); if(ne){ ne.textContent=signYen(c.net); ne.style.color=(c.net>=0?"var(--blue)":"var(--red)"); }
     const fe=document.getElementById("mjt-fee-"+ci); const f=num((t.fees||[])[ci])||0; if(fe) fe.textContent=(f?"−¥"+f.toLocaleString("ja-JP"):"–");
-    const pe=document.getElementById("mjt-pay-"+ci); if(pe){ pe.textContent=(c.net<0?"¥"+Math.abs(c.net).toLocaleString("ja-JP"):(c.net>0?"受取":"±0")); pe.style.color=(c.net<0?"var(--amber)":"var(--muted)"); }
+    const pe=document.getElementById("mjt-pay-"+ci); if(pe){
+      const anyFee=(t.players||[]).some((q,k)=>num((t.fees||[])[k])>0);
+      pe.textContent=(!anyFee?"–":(c.net<0?"¥"+Math.abs(c.net).toLocaleString("ja-JP"):(c.net>0?"+¥"+c.net.toLocaleString("ja-JP"):"±0")));
+      pe.style.color=(!anyFee?"var(--muted)":c.net<0?"var(--red)":c.net>0?"var(--blue)":"var(--muted)");
+    }
   });
 }
 /* スコア表の「自分」の成績を麻雀の収支記録(→家計簿)に反映 */
