@@ -41,6 +41,9 @@
   .input, select.input, textarea.input{background:var(--surface2); border:1px solid var(--line); border-radius:8px;
     color:var(--text); padding:10px 12px; font-size:14px; outline:none; width:100%;}
   .input.sm{padding:6px 8px; font-size:13px;}
+  /* iOSはtype=timeにネイティブの大型コントロール描画を当ててheight指定を無視することがある。
+     appearanceを剥がして日付と同じ「ただの箱」として描画させる */
+  input[type="time"]{-webkit-appearance:none; appearance:none;}
   .input.r{text-align:right;}
   input[type="date"].input{ -webkit-appearance:none; appearance:none; }
   .btn{border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--muted);
@@ -167,7 +170,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.52 (localStorage保存・完全オフライン)
+   Tally 2.53 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -552,7 +555,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.52";
+const APP_VERSION = "2.53";
 let _renderLoc = "";
 function render(){
   _renderBody();
