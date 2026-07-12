@@ -167,7 +167,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.50 (localStorage保存・完全オフライン)
+   Tally 2.51 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -356,6 +356,7 @@ function applyData(d){
     if(n.ruleName==null) n.ruleName = "";
     if(n.meIdx===undefined) n.meIdx = null;
     if(n.startAt==null) n.startAt = "";
+    if(n.endAt==null) n.endAt = "";
     ["mochi","kaeshi","uma1","uma2","uma3","uma4"].forEach(k=>{ if(n[k]==null) n[k]=""; });
     if(n.feeTotal==null) n.feeTotal="";
     if(n.hakoshita==null) n.hakoshita=false;
@@ -551,7 +552,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.50";
+const APP_VERSION = "2.51";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1081,7 +1082,7 @@ function mjtPrint(){
   setTimeout(()=>{ window.print(); }, 60);
 }
 function newMjTable(){
-  return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"], startAt:"",
+  return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"], startAt:"", endAt:"",
     rows:[["","",""]], chipStart:["","",""], chipEnd:["","",""],
     scoreRate:"100", chipRate:"0", fees:["","",""], feeTotal:"",
     mochi:"", kaeshi:"", uma1:"", uma2:"", uma3:"", uma4:"", hakoshita:false };
@@ -1112,6 +1113,12 @@ function viewMjTable(){
     '<input class="input mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="width:auto;min-width:150px;text-align:left;height:44px;box-sizing:border-box"></div>'+
     '<div style="flex:1;min-width:0"><div class="muted" style="font-size:9px;margin-bottom:3px">ルール名</div>'+
     '<input class="input" placeholder="例: DUO虹" value="'+esc(t.ruleName||"")+'" data-mt="rname" style="height:44px;box-sizing:border-box"></div></div>';
+  /* 実働時刻: 開始=名前入力完了で自動、終了=初回の収支反映で自動。ズレたらここで修正 */
+  h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:12px">'+
+    '<span class="muted" style="font-size:12px;width:74px">実働</span>'+
+    '<input class="input mono" type="time" value="'+esc(t.startAt||"")+'" data-mt="tstart" style="flex:1">'+
+    '<span class="muted" style="font-size:12px">〜</span>'+
+    '<input class="input mono" type="time" value="'+esc(t.endAt||"")+'" data-mt="tend" style="flex:1"></div>';
 
   /* 保存済みルール(横スクロール + 編集モード) — 案A: 保存も同じ1行に */
   h += '<div style="margin-bottom:12px">';
@@ -1326,6 +1333,8 @@ function bindMjTable(){
   }; });
   const rn=document.querySelector("[data-mt='rname']"); if(rn) rn.oninput=e=>{ t.ruleName=e.target.value; saveMjt(false); };
   const dt=document.querySelector("[data-mt='date']"); if(dt) dt.onchange=e=>{ if(e.target.value){ t.date=e.target.value; saveMjt(false); render(); } };
+  const mts=document.querySelector("[data-mt='tstart']"); if(mts) mts.oninput=e=>{ t.startAt=e.target.value; saveMjt(false); };
+  const mte=document.querySelector("[data-mt='tend']"); if(mte) mte.oninput=e=>{ t.endAt=e.target.value; saveMjt(false); };
   document.querySelectorAll("[data-mt='rd']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; el.onchange=()=>{ render(); }; });
   document.querySelectorAll("[data-mt='umaabs']").forEach(el=>{ el.oninput=e=>{ const f=el.dataset.v; const neg=String(t[f]||"").startsWith("-"); t[f]=(neg?"-":"")+e.target.value.replace(/-/g,""); saveMjt(false); }; el.onchange=()=>render(); });
   const ft=document.querySelector("[data-mt='ftotal']"); if(ft) ft.oninput=e=>{ t.feeTotal=e.target.value; saveMjt(false); };
@@ -1392,6 +1401,7 @@ function mjtToKakei(){
   const prev=S.mjSessions.filter(s=>s.fromTable===t.id);
   prev.forEach(ps=>{ S.entries=S.entries.filter(e=>e.id!=="mj-"+ps.id); });
   const wasReflected=prev.length>0;
+  if(!t.endAt) t.endAt = nowHM();   /* 終了時刻: 初回反映の時刻を表に記録(以後は表の値を尊重) */
   S.mjSessions=S.mjSessions.filter(s=>s.fromTable!==t.id);
   const sess={ id:uid(), date:t.date, category:"set", rule:t.rule,
     store:(t.ruleName||"").trim(),
@@ -1400,11 +1410,11 @@ function mjtToKakei(){
     setFee:String(num((t.fees||[])[pi])||0),
     ranks:[String(rc[0]),String(rc[1]),String(rc[2]),String(rc[3])].slice(0,mjtSeats(t)),
     players:(t.players||[]).map((p,i)=> i===pi ? "" : (p||"").trim()).filter(Boolean).slice(0,5),
-    /* 私的フィールドは再反映で消さない(卓由来の数字だけ再生成する)
-       開始=スコア表の自動記録(名前入力完了時刻)、終了=初回反映の時刻のみ。再反映では両方とも既存値を維持 */
+    /* 私的フィールド(経費・メモ)は再反映で消さない。
+       時刻は表が所有: 反映のたび表の値をコピー(表で直せば記録に伝播)。終了は初回反映時に表へ自動記録済み */
     expenses:(prev[0]&&prev[0].expenses)||[],
-    startAt:(prev[0]&&prev[0].startAt)||t.startAt||"",
-    endAt:(prev[0]&&prev[0].endAt)||nowHM(),
+    startAt:t.startAt||"",
+    endAt:t.endAt||"",
     memo:(prev[0]&&prev[0].memo)||"",
     fromTable:t.id };
   S.mjSessions.push(sess);
