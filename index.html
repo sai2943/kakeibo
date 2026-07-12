@@ -175,7 +175,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.59 (localStorage保存・完全オフライン)
+   Tally 2.60 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -583,7 +583,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.59";
+const APP_VERSION = "2.60";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -608,7 +608,8 @@ function _renderBody(){
   if(UI.screen==="wishlist"){ app.innerHTML = viewWishlist(); bindWishlist(); return; }
   if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
   if(UI.screen==="savings"){ app.innerHTML = viewSavings(); bindSavings(); return; }
-  document.body.classList.toggle("sheet-light", UI.screen==="mjtable");
+  document.body.classList.toggle("sheet-light", UI.screen==="mjplay");
+  if(UI.screen==="mjplay"){ app.innerHTML = viewMjPlay(); bindMjTable(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mjtlist"){ app.innerHTML = viewMjtList(); bindMjtList(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
@@ -1223,6 +1224,7 @@ function viewMjTable(){
 
   /* 単価(上に配置) */
   /* スコア表 */
+  h += '<button class="btn tealb full" style="margin:2px 0 14px;padding:13px 0;font-size:15px;font-weight:700" data-a="toPlay">▶ 対局モード(大きな文字でスコア入力)</button>';
   h += band("スコア(半荘ごと)");
   h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px"><table class="mjt score"><thead><tr><th style="width:38px">半荘</th>'+
     P.map((p,i)=>'<th '+colW+'><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前">'+
@@ -1299,7 +1301,14 @@ function viewMjTable(){
   }
   h += '<button class="btn tealb full" style="margin-bottom:14px;padding:11px 0;font-weight:700" data-mt="pdf">PDFで共有 / 印刷</button>';
 
-  /* キーパッド */
+  h += mjtKeypadHtml(t);
+  h += '<div style="height:40px"></div>';
+  return h;
+}
+
+function mjtKeypadHtml(t){
+  const P=t.players;
+  let h="";
   if(UI.mjtCell){
     const cell=UI.mjtCell, isScore=cell.k==="s";
     let who=P[cell.c]||("P"+(cell.c+1)), ctx, curVal;
@@ -1347,6 +1356,40 @@ function viewMjTable(){
         : '<button class="mjt-key done" data-mt="keydone" style="grid-column:span 3">完了</button>')+
       '</div></div>';
   }
+  return h;
+}
+
+function viewMjPlay(){
+  const t = UI.mjt, P = t.players, rows = (t.rows||[]);
+  let h = '<div class="row" style="align-items:center;margin-bottom:10px">'+
+    '<button class="navbtn" data-a="toTable" style="font-size:14px">‹ 設定・精算</button>'+
+    '<div style="flex:1;text-align:center;font-weight:700;font-size:15px">対局モード</div>'+
+    '<div style="width:86px;text-align:right"><span class="muted" style="font-size:11px">'+rows.length+'半荘</span></div></div>';
+  /* プレイヤー名+経過合計(大) */
+  h += '<table class="mono" style="width:100%;border-collapse:collapse;table-layout:fixed">'+
+    '<thead><tr><th style="width:32px"></th>'+P.map((p,ci)=>{
+      const c=mjtCalc(t,ci);
+      return '<th style="padding:4px 2px 8px;border-bottom:2px solid var(--line)">'+
+        '<div class="ellip" style="font-size:13px;font-weight:700">'+(t.meIdx===ci?'<span style="color:var(--amber)">★</span>':'')+esc(p||("P"+(ci+1)))+'</div>'+
+        '<div style="font-size:18px;font-weight:800;color:'+(c.sum<0?"var(--red)":c.sum>0?"var(--blue)":"var(--muted)")+'">'+c.sum.toFixed(1)+'</div></th>';
+    }).join("")+'</tr></thead><tbody>';
+  rows.forEach((r,ri)=>{
+    h += '<tr><td style="text-align:center;color:var(--muted);font-size:12px;border-bottom:1px solid var(--line)">'+(ri+1)+'</td>'+
+      P.map((p,ci)=>{
+        const sel = UI.mjtCell && UI.mjtCell.k==="s" && UI.mjtCell.r===ri && UI.mjtCell.c===ci;
+        let d, col;
+        if(mjtAbsent(t,ri,ci)){ d="抜"; col="var(--muted)"; }
+        else { const raw=mjtRawScore(t,ri,ci);
+          if(raw!==null){ d=String(t.rows[ri][ci]); col=raw<0?"var(--red)":raw>0?"var(--blue)":"var(--text)"; }
+          else if(mjtAutoIdx(t,ri)===ci){ const sc=mjtScore(t,ri,ci); d=(sc===null?"·":String(sc)); col="var(--amber)"; }
+          else { d="·"; col="var(--line)"; }
+        }
+        return '<td data-a="cell" data-r="'+ri+'" data-c="'+ci+'" style="text-align:center;padding:14px 2px;border-bottom:1px solid var(--line);font-size:19px;font-weight:700;color:'+col+';'+(sel?"background:rgba(242,179,61,.16);outline:2px solid var(--amber);border-radius:8px":"")+'">'+esc(d)+'</td>';
+      }).join("")+'</tr>';
+  });
+  h += '</tbody></table>';
+  h += '<button class="btn dash full" data-a="addrow" style="margin-top:12px;padding:13px 0;font-size:15px;font-weight:700">＋ 半荘を追加</button>';
+  h += mjtKeypadHtml(t);
   h += '<div style="height:40px"></div>';
   return h;
 }
@@ -1403,6 +1446,8 @@ function bindMjTable(){
       else if(a==="addrow"){ t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="rowdel"){ t.rows.splice(num(el.dataset.v),1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; renderKeepScroll(); }
+      else if(a==="toPlay"){ UI.mjtCell=null; UI.screen="mjplay"; render(); }
+      else if(a==="toTable"){ UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="cs"){ UI.mjtCell={k:"cs",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="ce"){ UI.mjtCell={k:"ce",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="key"){ padInput(el.dataset.v); }
