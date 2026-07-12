@@ -1,4 +1,6 @@
-# Tally PWA — 次チャットへの引き継ぎ (現行 v2.48)
+# Tally PWA — 次チャットへの引き継ぎ (現行 v2.50)
+
+> リポジトリでは固定名 `HANDOFF.md` で上書き運用(バージョンはこの見出し、履歴はGit)。
 
 ## 0. 現在のフェーズと優先事項
 **緊急タスクなし。開発は「データ収集フェーズ」に入った。**機能追加は原則凍結(機能予算: 「月1回以上使うか/入力摩擦を減らすか/意思決定を変えるか」を通らないものは足さない)。
@@ -53,7 +55,9 @@ open('_all.js','w',encoding='utf-8').write('\n;\n'.join(blocks))
 ## 5. データモデル(S, localStorage KEY="kakeibo:v1", Supabase同期)
 - `S.entries`: 家計簿 `{id,date,type,category,amount,memo,src,fixedId,store,item}`。src="slot"/"mahjong"=遊技連携(linkId="mj-"+id等), "daida"=代打ち, "fixed"=固定費。
 - `S.sessions`: パチスロ `{id,date,store,mode[nori/dai/solo],partnerName,fee,exchange,pExchange,pushPayout,pushDraw,machines[],expenses[],memo,`**`startAt,endAt`**`}`。**startAt/endAt(HH:MM文字列・任意)はv2.48で追加。時給分析用。カード等には表示しない(記録のみ)**。
-- `S.mjSessions`: 麻雀 `{id,date,store(ルール名),category[free/set],rule[3/4],score,chips,scoreRate,chipRate,ranks[4],players[](同卓者最大5),baseFee,topBonus,drinkFee,setFee,memo,fromTable,`**`startAt,endAt`**`}`。
+- `S.mjSessions`: 麻雀 `{id,date,store(ルール名),category[free/set],rule[3/4],score,chips,scoreRate,chipRate,ranks[4],players[](同卓者最大5),baseFee,topBonus,drinkFee,setFee,memo,fromTable,`**`startAt,endAt,expenses[]`**`}`。**expenses[](v2.49)=セット飲食等の私的経費 {id,label,amount}、スロットと同型UI。mjFinal = mjRaw − mjGameFee − mjExpTotal**。
+- **共有/私的の境界(v2.49-2.50・壊さないこと)**: スコア表(mjTables)は同卓者に見せる共有ドキュメントなので経費・時刻UIを置かない。収支反映は既存生成セッションを削除→再生成する方式だが、**私的フィールド(expenses/startAt/endAt/memo)はprev[0]から引き継いで生き残らせる**。卓由来の数字(スコア/チップ/ゲーム代/着順)だけが再生成対象。
+- **スコア表の時刻自動記録(v2.50)**: `t.startAt`=全席の名前が既定文字(A/B/C/D)以外で埋まった瞬間に1回だけnowHM()を記録。反映時に `sess.startAt = prev||t.startAt`、`sess.endAt = prev||nowHM()`(**終了時刻は初回反映のみ。再反映では更新しない**)。修正はセッション側の実働欄で可能。深夜跨ぎは end<start なら+24h解釈。
 - 計算: machSabai=end−start+hold、machYen=round(差枚/ex*1000)−現金、finalOwn=grossOwn−経費、mjFinal=mjRaw−mjGameFee、mjAvgRank。換金率は**全て1000円基準**(schemaV=3)。
 - `S.mdb`(機種), `S.stores`(店舗プリセット), `S.fixed`(固定費), `S.wishlist`, `S.bank`, `S.savings`, `S.budgets`, `S.mjTables`(スコア表), `S.mjPresets`, `S.borderTool`, `S.schemaV:3`, `S.updatedAt`(LWW用・save()でDate.now())。
 - **applyDataがスキーマ移行含む唯一の正規復元経路**。インポート(bimport)もスナップ復元もクラウド採用も全てapplyData経由(v2.40でbimportの手動代入バグを修正済み——二度と手動代入に戻さない)。
@@ -65,7 +69,7 @@ open('_all.js','w',encoding='utf-8').write('\n;\n'.join(blocks))
 3. **手動エクスポートJSON**: 機種変更・iOS大型更新の前のみ。保存先はiCloud Drive「Tally」フォルダ固定を推奨。
 
 - バックアップ画面の並び(使用頻度順・v2.41): クラウド同期→スナップショット→自己診断→エクスポート→インポート→バージョン表記。「アプリの更新」セクションは削除済み(自動チェック: 起動1.5秒後+前面復帰時60秒スロットル、手動: ヘッダー同期ボタン)。
-- **自己診断(btest)**: 保存領域R/W、本体件数、計算検証(差枚500/スロ収支-10000/セッション-11500/麻雀2400/平均着順1.75/スキーマ3——期待値は実関数で検証済みのフィクスチャ)、書出→再取込の件数・金額合計一致、画面計測(inner/client/vv/scr/sab/fixBtm/bodyBtm/dpr)、スナップ世代数。結果は×で閉じられる(msgclose)。診断・スナップ復元はrenderKeepScroll。
+- **自己診断(btest)**: 保存領域R/W、本体件数、計算検証(差枚500/スロ収支-10000/セッション-11500/麻雀2400/**麻雀経費込み2100**/平均着順1.75/スキーマ3——期待値は実関数で検証済みのフィクスチャ)、書出→再取込の件数・金額合計一致、画面計測(inner/client/vv/scr/sab/fixBtm/bodyBtm/dpr)、スナップ世代数。結果は×で閉じられる(msgclose)。診断・スナップ復元はrenderKeepScroll。
 
 ## 7. 直近チャットの作業ログ(v2.37→v2.48)
 - v2.38 アプリアイコン画線法化(?v=4) / v2.39 遊技タブをフラット5の目に
@@ -74,6 +78,8 @@ open('_all.js','w',encoding='utf-8').write('\n;\n'.join(blocks))
 - v2.44 **タブ/画面遷移のスクロール残留バグ根治**(render()のloc判定)
 - v2.45 画面計測を診断に追加 / v2.46 **適応型ナビ余白(--vgap/--navpad)**+manifest fullscreen実験 / v2.47 実験不発確定→manifest standaloneへ復帰+?v=2キャッシュバスト+空スナップ抑止
 - v2.48 **セッション実働時刻(startAt/endAt)を両フォームに追加**(時給分析の前提データ収集開始)
+- v2.49 **麻雀セッションに私的経費(expenses[])**: スロット同型UI、mjFinalに反映、再反映での私的フィールド消失バグを同時修正
+- v2.50 **スコア表の時刻自動記録**: 名前入力完了→startAt、初回反映→endAt(再反映では不変)。nowHM()ヘルパー新設(※todayStrは複数行関数——直後への挿入時はスコープ事故に注意、実際に一度やらかして修正した)
 - Supabase: RLS検証、履歴テーブル+トリガー導入、RESTORE_RUNBOOK.md作成
 
 ## 8. 未対応・保留(ユーザー合意済み)
@@ -83,5 +89,5 @@ open('_all.js','w',encoding='utf-8').write('\n;\n'.join(blocks))
 - ユーザー却下済み(蒸し返さない): 予算アラート/プッシュ通知、カテゴリ細分化、塗り潰しピル、ローカルスナップ世代数の増加(深い履歴はサーバの役割)、iOS 62ptへの追加CSS実験。
 
 ## 9. 現在のバージョンとファイル
-**v2.48**。リポジトリ構成: index.html / sw.js(未レビュー・内容未確認) / manifest.webmanifest(display:standalone, name/short_name:Tally) / apple-touch-icon.png / icon-192.png / icon-512.png / HANDOFF_Tally_v2_48.md / RESTORE_RUNBOOK.md。
+**v2.50**。リポジトリ構成: index.html / sw.js(未レビュー・内容未確認) / manifest.webmanifest(display:standalone, name/short_name:Tally) / apple-touch-icon.png / icon-192.png / icon-512.png / HANDOFF.md(本書) / RESTORE_RUNBOOK.md。
 sw.jsは一度も精読していないので、更新配信やキャッシュで不可解な挙動が出たらまずsw.jsをアップロードしてもらいレビューすること。
