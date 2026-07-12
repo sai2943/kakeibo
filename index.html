@@ -170,7 +170,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.56 (localStorage保存・完全オフライン)
+   Tally 2.57 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -578,7 +578,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.56";
+const APP_VERSION = "2.57";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -2117,11 +2117,18 @@ function bindMj(){
         save(); UI.screen="main"; UI.mjDraft=null; render();
       }
       else if(a==="mjxadd"){ (m.expenses=m.expenses||[]).push({id:uid(),store:"",item:"",amount:""}); render(); }
-      else if(a==="mjxdel"){ m.expenses=(m.expenses||[]).filter(x=>String(x.id)!==String(v)); render(); }
+      else if(a==="mjxdel"){
+        const x = (m.expenses||[]).find(e=>String(e.id)===String(v));
+        if(x && x.fromData){
+          if(!confirm("この経費は家計簿からの振替です。経費から外し、保存した時点で家計簿に記録を戻します。よろしいですか?")) return;
+          (m._restore=m._restore||[]).push(x.fromData);
+        }
+        m.expenses=(m.expenses||[]).filter(e=>String(e.id)!==String(v)); render();
+      }
       else if(a==="mjxfopen"){ UI.xferOpen=!UI.xferOpen; render(); }
       else if(a==="mjxfpick"){
         const e=(S.entries||[]).find(x=>String(x.id)===String(v));
-        if(e){ (m.expenses=m.expenses||[]).push({id:uid(), store:e.store||"", item:(e.item||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id}); UI.xferOpen=false; render(); }
+        if(e){ (m.expenses=m.expenses||[]).push({id:uid(), store:e.store||"", item:(e.item||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id, fromData:Object.assign({},e)}); UI.xferOpen=false; render(); }
       }
       else if(a==="mjsave") saveMj();
     };
@@ -2140,6 +2147,7 @@ function saveMj(){
   const m = UI.mjDraft;
   if(!m.date) return;
   const cleaned = Object.assign({}, m);
+  const _rs = cleaned._restore||[]; delete cleaned._restore;
   const rc = mjRankCount(cleaned);
   cleaned.ranks = (cleaned.ranks||["","","",""]).slice(0,4).map((x,i)=> i<rc ? x : "");
   cleaned.players = (cleaned.players||[]).map(p=>(p||"").trim()).filter(Boolean).slice(0,5);
@@ -2163,8 +2171,10 @@ function saveMj(){
   /* 家計簿からの振替: 選択元の記録をここで削除(保存とワンセット) */
   const _xf = new Set((cleaned.expenses||[]).map(x=>String(x.fromEntry)).filter(x=>x!=="undefined"&&x!=="null"));
   if(_xf.size) S.entries = S.entries.filter(e=>!_xf.has(String(e.id)));
+  _rs.forEach(d=>{ if(d && !S.entries.some(e=>String(e.id)===String(d.id))) S.entries.push(d); });
   save(); UI.screen="main"; UI.mjDraft=null; render();
-  if(_xf.size) toast("保存しました(家計簿から"+_xf.size+"件を経費へ振替)");
+  const _msgs=[]; if(_xf.size) _msgs.push("振替"+_xf.size+"件"); if(_rs.length) _msgs.push("家計簿へ"+_rs.length+"件戻し");
+  if(_msgs.length) toast("保存しました("+_msgs.join(" / ")+")");
 }
 
 function bindMain(){
@@ -3022,11 +3032,18 @@ function bindSessionActions(){
         if(m){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(gid)); render(); }
       }
       else if(a==="xadd"){ s.expenses.push({id:uid(),store:"",item:"",amount:""}); render(); }
-      else if(a==="xdel"){ s.expenses=s.expenses.filter(x=>String(x.id)!==String(v)); render(); }
+      else if(a==="xdel"){
+        const x = s.expenses.find(e=>String(e.id)===String(v));
+        if(x && x.fromData){
+          if(!confirm("この経費は家計簿からの振替です。経費から外し、保存した時点で家計簿に記録を戻します。よろしいですか?")) return;
+          (s._restore=s._restore||[]).push(x.fromData);
+        }
+        s.expenses=s.expenses.filter(e=>String(e.id)!==String(v)); render();
+      }
       else if(a==="xfopen"){ UI.xferOpen=!UI.xferOpen; render(); }
       else if(a==="xfpick"){
         const e=(S.entries||[]).find(x=>String(x.id)===String(v));
-        if(e){ s.expenses.push({id:uid(), store:e.store||"", item:(e.item||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id}); UI.xferOpen=false; render(); }
+        if(e){ s.expenses.push({id:uid(), store:e.store||"", item:(e.item||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id, fromData:Object.assign({},e)}); UI.xferOpen=false; render(); }
       }
       else if(a==="sdel"){
         if(!confirm("この稼働記録を削除しますか?(家計簿の連携分も消えます)")) return;
@@ -3045,6 +3062,7 @@ function saveSession(){
   const cleaned = Object.assign({}, s, {
     fee: String(num(s.fee))
   });
+  const _rs = cleaned._restore||[]; delete cleaned._restore;
   delete cleaned.own; delete cleaned.partner; delete cleaned.results;
   if(UI.isNewSess) S.sessions.push(cleaned);
   else S.sessions = S.sessions.map(x=>x.id===s.id?cleaned:x);
@@ -3069,8 +3087,10 @@ function saveSession(){
   /* 家計簿からの振替: 選択元の記録をここで削除(保存とワンセット) */
   const _xf = new Set((cleaned.expenses||[]).map(x=>String(x.fromEntry)).filter(x=>x!=="undefined"&&x!=="null"));
   if(_xf.size) S.entries = S.entries.filter(e=>!_xf.has(String(e.id)));
+  _rs.forEach(d=>{ if(d && !S.entries.some(e=>String(e.id)===String(d.id))) S.entries.push(d); });
   save(); UI.screen="main"; UI.draft=null; render();
-  if(_xf.size) toast("保存しました(家計簿から"+_xf.size+"件を経費へ振替)");
+  const _msgs=[]; if(_xf.size) _msgs.push("振替"+_xf.size+"件"); if(_rs.length) _msgs.push("家計簿へ"+_rs.length+"件戻し");
+  if(_msgs.length) toast("保存しました("+_msgs.join(" / ")+")");
 }
 </script>
 <script>
