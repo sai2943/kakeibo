@@ -170,7 +170,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.53 (localStorage保存・完全オフライン)
+   Tally 2.54 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -479,6 +479,29 @@ const slotMachines = (s, who) => (s.machines||[]).filter(m => m.kind==="slot" &&
 const personSlotYen = (s, who) => incomeMachines(s, who).reduce((a,m)=>a+machYenS(m, s), 0);
 const poolTotal = s => personSlotYen(s,"me") + personSlotYen(s,"partner");
 const expTotal = s => (s.expenses||[]).reduce((a,e)=>a+num(e.amount),0);
+/* ---------- 家計簿→セッション経費への振替 ----------
+   候補: 支出・非連携(src無し)・セッション日±3日・未選択。元記録の削除は保存時に実行(トランザクション) */
+function xferCandidates(dateStr, expenses){
+  const used = new Set((expenses||[]).map(x=>String(x.fromEntry)).filter(x=>x!=="undefined"&&x!=="null"));
+  const base = new Date((dateStr||todayStr())+"T00:00:00");
+  return (S.entries||[]).filter(e=>{
+    if(e.type!=="expense" || e.src) return false;
+    if(used.has(String(e.id))) return false;
+    const d = Math.abs((new Date((e.date||"")+"T00:00:00") - base)/86400000);
+    return d<=3;
+  }).sort((a,b)=> a.date<b.date?1:-1).slice(0,8);
+}
+function xferRowsHtml(list, act){
+  if(!list.length) return '<div class="muted" style="font-size:11px;margin:6px 0">直近±3日に振替できる支出がありません</div>';
+  return list.map(e=>{
+    const lbl = e.item || e.store || e.memo || e.category || "支出";
+    return '<button class="btn" style="width:100%;text-align:left;margin-top:6px;padding:8px 12px;font-size:12px;display:flex;gap:8px;align-items:center" data-a="'+act+'" data-v="'+e.id+'">'+
+      '<span class="muted mono" style="font-size:11px">'+esc((e.date||"").slice(5))+'</span>'+
+      '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(lbl)+'</span>'+
+      '<span class="mono">'+yen(num(e.amount))+'</span></button>';
+  }).join("");
+}
+const xferHint = '<div class="muted" style="font-size:10px;margin:8px 2px 0">選ぶと経費に入り、このセッションを保存した時点で元の家計簿記録が削除されます。</div>';
 /* 乗り打ちの折半調整: myShareが入力されていればそれを自分の取り分に使う(なければ折半) */
 const halfSplit = s => Math.round(poolTotal(s)/2);
 const myShare = s => (s.myShare!==undefined && s.myShare!=="") ? num(s.myShare) : halfSplit(s);
@@ -555,7 +578,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.53";
+const APP_VERSION = "2.54";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1994,6 +2017,8 @@ function viewMj(){
       '<button class="xbtn" data-a="mjxdel" data-v="'+x.id+'">×</button></div>';
   });
   h += '<button class="btn dash full" data-a="mjxadd">＋ 経費を追加</button>';
+  h += '<button class="btn dash full" style="margin-top:6px" data-a="mjxfopen">⇄ 家計簿から振替</button>';
+  if(UI.xferOpen){ h += xferHint + xferRowsHtml(xferCandidates(m.date, m.expenses), "mjxfpick"); }
 
   h += band("この日の結果");
   h += '<div class="card" id="mj-summary">'+mjSummary(m)+'</div>';
@@ -2090,6 +2115,11 @@ function bindMj(){
       }
       else if(a==="mjxadd"){ (m.expenses=m.expenses||[]).push({id:uid(),label:"",amount:""}); render(); }
       else if(a==="mjxdel"){ m.expenses=(m.expenses||[]).filter(x=>String(x.id)!==String(v)); render(); }
+      else if(a==="mjxfopen"){ UI.xferOpen=!UI.xferOpen; render(); }
+      else if(a==="mjxfpick"){
+        const e=(S.entries||[]).find(x=>String(x.id)===String(v));
+        if(e){ (m.expenses=m.expenses||[]).push({id:uid(), label:(e.item||e.store||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id}); UI.xferOpen=false; render(); }
+      }
       else if(a==="mjsave") saveMj();
     };
   });
@@ -2127,6 +2157,9 @@ function saveMj(){
       amount: Math.abs(fin),
       memo: "麻雀"+(cleaned.category==="free"?"(フリー":"(セット")+"・"+cleaned.rule+"麻)"+(cleaned.store?" @"+cleaned.store:"")});
   }
+  /* 家計簿からの振替: 選択元の記録をここで削除(保存とワンセット) */
+  const _xf = new Set((cleaned.expenses||[]).map(x=>String(x.fromEntry)).filter(x=>x!=="undefined"&&x!=="null"));
+  if(_xf.size) S.entries = S.entries.filter(e=>!_xf.has(String(e.id)));
   save(); UI.screen="main"; UI.mjDraft=null; render();
 }
 
@@ -2420,6 +2453,8 @@ function viewSession(){
       '<button class="xbtn" data-a="xdel" data-v="'+x.id+'">×</button></div>';
   });
   h += '<button class="btn dash full" data-a="xadd">＋ 経費を追加</button>';
+  h += '<button class="btn dash full" style="margin-top:6px" data-a="xfopen">⇄ 家計簿から振替</button>';
+  if(UI.xferOpen){ h += xferHint + xferRowsHtml(xferCandidates(s.date, s.expenses), "xfpick"); }
 
   /* ----- サマリー ----- */
   h += band("このセッションの結果");
@@ -2981,6 +3016,11 @@ function bindSessionActions(){
       }
       else if(a==="xadd"){ s.expenses.push({id:uid(),label:"",amount:""}); render(); }
       else if(a==="xdel"){ s.expenses=s.expenses.filter(x=>String(x.id)!==String(v)); render(); }
+      else if(a==="xfopen"){ UI.xferOpen=!UI.xferOpen; render(); }
+      else if(a==="xfpick"){
+        const e=(S.entries||[]).find(x=>String(x.id)===String(v));
+        if(e){ s.expenses.push({id:uid(), label:(e.item||e.store||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id}); UI.xferOpen=false; render(); }
+      }
       else if(a==="sdel"){
         if(!confirm("この稼働記録を削除しますか?(家計簿の連携分も消えます)")) return;
         S.entries = S.entries.filter(e=>e.id!=="slot-"+s.id);
@@ -3019,6 +3059,9 @@ function saveSession(){
       amount: Math.abs(fin),
       memo: modeLabel(cleaned.mode)+(cleaned.store?" @"+cleaned.store:"")});
   }
+  /* 家計簿からの振替: 選択元の記録をここで削除(保存とワンセット) */
+  const _xf = new Set((cleaned.expenses||[]).map(x=>String(x.fromEntry)).filter(x=>x!=="undefined"&&x!=="null"));
+  if(_xf.size) S.entries = S.entries.filter(e=>!_xf.has(String(e.id)));
   save(); UI.screen="main"; UI.draft=null; render();
 }
 </script>
