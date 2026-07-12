@@ -44,6 +44,11 @@
   /* iOSはtype=timeにネイティブの大型コントロール描画を当ててheight指定を無視することがある。
      appearanceを剥がして日付と同じ「ただの箱」として描画させる */
   input[type="time"]{-webkit-appearance:none; appearance:none;}
+  /* スコア表=共有ドキュメントは白基調(同卓者への視認性優先)。変数差し替えで一括再テーマ */
+  body.sheet-light{
+    --bg:#F4F6F6; --surface:#FFFFFF; --surface2:#E9EEED; --line:#C2CFCD;
+    --amber:#A9780E; --teal:#0E8C7A; --red:#C0392B; --text:#1B2E2C; --muted:#5E7573; --blue:#2E6DA4;
+  }
   .input.r{text-align:right;}
   input[type="date"].input{ -webkit-appearance:none; appearance:none; }
   .btn{border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--muted);
@@ -170,7 +175,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.57 (localStorage保存・完全オフライン)
+   Tally 2.58 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -578,7 +583,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.57";
+const APP_VERSION = "2.58";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -603,6 +608,7 @@ function _renderBody(){
   if(UI.screen==="wishlist"){ app.innerHTML = viewWishlist(); bindWishlist(); return; }
   if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
   if(UI.screen==="savings"){ app.innerHTML = viewSavings(); bindSavings(); return; }
+  document.body.classList.toggle("sheet-light", UI.screen==="mjtable");
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mjtlist"){ app.innerHTML = viewMjtList(); bindMjtList(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
