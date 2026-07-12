@@ -167,7 +167,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.49 (localStorage保存・完全オフライン)
+   Tally 2.50 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -184,6 +184,7 @@ const clsPM = n => n>=0 ? "teal" : "red";
 const esc = s => String(s==null?"":s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const todayStr = () => { const d=new Date();
   return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const nowHM = () => { const d=new Date(); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); };
 const uid = () => Date.now() + Math.floor(Math.random()*1000);
 
 /* ---------- 固定費(定期)テンプレート ----------
@@ -354,6 +355,7 @@ function applyData(d){
     if(!n.rule) n.rule = "3";
     if(n.ruleName==null) n.ruleName = "";
     if(n.meIdx===undefined) n.meIdx = null;
+    if(n.startAt==null) n.startAt = "";
     ["mochi","kaeshi","uma1","uma2","uma3","uma4"].forEach(k=>{ if(n[k]==null) n[k]=""; });
     if(n.feeTotal==null) n.feeTotal="";
     if(n.hakoshita==null) n.hakoshita=false;
@@ -549,7 +551,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.49";
+const APP_VERSION = "2.50";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1079,7 +1081,7 @@ function mjtPrint(){
   setTimeout(()=>{ window.print(); }, 60);
 }
 function newMjTable(){
-  return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"],
+  return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"], startAt:"",
     rows:[["","",""]], chipStart:["","",""], chipEnd:["","",""],
     scoreRate:"100", chipRate:"0", fees:["","",""], feeTotal:"",
     mochi:"", kaeshi:"", uma1:"", uma2:"", uma3:"", uma4:"", hakoshita:false };
@@ -1312,7 +1314,16 @@ function viewMjTable(){
 
 function bindMjTable(){
   const t = UI.mjt;
-  document.querySelectorAll("[data-mt='pname']").forEach(el=>{ el.oninput=e=>{ t.players[num(el.dataset.v)]=e.target.value; saveMjt(false); }; });
+  document.querySelectorAll("[data-mt='pname']").forEach(el=>{ el.oninput=e=>{
+    t.players[num(el.dataset.v)]=e.target.value;
+    /* 全席の名前が既定文字(A/B/C/D)以外で埋まった瞬間=対局開始とみなし1回だけ記録 */
+    if(!t.startAt){
+      const seats=mjtSeats(t);
+      const done=(t.players||[]).slice(0,seats).every((p,i)=>{ const q=(p||"").trim(); return q && q!==String.fromCharCode(65+i); });
+      if(done) t.startAt=nowHM();
+    }
+    saveMjt(false);
+  }; });
   const rn=document.querySelector("[data-mt='rname']"); if(rn) rn.oninput=e=>{ t.ruleName=e.target.value; saveMjt(false); };
   const dt=document.querySelector("[data-mt='date']"); if(dt) dt.onchange=e=>{ if(e.target.value){ t.date=e.target.value; saveMjt(false); render(); } };
   document.querySelectorAll("[data-mt='rd']").forEach(el=>{ el.oninput=e=>{ t[el.dataset.v]=e.target.value; saveMjt(false); }; el.onchange=()=>{ render(); }; });
@@ -1389,9 +1400,11 @@ function mjtToKakei(){
     setFee:String(num((t.fees||[])[pi])||0),
     ranks:[String(rc[0]),String(rc[1]),String(rc[2]),String(rc[3])].slice(0,mjtSeats(t)),
     players:(t.players||[]).map((p,i)=> i===pi ? "" : (p||"").trim()).filter(Boolean).slice(0,5),
-    /* 私的フィールドは再反映で消さない(卓由来の数字だけ再生成する) */
+    /* 私的フィールドは再反映で消さない(卓由来の数字だけ再生成する)
+       開始=スコア表の自動記録(名前入力完了時刻)、終了=初回反映の時刻のみ。再反映では両方とも既存値を維持 */
     expenses:(prev[0]&&prev[0].expenses)||[],
-    startAt:(prev[0]&&prev[0].startAt)||"", endAt:(prev[0]&&prev[0].endAt)||"",
+    startAt:(prev[0]&&prev[0].startAt)||t.startAt||"",
+    endAt:(prev[0]&&prev[0].endAt)||nowHM(),
     memo:(prev[0]&&prev[0].memo)||"",
     fromTable:t.id };
   S.mjSessions.push(sess);
