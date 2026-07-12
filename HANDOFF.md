@@ -1,4 +1,4 @@
-# Tally PWA — 次チャットへの引き継ぎ (現行 v2.53)
+# Tally PWA — 次チャットへの引き継ぎ (現行 v2.57)
 
 > リポジトリでは固定名 `HANDOFF.md` で上書き運用(バージョンはこの見出し、履歴はGit)。
 
@@ -83,6 +83,10 @@ open('_all.js','w',encoding='utf-8').write('\n;\n'.join(blocks))
 - v2.51 **スコア表に時刻欄を表示・編集可に**: 時刻の所有権を表へ移管(反映は常に表の値をコピー)。t.endAtフィールド新設
 - v2.52 表の時刻欄を「プレイ時間」に改称しレイアウトを日付行の様式(ラベル上置き・高さ44px)に統一
 - v2.53 **iOSがtype=timeへ大型ネイティブ描画を当てheightを無視する問題**を `input[type="time"]{appearance:none}` で抑止(dateは従うのにtimeは従わない非対称。今後time入力を足す時もこのCSSが効く前提でOK)
+- v2.54 **家計簿→セッション経費の振替**(先に家計簿へ記録した移動費等を、後からセッション経費へ移して元記録を保存時削除)
+- v2.55 経費行を家計簿と同じ**店名/品目**の2分割に(旧labelは品目へフォールバック表示・編集で自然移行。振替は店名/品目を無劣化で運搬。履歴補完チップは経費行では意図的に不採用——振替が補完役のため)
+- v2.56 振替を含む保存時にトーストで件数を明示。**「振替元をグレーアウトで残す」案はユーザーと議論の上で却下済み**(集計除外の分岐が全箇所に必要になり二重計上リスク、墓標は財務事実でなく編集メタデータ、追跡はfromEntry+移動先の店名/品目で担保——蒸し返さない)
+- v2.57 **誤振替の取り消し**: 振替行はfromDataに元記録の完全コピーを保持。振替行の×=「家計簿へ戻す」(確認後、draft._restoreに積み、**保存時に**元記録を復元。保存せず戻れば何も起きない往復対称トランザクション。二重復元はidガードで防止。_restoreはセッションに永続化しない)。v2.54-2.56期の振替行はfromData無しのため×=通常削除
 - Supabase: RLS検証、履歴テーブル+トリガー導入、RESTORE_RUNBOOK.md作成
 
 ## 8. 未対応・保留(ユーザー合意済み)
@@ -92,5 +96,5 @@ open('_all.js','w',encoding='utf-8').write('\n;\n'.join(blocks))
 - ユーザー却下済み(蒸し返さない): 予算アラート/プッシュ通知、カテゴリ細分化、塗り潰しピル、ローカルスナップ世代数の増加(深い履歴はサーバの役割)、iOS 62ptへの追加CSS実験。
 
 ## 9. 現在のバージョンとファイル
-**v2.53**。リポジトリ構成: index.html / sw.js(未レビュー・内容未確認) / manifest.webmanifest(display:standalone, name/short_name:Tally) / apple-touch-icon.png / icon-192.png / icon-512.png / HANDOFF.md(本書) / RESTORE_RUNBOOK.md。
+**v2.57**。リポジトリ構成: index.html / sw.js(未レビュー・内容未確認) / manifest.webmanifest(display:standalone, name/short_name:Tally) / apple-touch-icon.png / icon-192.png / icon-512.png / HANDOFF.md(本書) / RESTORE_RUNBOOK.md。
 sw.jsは一度も精読していないので、更新配信やキャッシュで不可解な挙動が出たらまずsw.jsをアップロードしてもらいレビューすること。
