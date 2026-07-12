@@ -175,7 +175,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.60 (localStorage保存・完全オフライン)
+   Tally 2.61 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -583,7 +583,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.60";
+const APP_VERSION = "2.61";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1224,7 +1224,7 @@ function viewMjTable(){
 
   /* 単価(上に配置) */
   /* スコア表 */
-  h += '<button class="btn tealb full" style="margin:2px 0 14px;padding:13px 0;font-size:15px;font-weight:700" data-a="toPlay">▶ 対局モード(大きな文字でスコア入力)</button>';
+  h += '<button class="btn tealb full" style="margin:2px 0 14px;padding:13px 0;font-size:15px;font-weight:700" data-mt="toPlay">▶ 対局モード(大きな文字でスコア入力)</button>';
   h += band("スコア(半荘ごと)");
   h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px"><table class="mjt score"><thead><tr><th style="width:38px">半荘</th>'+
     P.map((p,i)=>'<th '+colW+'><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前">'+
@@ -1362,7 +1362,7 @@ function mjtKeypadHtml(t){
 function viewMjPlay(){
   const t = UI.mjt, P = t.players, rows = (t.rows||[]);
   let h = '<div class="row" style="align-items:center;margin-bottom:10px">'+
-    '<button class="navbtn" data-a="toTable" style="font-size:14px">‹ 設定・精算</button>'+
+    '<button class="navbtn" data-mt="toTable" style="font-size:14px">‹ 設定・精算</button>'+
     '<div style="flex:1;text-align:center;font-weight:700;font-size:15px">対局モード</div>'+
     '<div style="width:86px;text-align:right"><span class="muted" style="font-size:11px">'+rows.length+'半荘</span></div></div>';
   /* プレイヤー名+経過合計(大) */
@@ -1384,11 +1384,11 @@ function viewMjPlay(){
           else if(mjtAutoIdx(t,ri)===ci){ const sc=mjtScore(t,ri,ci); d=(sc===null?"·":String(sc)); col="var(--amber)"; }
           else { d="·"; col="var(--line)"; }
         }
-        return '<td data-a="cell" data-r="'+ri+'" data-c="'+ci+'" style="text-align:center;padding:14px 2px;border-bottom:1px solid var(--line);font-size:19px;font-weight:700;color:'+col+';'+(sel?"background:rgba(242,179,61,.16);outline:2px solid var(--amber);border-radius:8px":"")+'">'+esc(d)+'</td>';
+        return '<td data-mt="cell" data-r="'+ri+'" data-c="'+ci+'" style="text-align:center;padding:14px 2px;border-bottom:1px solid var(--line);font-size:19px;font-weight:700;color:'+col+';'+(sel?"background:rgba(242,179,61,.16);outline:2px solid var(--amber);border-radius:8px":"")+'">'+esc(d)+'</td>';
       }).join("")+'</tr>';
   });
   h += '</tbody></table>';
-  h += '<button class="btn dash full" data-a="addrow" style="margin-top:12px;padding:13px 0;font-size:15px;font-weight:700">＋ 半荘を追加</button>';
+  h += '<button class="btn dash full" data-mt="addrow" style="margin-top:12px;padding:13px 0;font-size:15px;font-weight:700">＋ 半荘を追加</button>';
   h += mjtKeypadHtml(t);
   h += '<div style="height:40px"></div>';
   return h;
