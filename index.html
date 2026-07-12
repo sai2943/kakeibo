@@ -177,7 +177,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.64 (localStorage保存・完全オフライン)
+   Tally 2.65 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -585,7 +585,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.64";
+const APP_VERSION = "2.65";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1231,7 +1231,7 @@ function viewMjTable(){
     '</div>';
 
   /* 集計(常時表示・sticky) — 見るだけ、操作は最下部に集約 */
-  h += '<div class="mjt-sticky"><div style="overflow-x:auto"><table class="mjt sum"><thead><tr><th style="width:56px">成績</th>'+
+  h += '<div style="padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--line)"><div style="overflow-x:auto"><table class="mjt sum"><thead><tr><th style="width:56px">成績</th>'+
     P.map((p,i)=>'<th '+colW+'>'+(t.meIdx===i?'<span style="color:var(--amber)">★</span>':"")+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>'+
     '<tr><td class="mjt-no" style="font-size:10px">平均着順</td>'+
     P.map((p,ci)=>{ const av=mjtAvgRank(t,ci); return '<td class="mjt-cell amber" style="font-size:15px;font-weight:700">'+(av===null?"–":av.toFixed(2))+'</td>'; }).join("")+'</tr>'+
@@ -1253,27 +1253,24 @@ function viewMjTable(){
 
   /* 単価(上に配置) */
   /* スコア表 */
-  h += band("スコア");
-  h += '<div style="display:grid;grid-template-columns:repeat('+Math.min(P.length,4)+',1fr);gap:6px;margin-bottom:8px">'+
-    P.map((p,i)=>'<div><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前">'+
-      (P.length>mjtSeats(t)?'<div class="mjt-pdel" data-mt="pdel" data-v="'+i+'">×削除</div>':'')+'</div>').join("")+'</div>';
-  if(P.length<6) h += '<button class="btn dash full" style="padding:8px 0;font-size:12px;margin-bottom:8px" data-mt="addp">＋ プレイヤーを追加</button>';
-  h += '<button class="btn tealb full" style="padding:13px 0;font-size:15px;font-weight:700;margin-bottom:14px" data-mt="toPlay">▶ 対局モード(スコアの入力・閲覧)</button>';
 
   /* チップ(スコアの下) */
-  h += band("チップ(開始→終了 枚数)");
-  h += '<div style="overflow-x:auto;margin-bottom:14px"><table class="mjt"><thead><tr><th style="width:38px"></th>'+
-    P.map((p,i)=>'<th '+colW+'>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>'+
+  h += band("プレイヤー・チップ(開始→終了 枚数)");
+  h += '<div style="overflow-x:auto;margin-bottom:8px"><table class="mjt"><thead><tr><th style="width:38px"></th>'+
+    P.map((p,i)=>'<th '+colW+'><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前">'+
+      (P.length>mjtSeats(t)?'<div class="mjt-pdel" data-mt="pdel" data-v="'+i+'">×削除</div>':'')+'</th>').join("")+
+    (P.length<6?'<th style="width:30px" class="mjt-add" data-mt="addp">＋</th>':'')+'</tr></thead><tbody>'+
     '<tr><td class="mjt-no">開始</td>'+
     P.map((p,ci)=>{ const sel=UI.mjtCell&&UI.mjtCell.k==="cs"&&UI.mjtCell.c===ci; const x=(t.chipStart||[])[ci]||""; const neg=(num(x)||0)<0;
-      return '<td class="mjt-cell '+(sel?"sel ":"")+(neg?"red":"")+'" data-mt="cs" data-c="'+ci+'">'+(x===""?'<span class="mjt-ph">·</span>':esc(String(x)))+'</td>'; }).join("")+'</tr>'+
+      return '<td class="mjt-cell '+(sel?"sel ":"")+(neg?"red":"")+'" data-mt="cs" data-c="'+ci+'">'+(x===""?'<span class="mjt-ph">·</span>':esc(String(x)))+'</td>'; }).join("")+(P.length<6?'<td></td>':'')+'</tr>'+
     '<tr><td class="mjt-no">終了</td>'+
     P.map((p,ci)=>{ const sel=UI.mjtCell&&UI.mjtCell.k==="ce"&&UI.mjtCell.c===ci; const er=mjtChipEndRaw(t,ci); const auto=mjtChipAutoIdx(t)===ci;
       let inner="",cls=""; if(er!==null){ inner=esc(String((t.chipEnd||[])[ci])); } else if(auto){ inner='<span class="mjt-auto">'+mjtChipEndDisp(t,ci)+'</span>'; } else inner='<span class="mjt-ph">·</span>';
-      return '<td class="mjt-cell '+(sel?"sel ":"")+cls+'" data-mt="ce" data-c="'+ci+'">'+inner+'</td>'; }).join("")+'</tr>'+
+      return '<td class="mjt-cell '+(sel?"sel ":"")+cls+'" data-mt="ce" data-c="'+ci+'">'+inner+'</td>'; }).join("")+(P.length<6?'<td></td>':'')+'</tr>'+
     '<tr><td class="mjt-no">増減</td>'+
-    P.map((p,ci)=>{ const net=mjtChipNet(t,ci); return '<td class="mjt-cell" style="color:'+(net<0?"var(--red)":net>0?"var(--blue)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</td>'; }).join("")+'</tr>'+
+    P.map((p,ci)=>{ const net=mjtChipNet(t,ci); return '<td class="mjt-cell" style="color:'+(net<0?"var(--red)":net>0?"var(--blue)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</td>'; }).join("")+(P.length<6?'<td></td>':'')+'</tr>'+
     '</tbody></table></div>';
+  h += '<button class="btn tealb full" style="padding:13px 0;font-size:15px;font-weight:700;margin-bottom:14px" data-mt="toPlay">▶ 対局モード(スコアの入力・閲覧)</button>';
 
   /* ゲーム代(会計フロー) */
   h += band("ゲーム代(精算)");
