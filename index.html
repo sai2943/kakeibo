@@ -166,6 +166,7 @@
   .pr-no, .pr-lbl{ background:#eee !important; font-weight:700; }
   .pr-tbl td.pr-neg{ color:#c00 !important; }
   .pr-abs{ color:#999 !important; }
+  .pr-latest td{ background:#FBF3DC !important; }
   .pr-sum .pr-final td{ font-weight:700; border-top:2px solid #333 !important; font-size:12px; }
   .pr-foot{ font-size:10px; color:#666 !important; margin-top:6px; }
 </style>
@@ -178,7 +179,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.66 (localStorage保存・完全オフライン)
+   Tally 2.67 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -586,7 +587,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.66";
+const APP_VERSION = "2.67";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1087,58 +1088,73 @@ function mjtChartSvg(t){
   const series=P.map((p,ci)=>{ let cum=0; return idx.map(ri=>{ const sc=mjtScore(t,ri,ci); if(sc!==null && !mjtAbsent(t,ri,ci)) cum+=sc; return cum; }); });
   let mn=0,mx=0; series.forEach(a=>a.forEach(v=>{ if(v<mn)mn=v; if(v>mx)mx=v; }));
   if(mn===mx) mx=mn+1;
-  const W=640,H=240,L=46,R=10,T=12,B=26;
+  const W=640,H=300,L=48,R=58,T=14,B=26;
   const px=i=> L+(W-L-R)*(i/(idx.length-1));
   const py=v=> T+(H-T-B)*(1-(v-mn)/(mx-mn));
+  /* 切りの良い目盛り */
+  const raw=(mx-mn)/4, pw=Math.pow(10,Math.floor(Math.log10(raw)));
+  const step=[1,2,2.5,5,10].map(c=>c*pw).find(c=>c>=raw)||raw;
+  const ticks=[]; for(let v=Math.ceil(mn/step)*step; v<=mx+1e-9; v+=step) ticks.push(Math.round(v*100)/100);
+  if(ticks.indexOf(0)<0) ticks.push(0);
   let g='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">';
-  Array.from(new Set([mn,0,mx])).forEach(v=>{ const y=py(v);
-    g+='<line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="'+(v===0?"#888":"#ddd")+'" stroke-width="'+(v===0?1.5:1)+'"/>'+
-       '<text x="'+(L-4)+'" y="'+(y+3.5)+'" text-anchor="end" font-size="10" fill="#666">'+v+'</text>'; });
-  const step=Math.max(1,Math.ceil(idx.length/10));
-  idx.forEach((ri,i)=>{ if(i%step===0||i===idx.length-1) g+='<text x="'+px(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#666">'+(ri+1)+'</text>'; });
+  ticks.forEach(v=>{ const y=py(v);
+    g+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+'" stroke="'+(v===0?"#777":"#e4e4e4")+'" stroke-width="'+(v===0?1.6:1)+'"/>'+
+       '<text x="'+(L-4)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="#666">'+v+'</text>'; });
+  const stp=Math.max(1,Math.ceil(idx.length/10));
+  idx.forEach((ri,i)=>{ if(i%stp===0||i===idx.length-1) g+='<text x="'+px(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#666">'+(ri+1)+'</text>'; });
   series.forEach((a,ci)=>{ const c=cols[ci%cols.length];
-    g+='<polyline fill="none" stroke="'+c+'" stroke-width="2" points="'+a.map((v,i)=>px(i).toFixed(1)+","+py(v).toFixed(1)).join(" ")+'"/>';
-    a.forEach((v,i)=>{ g+='<circle cx="'+px(i).toFixed(1)+'" cy="'+py(v).toFixed(1)+'" r="2.4" fill="'+c+'"/>'; });
-  });
+    g+='<polyline fill="none" stroke="'+c+'" stroke-width="2.5" stroke-linejoin="round" points="'+a.map((v,i)=>px(i).toFixed(1)+","+py(v).toFixed(1)).join(" ")+'"/>'+
+       '<circle cx="'+px(a.length-1).toFixed(1)+'" cy="'+py(a[a.length-1]).toFixed(1)+'" r="3" fill="'+c+'"/>'; });
+  /* 凡例の代わりに線の右端へ名前を直付け(重なりは縦にずらす) */
+  const lbl=series.map((a,ci)=>({ci,y:py(a[a.length-1])})).sort((a,b)=>a.y-b.y);
+  for(let i=1;i<lbl.length;i++){ if(lbl[i].y < lbl[i-1].y+11) lbl[i].y = lbl[i-1].y+11; }
+  lbl.forEach(o=>{ const y=Math.min(Math.max(o.y,T+4),H-B-2);
+    g+='<text x="'+(W-R+5)+'" y="'+(y+3.5).toFixed(1)+'" font-size="10" font-weight="700" fill="'+cols[o.ci%cols.length]+'">'+esc(P[o.ci]||("P"+(o.ci+1)))+'</text>'; });
   g+='</svg>';
-  const legend='<div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10px;margin:2px 0">'+
-    P.map((p,ci)=>'<span><span style="display:inline-block;width:10px;height:3px;background:'+cols[ci%cols.length]+';vertical-align:middle;margin-right:3px"></span>'+esc(p||("P"+(ci+1)))+'</span>').join("")+'</div>';
-  return '<div style="margin-top:8px;font-weight:700;font-size:12px">スコア推移(累積・チップ除く)</div>'+legend+g;
+  return '<div style="margin-top:8px;font-weight:700;font-size:12px">スコア推移(累積・チップ除く)</div>'+g;
 }
-function mjtPrintHtml(t){
+function mjtPrintHtml(t, mode){
+  mode = mode || "print";  /* print=紙(過程→グラフ→結果) / screen=精算シート(結果→直近→グラフ→全過程) */
   const P=t.players, seats=mjtSeats(t), rows=(t.rows||[]);
   const calcs=P.map((p,ci)=>mjtCalc(t,ci));
   const money=n=>(n<0?"−":"")+"¥"+Math.abs(n).toLocaleString("ja-JP");
-  let h='<div class="pr-wrap">';
-  h+='<div class="pr-title">麻雀スコア表</div>';
-  h+='<div class="pr-sub">'+esc(t.date||"")+(t.ruleName?" ・ "+esc(t.ruleName):"")+" ・ "+seats+"人打ち</div>";
-  /* 半荘ごとスコア */
-  h+='<table class="pr-tbl"><thead><tr><th>No</th>'+P.map((p,i)=>'<th>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>';
-  rows.forEach((r,ri)=>{
-    h+='<tr><td class="pr-no">'+(ri+1)+'</td>'+P.map((p,ci)=>{
-      if(mjtAbsent(t,ri,ci)) return '<td class="pr-abs">抜</td>';
-      const s=mjtScore(t,ri,ci);
-      if(s===null) return '<td></td>';
-      return '<td class="'+(s<0?"pr-neg":"")+'">'+s.toFixed(1)+'</td>';
-    }).join("")+'</tr>';
-  });
-  h+='</tbody></table>';
-  h+='<div class="pr-break"></div>'+mjtChartSvg(t);
-  /* 集計(アプリの成績表と同じ値) */
-  h+='<table class="pr-tbl pr-sum"><thead><tr><th></th>'+P.map((p,i)=>'<th>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>';
-  h+='<tr><td class="pr-lbl">平均着順</td>'+P.map((p,ci)=>{const av=mjtAvgRank(t,ci);return '<td>'+(av===null?"–":av.toFixed(2))+'</td>';}).join("")+'</tr>';
-  h+='<tr><td class="pr-lbl">合計</td>'+calcs.map(c=>'<td class="'+(c.sum<0?"pr-neg":"")+'">'+c.sum.toFixed(1)+'</td>').join("")+'</tr>';
-  h+='<tr><td class="pr-lbl">チップ</td>'+calcs.map(c=>'<td class="'+(c.chipNet<0?"pr-neg":"")+'">'+(c.chipNet>0?"+":"")+c.chipNet+'</td>').join("")+'</tr>';
-  h+='<tr><td class="pr-lbl">収支</td>'+calcs.map(c=>'<td class="'+(c.shushi<0?"pr-neg":"")+'">'+money(c.shushi)+'</td>').join("")+'</tr>';
+  const names='<tr><th>No</th>'+P.map((p,i)=>'<th>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr>';
+  const cellsOf=ri=>P.map((p,ci)=>{
+    if(mjtAbsent(t,ri,ci)) return '<td class="pr-abs">抜</td>';
+    const sc=mjtScore(t,ri,ci);
+    if(sc===null) return '<td></td>';
+    return '<td class="'+(sc<0?"pr-neg":"")+'">'+sc.toFixed(1)+'</td>';
+  }).join("");
+  let lastIdx=-1; rows.forEach((r,ri)=>{ if(P.some((p,ci)=>mjtScore(t,ri,ci)!==null)) lastIdx=ri; });
+
+  const head='<div class="pr-title">麻雀スコア表</div>'+
+    '<div class="pr-sub">'+esc(t.date||"")+(t.ruleName?" ・ "+esc(t.ruleName):"")+" ・ "+seats+"人打ち</div>";
+  const tbl=hl=>{
+    let x='<table class="pr-tbl"><thead>'+names+'</thead><tbody>';
+    rows.forEach((r,ri)=>{ x+='<tr'+((hl&&ri===lastIdx)?' class="pr-latest"':'')+'><td class="pr-no">'+(ri+1)+'</td>'+cellsOf(ri)+'</tr>'; });
+    return x+'</tbody></table>';
+  };
+  const latest = lastIdx<0 ? "" :
+    '<table class="pr-tbl"><thead>'+names.replace('<th>No</th>','<th>直近</th>')+'</thead><tbody>'+
+    '<tr class="pr-latest"><td class="pr-no">半荘'+(lastIdx+1)+'</td>'+cellsOf(lastIdx)+'</tr></tbody></table>';
+  const chart=mjtChartSvg(t);
+  let sum='<table class="pr-tbl pr-sum"><thead><tr><th></th>'+P.map((p,i)=>'<th>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>';
+  sum+='<tr><td class="pr-lbl">平均着順</td>'+P.map((p,ci)=>{const av=mjtAvgRank(t,ci);return '<td>'+(av===null?"–":av.toFixed(2))+'</td>';}).join("")+'</tr>';
+  sum+='<tr><td class="pr-lbl">合計</td>'+calcs.map(c=>'<td class="'+(c.sum<0?"pr-neg":"")+'">'+c.sum.toFixed(1)+'</td>').join("")+'</tr>';
+  sum+='<tr><td class="pr-lbl">チップ</td>'+calcs.map(c=>'<td class="'+(c.chipNet<0?"pr-neg":"")+'">'+(c.chipNet>0?"+":"")+c.chipNet+'</td>').join("")+'</tr>';
+  sum+='<tr><td class="pr-lbl">収支</td>'+calcs.map(c=>'<td class="'+(c.shushi<0?"pr-neg":"")+'">'+money(c.shushi)+'</td>').join("")+'</tr>';
   const anyFee=calcs.some(c=>c.fee>0);
   if(anyFee){
-    h+='<tr><td class="pr-lbl">場代</td>'+calcs.map(c=>'<td class="pr-neg">'+(c.fee>0?money(-c.fee):"–")+'</td>').join("")+'</tr>';
-    h+='<tr class="pr-final"><td class="pr-lbl">支払</td>'+calcs.map(c=>'<td class="'+(c.net<0?"pr-neg":"")+'">'+money(c.net)+'</td>').join("")+'</tr>';
+    sum+='<tr><td class="pr-lbl">場代</td>'+calcs.map(c=>'<td class="pr-neg">'+(c.fee>0?money(-c.fee):"–")+'</td>').join("")+'</tr>';
+    sum+='<tr class="pr-final"><td class="pr-lbl">支払</td>'+calcs.map(c=>'<td class="'+(c.net<0?"pr-neg":"")+'">'+money(c.net)+'</td>').join("")+'</tr>';
   }
-  h+='</tbody></table>';
-  h+='<div class="pr-foot">スコア1点=¥'+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ Tally</div>";
-  h+='</div>';
-  return h;
+  sum+='</tbody></table>';
+  const foot='<div class="pr-foot">スコア1点=¥'+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ Tally</div>";
+
+  const body = (mode==="screen")
+    ? head + sum + latest + chart + tbl(true)
+    : head + tbl(false) + '<div class="pr-break"></div>' + chart + sum;
+  return '<div class="pr-wrap">'+body+foot+'</div>';
 }
 function mjtPrint(){
   const pa=document.getElementById("print-area");
@@ -1354,6 +1370,7 @@ function mjtKeypadHtml(t){
             '<button class="mjt-key done" data-mt="keydone" style="padding:12px 0;font-size:17px">完了</button>'+
             '<button class="mjt-key" data-mt="key" data-v="▶" style="padding:12px 0;color:var(--teal);font-size:22px">▶</button>'+
           '</div>'+
+          '<button class="btn" data-mt="tosheet" style="width:100%;margin-top:6px;padding:8px 0;font-size:12px;color:var(--teal);border-color:var(--teal)">精算シートを表示</button>'+
           '<button class="btn" data-mt="rowdelcur" style="width:100%;margin-top:6px;padding:6px 0;font-size:11px;color:var(--red);border-color:var(--red)">この半荘(行)を削除</button>'
         : '')+
       '</div>';
@@ -1368,7 +1385,7 @@ function viewMjSheet(){
     '<div style="flex:1;text-align:center;font-weight:700;font-size:14px">精算シート</div>'+
     '<button class="navbtn" data-mt="pdf" style="font-size:13px;color:var(--teal)">PDF保存</button></div>'+
     '<div class="muted" style="font-size:10px;margin:0 0 8px;text-align:center">スクリーンショットがそのまま共有用の画像になります(URL等は写りません)</div>';
-  h += mjtPrintHtml(t);
+  h += mjtPrintHtml(t, "screen");
   h += '<div style="height:30px"></div>';
   return h;
 }
@@ -1466,11 +1483,12 @@ function bindMjTable(){
       else if(a==="addrow"){ t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="rowdel"){ t.rows.splice(num(el.dataset.v),1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="rowdelcur"){ const c=UI.mjtCell; if(c&&c.k==="s"&&confirm("半荘"+(c.r+1)+"を削除しますか?(この行の全員のスコアが消えます)")){ t.rows.splice(c.r,1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); renderKeepScroll(); } }
-      else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; renderKeepScroll(); }
+      else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; renderKeepScroll();
+        const pw=document.querySelector(".mjt-pad-wrap"); if(pw) pw.scrollIntoView({block:"nearest",behavior:"smooth"}); }
       else if(a==="toPlay"){ UI.mjtCell=null; UI.screen="mjplay"; render(); }
       else if(a==="toTable"){ UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
-      else if(a==="tosheet"){ UI.mjtCell=null; UI.screen="mjsheet"; render(); }
-      else if(a==="sheetback"){ UI.screen="mjtable"; render(); }
+      else if(a==="tosheet"){ UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
+      else if(a==="sheetback"){ UI.screen=UI.sheetFrom||"mjtable"; render(); }
       else if(a==="cs"){ UI.mjtCell={k:"cs",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="ce"){ UI.mjtCell={k:"ce",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="key"){ padInput(el.dataset.v); }
