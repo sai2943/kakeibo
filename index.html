@@ -167,6 +167,7 @@
   .pr-no, .pr-lbl{ background:#eee !important; font-weight:700; }
   .pr-tbl td.pr-neg{ color:#c00 !important; }
   .pr-abs{ color:#999 !important; }
+  .pr-hist tbody tr:nth-child(even):not(.pr-latest) td{ background:#F2F6F5 !important; }
   .pr-latest td{ background:#FBF3DC !important; }
   .pr-no, .pr-lbl{ white-space:nowrap; }
   /* ↓画面上の精算シート専用の調整(印刷は#print-area経由なので不変) */
@@ -186,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.69 (localStorage保存・完全オフライン)
+   Tally 2.70 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -594,7 +595,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.69";
+const APP_VERSION = "2.70";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1137,8 +1138,8 @@ function mjtPrintHtml(t, mode){
   const head='<div class="pr-title">麻雀スコア表</div>'+
     '<div class="pr-sub">'+esc(t.date||"")+(t.ruleName?" ・ "+esc(t.ruleName):"")+" ・ "+seats+"人打ち</div>";
   const tbl=hl=>{
-    let x='<table class="pr-tbl"><thead>'+names+'</thead><tbody>';
-    rows.forEach((r,ri)=>{ x+='<tr'+((hl&&ri===lastIdx)?' class="pr-latest"':'')+'><td class="pr-no">'+(ri+1)+'</td>'+cellsOf(ri)+'</tr>'; });
+    let x='<table class="pr-tbl pr-hist"><thead>'+names.replace('<th>No</th>','<th>回</th>')+'</thead><tbody>';
+    rows.forEach((r,ri)=>{ x+='<tr'+((hl&&ri===lastIdx)?' class="pr-latest"':'')+'><td class="pr-no">'+(ri+1)+'回戦</td>'+cellsOf(ri)+'</tr>'; });
     return x+'</tbody></table>';
   };
   const latest = lastIdx<0 ? "" :
@@ -1158,10 +1159,21 @@ function mjtPrintHtml(t, mode){
   sum+='</tbody></table>';
   const foot='<div class="pr-foot">スコア1点=¥'+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ Tally</div>";
 
-  const body = (mode==="screen")
-    ? head + sum + latest + chart + tbl(true)
-    : head + tbl(false) + '<div class="pr-break"></div>' + chart + sum;
-  return '<div class="pr-wrap">'+body+foot+'</div>';
+  /* 途中経過用: 平均着順・着順内訳・合計(点)のみ。円換算・場代・支払は出さない */
+  let sumMid='<table class="pr-tbl pr-sum"><thead><tr><th></th>'+P.map((p,i)=>'<th>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>';
+  sumMid+='<tr><td class="pr-lbl">平均着順</td>'+P.map((p,ci)=>{const av=mjtAvgRank(t,ci);return '<td>'+(av===null?"–":av.toFixed(2))+'</td>';}).join("")+'</tr>';
+  sumMid+='<tr><td class="pr-lbl">着順内訳</td>'+P.map((p,ci)=>'<td>'+mjtRankCounts(t,ci).slice(0,seats).join("·")+'</td>').join("")+'</tr>';
+  sumMid+='<tr class="pr-final"><td class="pr-lbl">合計</td>'+calcs.map(c=>'<td class="'+(c.sum<0?"pr-neg":"")+'">'+c.sum.toFixed(1)+'</td>').join("")+'</tr>';
+  sumMid+='</tbody></table>';
+  const headMid='<div class="pr-title">途中経過</div>'+
+    '<div class="pr-sub">'+esc(t.date||"")+(t.ruleName?" ・ "+esc(t.ruleName):"")+" ・ "+seats+"人打ち</div>";
+
+  const body = (mode==="mid")
+    ? headMid + sumMid + latest + chart + tbl(true)
+    : (mode==="screen")
+      ? head + sum + latest + chart + tbl(true)
+      : head + tbl(false) + '<div class="pr-break"></div>' + chart + sum;
+  return '<div class="pr-wrap">'+body+(mode==="mid"?"":foot)+'</div>';
 }
 function mjtPrint(){
   const pa=document.getElementById("print-area");
@@ -1256,25 +1268,7 @@ function viewMjTable(){
     '</div>';
 
   /* 集計(常時表示・sticky) — 見るだけ、操作は最下部に集約 */
-  h += '<div style="padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid var(--line)"><div style="overflow-x:auto"><table class="mjt sum"><thead><tr><th style="width:56px">成績</th>'+
-    P.map((p,i)=>'<th '+colW+'>'+(t.meIdx===i?'<span style="color:var(--amber)">★</span>':"")+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>'+
-    '<tr><td class="mjt-no" style="font-size:10px">平均着順</td>'+
-    P.map((p,ci)=>{ const av=mjtAvgRank(t,ci); return '<td class="mjt-cell amber" style="font-size:15px;font-weight:700">'+(av===null?"–":av.toFixed(2))+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no" style="font-size:10px">着順内訳</td>'+
-    P.map((p,ci)=>{ const rc=mjtRankCounts(t,ci); return '<td class="mjt-mini">'+rc.slice(0,mjtSeats(t)).map((n,k)=>'<div>'+(k+1)+'着 '+n+'</div>').join("")+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no" style="font-size:10px">スコア</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-sc-'+ci+'"><div style="font-size:13px;font-weight:700;color:'+(c.sum<0?"var(--red)":c.sum>0?"var(--blue)":"inherit")+'">'+c.sum.toFixed(1)+'</div><div class="muted" style="font-size:10px">'+signYen(c.scoreYen)+'</div></td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no" style="font-size:10px">チップ</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-cp-'+ci+'"><div style="font-size:13px;font-weight:700;color:'+(c.chipNet<0?"var(--red)":c.chipNet>0?"var(--blue)":"inherit")+'">'+(c.chipNet>0?"+":"")+c.chipNet+'</div><div class="muted" style="font-size:10px">'+signYen(c.chipYen)+'</div></td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no">収支</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell" id="mjt-net-'+ci+'" style="font-size:13px;font-weight:700;color:'+(c.shushi>=0?"var(--blue)":"var(--red)")+'">'+signYen(c.shushi)+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no" style="font-size:10px">ゲーム代</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); return '<td class="mjt-cell muted" id="mjt-fee-'+ci+'" style="font-size:11px">'+(c.fee?"−¥"+c.fee.toLocaleString("ja-JP"):"–")+'</td>'; }).join("")+'</tr>'+
-    '<tr><td class="mjt-no" style="color:var(--amber)">支払</td>'+
-    P.map((p,ci)=>{ const c=mjtCalc(t,ci); const pay=c.net; const feeIn=P.some((q,k)=>num((t.fees||[])[k])>0); return '<td class="mjt-cell" id="mjt-pay-'+ci+'" style="font-size:14px;font-weight:700;color:'+(!feeIn?"var(--muted)":pay<0?"var(--red)":pay>0?"var(--blue)":"var(--muted)")+'">'+(!feeIn?"–":(pay<0?"¥"+Math.abs(pay).toLocaleString("ja-JP"):(pay>0?"+¥"+pay.toLocaleString("ja-JP"):"±0")))+'</td>'; }).join("")+'</tr>'+
-    '</tbody></table></div>'+
-    (function(){ const fs=P.reduce((a,p,ci)=>a+(num((t.fees||[])[ci])||0),0); return fs>0?'<div style="text-align:center;font-size:12px;margin-top:6px" class="muted">店に払うゲーム代 合計 <span class="mono" style="color:var(--amber);font-weight:700">¥'+fs.toLocaleString("ja-JP")+'</span></div>':''; })()+
-    '</div>';
+  /* 成績表は撤去(v2.70): 途中経過は途中経過シート、最終結果は清算シートが担当 */
 
   /* 単価(上に配置) */
   /* スコア表 */
@@ -1377,7 +1371,7 @@ function mjtKeypadHtml(t){
             '<button class="mjt-key done" data-mt="keydone" style="padding:12px 0;font-size:17px">完了</button>'+
             '<button class="mjt-key" data-mt="key" data-v="▶" style="padding:12px 0;color:var(--teal);font-size:22px">▶</button>'+
           '</div>'+
-          '<button class="btn" data-mt="tosheet" style="width:100%;margin-top:6px;padding:8px 0;font-size:12px;color:var(--teal);border-color:var(--teal)">精算シートを表示</button>'+
+          '<button class="btn" data-mt="tomid" style="width:100%;margin-top:6px;padding:8px 0;font-size:12px;color:var(--teal);border-color:var(--teal)">途中経過を表示</button>'+
           '<button class="btn" data-mt="rowdelcur" style="width:100%;margin-top:6px;padding:6px 0;font-size:11px;color:var(--red);border-color:var(--red)">この回戦(行)を削除</button>'
         : '')+
       '</div>';
@@ -1386,13 +1380,13 @@ function mjtKeypadHtml(t){
 }
 
 function viewMjSheet(){
-  const t = UI.mjt;
+  const t = UI.mjt, mid = UI.sheetMode==="mid";
   let h = '<div class="row" style="align-items:center;padding:calc(max(env(safe-area-inset-top,0px), 54px) + 6px) 0 6px">'+
     '<button class="navbtn" data-mt="sheetback" style="font-size:14px">‹ 戻る</button>'+
-    '<div style="flex:1;text-align:center;font-weight:700;font-size:14px">精算シート</div>'+
-    '<button class="navbtn" data-mt="pdf" style="font-size:13px;color:var(--teal)">PDF保存</button></div>'+
+    '<div style="flex:1;text-align:center;font-weight:700;font-size:14px">'+(mid?"途中経過":"精算シート")+'</div>'+
+    (mid?'<div style="width:70px"></div>':'<button class="navbtn" data-mt="pdf" style="font-size:13px;color:var(--teal)">PDF保存</button>')+'</div>'+
     '<div class="muted" style="font-size:10px;margin:0 0 8px;text-align:center">スクリーンショットがそのまま共有用の画像になります(URL等は写りません)</div>';
-  h += mjtPrintHtml(t, "screen");
+  h += mjtPrintHtml(t, mid?"mid":"screen");
   h += '<div style="height:30px"></div>';
   return h;
 }
@@ -1494,7 +1488,8 @@ function bindMjTable(){
         const pw=document.querySelector(".mjt-pad-wrap"); if(pw) pw.scrollIntoView({block:"nearest",behavior:"smooth"}); }
       else if(a==="toPlay"){ UI.mjtCell=null; UI.screen="mjplay"; render(); }
       else if(a==="toTable"){ UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
-      else if(a==="tosheet"){ UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
+      else if(a==="tosheet"){ UI.sheetMode="full"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
+      else if(a==="tomid"){ UI.sheetMode="mid"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
       else if(a==="sheetback"){ UI.screen=UI.sheetFrom||"mjtable"; render(); }
       else if(a==="cs"){ UI.mjtCell={k:"cs",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="ce"){ UI.mjtCell={k:"ce",c:num(el.dataset.c)}; renderKeepScroll(); }
