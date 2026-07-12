@@ -167,6 +167,11 @@
   .pr-tbl td.pr-neg{ color:#c00 !important; }
   .pr-abs{ color:#999 !important; }
   .pr-latest td{ background:#FBF3DC !important; }
+  .pr-no, .pr-lbl{ white-space:nowrap; }
+  /* ↓画面上の精算シート専用の拡大(印刷は#print-area経由なので不変) */
+  #app .pr-title{ font-size:20px; }
+  #app .pr-tbl th, #app .pr-tbl td{ font-size:12.5px; padding:4px 5px; white-space:nowrap; }
+  #app .pr-sum .pr-final td{ font-size:14px; }
   .pr-sum .pr-final td{ font-weight:700; border-top:2px solid #333 !important; font-size:12px; }
   .pr-foot{ font-size:10px; color:#666 !important; margin-top:6px; }
 </style>
@@ -179,7 +184,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.67 (localStorage保存・完全オフライン)
+   Tally 2.68 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -587,7 +592,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.67";
+const APP_VERSION = "2.68";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -612,7 +617,7 @@ function _renderBody(){
   if(UI.screen==="wishlist"){ app.innerHTML = viewWishlist(); bindWishlist(); return; }
   if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
   if(UI.screen==="savings"){ app.innerHTML = viewSavings(); bindSavings(); return; }
-  document.body.classList.toggle("sheet-light", UI.screen==="mjplay");
+  document.body.classList.toggle("sheet-light", UI.screen==="mjplay"||UI.screen==="mjsheet");
   if(UI.screen==="mjplay"){ app.innerHTML = viewMjPlay(); bindMjTable(); return; }
   if(UI.screen==="mjsheet"){ app.innerHTML = viewMjSheet(); bindMjTable(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
@@ -1101,7 +1106,7 @@ function mjtChartSvg(t){
     g+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+'" stroke="'+(v===0?"#777":"#e4e4e4")+'" stroke-width="'+(v===0?1.6:1)+'"/>'+
        '<text x="'+(L-4)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="#666">'+v+'</text>'; });
   const stp=Math.max(1,Math.ceil(idx.length/10));
-  idx.forEach((ri,i)=>{ if(i%stp===0||i===idx.length-1) g+='<text x="'+px(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#666">'+(ri+1)+'</text>'; });
+  idx.forEach((ri,i)=>{ if(i===idx.length-1 || (i%stp===0 && idx.length-1-i>1)) g+='<text x="'+px(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle" font-size="10" fill="#666">'+(ri+1)+'</text>'; });
   series.forEach((a,ci)=>{ const c=cols[ci%cols.length];
     g+='<polyline fill="none" stroke="'+c+'" stroke-width="2.5" stroke-linejoin="round" points="'+a.map((v,i)=>px(i).toFixed(1)+","+py(v).toFixed(1)).join(" ")+'"/>'+
        '<circle cx="'+px(a.length-1).toFixed(1)+'" cy="'+py(a[a.length-1]).toFixed(1)+'" r="3" fill="'+c+'"/>'; });
@@ -1380,7 +1385,7 @@ function mjtKeypadHtml(t){
 
 function viewMjSheet(){
   const t = UI.mjt;
-  let h = '<div class="row" style="align-items:center;padding:calc(env(safe-area-inset-top,0px)) 0 6px">'+
+  let h = '<div class="row" style="align-items:center;padding:calc(max(env(safe-area-inset-top,0px), 54px) + 6px) 0 6px">'+
     '<button class="navbtn" data-mt="sheetback" style="font-size:14px">‹ 戻る</button>'+
     '<div style="flex:1;text-align:center;font-weight:700;font-size:14px">精算シート</div>'+
     '<button class="navbtn" data-mt="pdf" style="font-size:13px;color:var(--teal)">PDF保存</button></div>'+
