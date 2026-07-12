@@ -177,7 +177,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.63 (localStorage保存・完全オフライン)
+   Tally 2.64 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -585,7 +585,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.63";
+const APP_VERSION = "2.64";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1123,7 +1123,7 @@ function mjtPrintHtml(t){
   h+='</tbody></table>';
   h+='<div class="pr-break"></div>'+mjtChartSvg(t);
   /* 集計(アプリの成績表と同じ値) */
-  h+='<table class="pr-tbl pr-sum"><tbody>';
+  h+='<table class="pr-tbl pr-sum"><thead><tr><th></th>'+P.map((p,i)=>'<th>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody>';
   h+='<tr><td class="pr-lbl">平均着順</td>'+P.map((p,ci)=>{const av=mjtAvgRank(t,ci);return '<td>'+(av===null?"–":av.toFixed(2))+'</td>';}).join("")+'</tr>';
   h+='<tr><td class="pr-lbl">合計</td>'+calcs.map(c=>'<td class="'+(c.sum<0?"pr-neg":"")+'">'+c.sum.toFixed(1)+'</td>').join("")+'</tr>';
   h+='<tr><td class="pr-lbl">チップ</td>'+calcs.map(c=>'<td class="'+(c.chipNet<0?"pr-neg":"")+'">'+(c.chipNet>0?"+":"")+c.chipNet+'</td>').join("")+'</tr>';
@@ -1253,31 +1253,12 @@ function viewMjTable(){
 
   /* 単価(上に配置) */
   /* スコア表 */
-  h += '<button class="btn tealb full" style="margin:2px 0 14px;padding:13px 0;font-size:15px;font-weight:700" data-mt="toPlay">▶ 対局モード(大きな文字でスコア入力)</button>';
-  h += band("スコア(半荘ごと)");
-  h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px"><table class="mjt score"><thead><tr><th style="width:38px">半荘</th>'+
-    P.map((p,i)=>'<th '+colW+'><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前">'+
-      (P.length>mjtSeats(t)?'<div class="mjt-pdel" data-mt="pdel" data-v="'+i+'">×削除</div>':'')+'</th>').join("")+
-    (P.length<6?'<th style="width:30px" class="mjt-add" data-mt="addp">＋</th>':'')+'</tr></thead><tbody>';
-  (t.rows||[]).forEach((r,ri)=>{
-    const autoIdx=mjtAutoIdx(t,ri);
-    h += '<tr><td class="mjt-no">'+(ri+1)+'</td>'+
-      P.map((p,ci)=>{
-        const sel = UI.mjtCell && UI.mjtCell.k==="s" && UI.mjtCell.r===ri && UI.mjtCell.c===ci;
-        let inner, cls="";
-        if(mjtAbsent(t,ri,ci)){ inner='<span class="mjt-abs">抜</span>'; cls="abs"; }
-        else { const raw=mjtRawScore(t,ri,ci);
-          if(raw!==null){ inner=esc(String(t.rows[ri][ci])); cls=(raw<0?"red":raw>0?"blue":""); }
-          else if(autoIdx===ci){ const s=mjtScore(t,ri,ci); inner='<span style="font-style:italic">'+s+'</span>'; cls=(s<0?"red":s>0?"blue":""); }
-          else inner='<span class="mjt-ph">·</span>';
-        }
-        return '<td class="mjt-cell '+(sel?"sel ":"")+cls+'" data-mt="cell" data-r="'+ri+'" data-c="'+ci+'">'+inner+'</td>';
-      }).join("")+
-      (P.length<6?'<td></td>':'')+
-      '<td class="mjt-x" data-mt="rowdel" data-v="'+ri+'">×</td></tr>';
-  });
-  h += '</tbody></table></div>';
-  h += '<button class="btn dash full" style="padding:10px 0;margin-bottom:14px" data-mt="addrow">＋ 半荘を追加</button>';
+  h += band("スコア");
+  h += '<div style="display:grid;grid-template-columns:repeat('+Math.min(P.length,4)+',1fr);gap:6px;margin-bottom:8px">'+
+    P.map((p,i)=>'<div><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前">'+
+      (P.length>mjtSeats(t)?'<div class="mjt-pdel" data-mt="pdel" data-v="'+i+'">×削除</div>':'')+'</div>').join("")+'</div>';
+  if(P.length<6) h += '<button class="btn dash full" style="padding:8px 0;font-size:12px;margin-bottom:8px" data-mt="addp">＋ プレイヤーを追加</button>';
+  h += '<button class="btn tealb full" style="padding:13px 0;font-size:15px;font-weight:700;margin-bottom:14px" data-mt="toPlay">▶ 対局モード(スコアの入力・閲覧)</button>';
 
   /* チップ(スコアの下) */
   h += band("チップ(開始→終了 枚数)");
@@ -1383,7 +1364,9 @@ function mjtKeypadHtml(t){
           '<div style="display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)">半荘内で移動</div>'+
           '<button class="mjt-key" data-mt="key" data-v="▶" style="color:var(--teal);font-size:20px">▶</button>'
         : '<button class="mjt-key done" data-mt="keydone" style="grid-column:span 3">完了</button>')+
-      '</div></div>';
+      '</div>'+
+      (isScore?'<button class="btn" data-mt="rowdelcur" style="width:100%;margin-top:6px;padding:8px 0;font-size:12px;color:var(--red);border-color:var(--red)">この半荘(行)を削除</button>':'')+
+      '</div>';
   }
   return h;
 }
@@ -1480,6 +1463,7 @@ function bindMjTable(){
       else if(a==="tokakei"){ mjtToKakei(); }
       else if(a==="addrow"){ t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="rowdel"){ t.rows.splice(num(el.dataset.v),1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
+      else if(a==="rowdelcur"){ const c=UI.mjtCell; if(c&&c.k==="s"&&confirm("半荘"+(c.r+1)+"を削除しますか?(この行の全員のスコアが消えます)")){ t.rows.splice(c.r,1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); renderKeepScroll(); } }
       else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="toPlay"){ UI.mjtCell=null; UI.screen="mjplay"; render(); }
       else if(a==="toTable"){ UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
