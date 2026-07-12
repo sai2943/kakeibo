@@ -167,7 +167,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.51 (localStorage保存・完全オフライン)
+   Tally 2.52 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -552,7 +552,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.51";
+const APP_VERSION = "2.52";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1113,12 +1113,12 @@ function viewMjTable(){
     '<input class="input mono" type="date" value="'+esc(t.date||"")+'" data-mt="date" style="width:auto;min-width:150px;text-align:left;height:44px;box-sizing:border-box"></div>'+
     '<div style="flex:1;min-width:0"><div class="muted" style="font-size:9px;margin-bottom:3px">ルール名</div>'+
     '<input class="input" placeholder="例: DUO虹" value="'+esc(t.ruleName||"")+'" data-mt="rname" style="height:44px;box-sizing:border-box"></div></div>';
-  /* 実働時刻: 開始=名前入力完了で自動、終了=初回の収支反映で自動。ズレたらここで修正 */
-  h += '<div class="row" style="gap:8px;align-items:center;margin-bottom:12px">'+
-    '<span class="muted" style="font-size:12px;width:74px">実働</span>'+
-    '<input class="input mono" type="time" value="'+esc(t.startAt||"")+'" data-mt="tstart" style="flex:1">'+
+  /* プレイ時間: 開始=名前入力完了で自動、終了=初回の収支反映で自動。ズレたらここで修正 */
+  h += '<div style="margin-bottom:12px"><div class="muted" style="font-size:9px;margin-bottom:3px">プレイ時間</div>'+
+    '<div class="row" style="gap:8px;align-items:center">'+
+    '<input class="input mono" type="time" value="'+esc(t.startAt||"")+'" data-mt="tstart" style="flex:1;height:44px;box-sizing:border-box">'+
     '<span class="muted" style="font-size:12px">〜</span>'+
-    '<input class="input mono" type="time" value="'+esc(t.endAt||"")+'" data-mt="tend" style="flex:1"></div>';
+    '<input class="input mono" type="time" value="'+esc(t.endAt||"")+'" data-mt="tend" style="flex:1;height:44px;box-sizing:border-box"></div></div>';
 
   /* 保存済みルール(横スクロール + 編集モード) — 案A: 保存も同じ1行に */
   h += '<div style="margin-bottom:12px">';
