@@ -170,7 +170,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.55 (localStorage保存・完全オフライン)
+   Tally 2.56 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -578,7 +578,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.55";
+const APP_VERSION = "2.56";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -2164,6 +2164,7 @@ function saveMj(){
   const _xf = new Set((cleaned.expenses||[]).map(x=>String(x.fromEntry)).filter(x=>x!=="undefined"&&x!=="null"));
   if(_xf.size) S.entries = S.entries.filter(e=>!_xf.has(String(e.id)));
   save(); UI.screen="main"; UI.mjDraft=null; render();
+  if(_xf.size) toast("保存しました(家計簿から"+_xf.size+"件を経費へ振替)");
 }
 
 function bindMain(){
@@ -3069,6 +3070,7 @@ function saveSession(){
   const _xf = new Set((cleaned.expenses||[]).map(x=>String(x.fromEntry)).filter(x=>x!=="undefined"&&x!=="null"));
   if(_xf.size) S.entries = S.entries.filter(e=>!_xf.has(String(e.id)));
   save(); UI.screen="main"; UI.draft=null; render();
+  if(_xf.size) toast("保存しました(家計簿から"+_xf.size+"件を経費へ振替)");
 }
 </script>
 <script>
