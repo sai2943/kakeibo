@@ -170,7 +170,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.54 (localStorage保存・完全オフライン)
+   Tally 2.55 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -578,7 +578,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.54";
+const APP_VERSION = "2.55";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -2012,8 +2012,9 @@ function viewMj(){
   h += band("経費(飲食など)");
   (m.expenses||[]).forEach(x=>{
     h += '<div class="row" style="gap:6px;margin-bottom:6px">'+
-      '<input class="input sm" placeholder="内容" value="'+esc(x.label)+'" style="flex:1.5" data-in="mjxlabel" data-v="'+x.id+'">'+
-      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="金額" value="'+esc(x.amount)+'" style="flex:1" data-in="mjxamount" data-v="'+x.id+'">'+
+      '<input class="input sm" placeholder="店名" value="'+esc(x.store||"")+'" style="flex:1" data-in="mjxstore" data-v="'+x.id+'">'+
+      '<input class="input sm" placeholder="品目" value="'+esc(x.item!=null?x.item:(x.label||""))+'" style="flex:1.2" data-in="mjxitem" data-v="'+x.id+'">'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="金額" value="'+esc(x.amount)+'" style="flex:0.9;min-width:72px" data-in="mjxamount" data-v="'+x.id+'">'+
       '<button class="xbtn" data-a="mjxdel" data-v="'+x.id+'">×</button></div>';
   });
   h += '<button class="btn dash full" data-a="mjxadd">＋ 経費を追加</button>';
@@ -2074,10 +2075,12 @@ function bindMj(){
     const kind=el.dataset.in, v=el.dataset.v;
     el.oninput = ()=>{
       if(kind==="mjf"){ m[v]=el.value; refreshMj(); }
-      else if(kind==="mjxlabel"||kind==="mjxamount"){
+      else if(kind==="mjxstore"||kind==="mjxitem"||kind==="mjxamount"){
         const x = (m.expenses||[]).find(e=>String(e.id)===String(v));
         if(!x) return;
-        if(kind==="mjxlabel") x.label=el.value; else x.amount=el.value;
+        if(kind==="mjxstore") x.store=el.value;
+        else if(kind==="mjxitem"){ x.item=el.value; delete x.label; }
+        else x.amount=el.value;
         refreshMj();
       }
       else if(kind==="mjabs"){
@@ -2113,12 +2116,12 @@ function bindMj(){
         S.mjSessions = (S.mjSessions||[]).filter(x=>x.id!==m.id);
         save(); UI.screen="main"; UI.mjDraft=null; render();
       }
-      else if(a==="mjxadd"){ (m.expenses=m.expenses||[]).push({id:uid(),label:"",amount:""}); render(); }
+      else if(a==="mjxadd"){ (m.expenses=m.expenses||[]).push({id:uid(),store:"",item:"",amount:""}); render(); }
       else if(a==="mjxdel"){ m.expenses=(m.expenses||[]).filter(x=>String(x.id)!==String(v)); render(); }
       else if(a==="mjxfopen"){ UI.xferOpen=!UI.xferOpen; render(); }
       else if(a==="mjxfpick"){
         const e=(S.entries||[]).find(x=>String(x.id)===String(v));
-        if(e){ (m.expenses=m.expenses||[]).push({id:uid(), label:(e.item||e.store||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id}); UI.xferOpen=false; render(); }
+        if(e){ (m.expenses=m.expenses||[]).push({id:uid(), store:e.store||"", item:(e.item||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id}); UI.xferOpen=false; render(); }
       }
       else if(a==="mjsave") saveMj();
     };
@@ -2448,8 +2451,9 @@ function viewSession(){
   h += band("経費(飲食など)");
   (s.expenses||[]).forEach(x=>{
     h += '<div class="row" style="gap:6px;margin-bottom:6px">'+
-      '<input class="input sm" placeholder="内容" value="'+esc(x.label)+'" style="flex:1.5" data-in="xlabel" data-v="'+x.id+'">'+
-      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="金額" value="'+esc(x.amount)+'" style="flex:1" data-in="xamount" data-v="'+x.id+'">'+
+      '<input class="input sm" placeholder="店名" value="'+esc(x.store||"")+'" style="flex:1" data-in="xstore" data-v="'+x.id+'">'+
+      '<input class="input sm" placeholder="品目" value="'+esc(x.item!=null?x.item:(x.label||""))+'" style="flex:1.2" data-in="xitem" data-v="'+x.id+'">'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="金額" value="'+esc(x.amount)+'" style="flex:0.9;min-width:72px" data-in="xamount" data-v="'+x.id+'">'+
       '<button class="xbtn" data-a="xdel" data-v="'+x.id+'">×</button></div>';
   });
   h += '<button class="btn dash full" data-a="xadd">＋ 経費を追加</button>';
@@ -2853,10 +2857,12 @@ function bindSession(){
       else if(kind==="pexchange"){ s.pExchange=el.value; refreshSlot(); }
 
       else if(kind==="myshare"){ s.myShare=el.value; refreshSlot(); }
-      else if(kind==="xlabel"||kind==="xamount"){
+      else if(kind==="xstore"||kind==="xitem"||kind==="xamount"){
         const x = s.expenses.find(e=>String(e.id)===String(v));
         if(!x) return;
-        if(kind==="xlabel") x.label=el.value; else x.amount=el.value;
+        if(kind==="xstore") x.store=el.value;
+        else if(kind==="xitem"){ x.item=el.value; delete x.label; }
+        else x.amount=el.value;
         refreshSummary();
       }
       else if(kind==="mname"){
@@ -3014,12 +3020,12 @@ function bindSessionActions(){
         const m=s.machines.find(x=>String(x.id)===String(mid));
         if(m){ m.segments=(m.segments||[]).filter(x=>String(x.id)!==String(gid)); render(); }
       }
-      else if(a==="xadd"){ s.expenses.push({id:uid(),label:"",amount:""}); render(); }
+      else if(a==="xadd"){ s.expenses.push({id:uid(),store:"",item:"",amount:""}); render(); }
       else if(a==="xdel"){ s.expenses=s.expenses.filter(x=>String(x.id)!==String(v)); render(); }
       else if(a==="xfopen"){ UI.xferOpen=!UI.xferOpen; render(); }
       else if(a==="xfpick"){
         const e=(S.entries||[]).find(x=>String(x.id)===String(v));
-        if(e){ s.expenses.push({id:uid(), label:(e.item||e.store||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id}); UI.xferOpen=false; render(); }
+        if(e){ s.expenses.push({id:uid(), store:e.store||"", item:(e.item||e.memo||e.category||"支出"), amount:String(num(e.amount)), fromEntry:e.id}); UI.xferOpen=false; render(); }
       }
       else if(a==="sdel"){
         if(!confirm("この稼働記録を削除しますか?(家計簿の連携分も消えます)")) return;
