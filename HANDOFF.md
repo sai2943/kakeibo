@@ -1,4 +1,4 @@
-# Tally PWA — 次チャットへの引き継ぎ (現行 v2.52)
+# Tally PWA — 次チャットへの引き継ぎ (現行 v2.53)
 
 > リポジトリでは固定名 `HANDOFF.md` で上書き運用(バージョンはこの見出し、履歴はGit)。
 
@@ -82,6 +82,7 @@ open('_all.js','w',encoding='utf-8').write('\n;\n'.join(blocks))
 - v2.50 **スコア表の時刻自動記録**: 名前入力完了→startAt、初回反映→endAt(再反映では不変)。nowHM()ヘルパー新設(※todayStrは複数行関数——直後への挿入時はスコープ事故に注意、実際に一度やらかして修正した)
 - v2.51 **スコア表に時刻欄を表示・編集可に**: 時刻の所有権を表へ移管(反映は常に表の値をコピー)。t.endAtフィールド新設
 - v2.52 表の時刻欄を「プレイ時間」に改称しレイアウトを日付行の様式(ラベル上置き・高さ44px)に統一
+- v2.53 **iOSがtype=timeへ大型ネイティブ描画を当てheightを無視する問題**を `input[type="time"]{appearance:none}` で抑止(dateは従うのにtimeは従わない非対称。今後time入力を足す時もこのCSSが効く前提でOK)
 - Supabase: RLS検証、履歴テーブル+トリガー導入、RESTORE_RUNBOOK.md作成
 
 ## 8. 未対応・保留(ユーザー合意済み)
@@ -91,5 +92,5 @@ open('_all.js','w',encoding='utf-8').write('\n;\n'.join(blocks))
 - ユーザー却下済み(蒸し返さない): 予算アラート/プッシュ通知、カテゴリ細分化、塗り潰しピル、ローカルスナップ世代数の増加(深い履歴はサーバの役割)、iOS 62ptへの追加CSS実験。
 
 ## 9. 現在のバージョンとファイル
-**v2.52**。リポジトリ構成: index.html / sw.js(未レビュー・内容未確認) / manifest.webmanifest(display:standalone, name/short_name:Tally) / apple-touch-icon.png / icon-192.png / icon-512.png / HANDOFF.md(本書) / RESTORE_RUNBOOK.md。
+**v2.53**。リポジトリ構成: index.html / sw.js(未レビュー・内容未確認) / manifest.webmanifest(display:standalone, name/short_name:Tally) / apple-touch-icon.png / icon-192.png / icon-512.png / HANDOFF.md(本書) / RESTORE_RUNBOOK.md。
 sw.jsは一度も精読していないので、更新配信やキャッシュで不可解な挙動が出たらまずsw.jsをアップロードしてもらいレビューすること。
