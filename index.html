@@ -152,21 +152,22 @@
     body::after{ display:none !important; }
     #print-area{ display:block !important; background:#fff !important; color:#000 !important; }
     #print-area *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
-    .pr-wrap{ color:#000 !important; background:#fff !important; font-family:-apple-system,sans-serif; padding:10mm; }
     .pr-break{ page-break-before:always; break-before:page; }
-    .pr-title{ font-size:18px; font-weight:700; color:#000 !important; }
-    .pr-sub{ font-size:11px; color:#333 !important; margin:2px 0 10px; }
-    .pr-tbl{ border-collapse:collapse; width:100%; margin-bottom:10px; background:#fff !important; }
-    .pr-tbl th, .pr-tbl td{ border:1px solid #777 !important; padding:2px 4px; text-align:center; font-size:11px; color:#000 !important; background:#fff !important; }
-    .pr-tbl th{ background:#dfe9e7 !important; font-weight:700; }
-    .pr-no, .pr-lbl{ background:#eee !important; font-weight:700; }
-    .pr-tbl td.pr-neg{ color:#c00 !important; }
-    .pr-abs{ color:#999 !important; }
     .pr-tbl tr{ break-inside:avoid; page-break-inside:avoid; }
     .pr-sum{ break-inside:avoid; page-break-inside:avoid; }
-    .pr-sum .pr-final td{ font-weight:700; border-top:2px solid #333 !important; font-size:12px; }
-    .pr-foot{ font-size:10px; color:#666 !important; margin-top:6px; }
   }
+  /* 精算票の見た目(印刷と画面上の精算シートで共用) */
+  .pr-wrap{ color:#000 !important; background:#fff !important; font-family:-apple-system,sans-serif; padding:10mm; border-radius:10px; }
+  .pr-title{ font-size:18px; font-weight:700; color:#000 !important; }
+  .pr-sub{ font-size:11px; color:#333 !important; margin:2px 0 10px; }
+  .pr-tbl{ border-collapse:collapse; width:100%; margin-bottom:10px; background:#fff !important; }
+  .pr-tbl th, .pr-tbl td{ border:1px solid #777 !important; padding:2px 4px; text-align:center; font-size:11px; color:#000 !important; background:#fff !important; }
+  .pr-tbl th{ background:#dfe9e7 !important; font-weight:700; }
+  .pr-no, .pr-lbl{ background:#eee !important; font-weight:700; }
+  .pr-tbl td.pr-neg{ color:#c00 !important; }
+  .pr-abs{ color:#999 !important; }
+  .pr-sum .pr-final td{ font-weight:700; border-top:2px solid #333 !important; font-size:12px; }
+  .pr-foot{ font-size:10px; color:#666 !important; margin-top:6px; }
 </style>
 </head>
 <body>
@@ -177,7 +178,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.65 (localStorage保存・完全オフライン)
+   Tally 2.66 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -585,7 +586,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.65";
+const APP_VERSION = "2.66";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -612,6 +613,7 @@ function _renderBody(){
   if(UI.screen==="savings"){ app.innerHTML = viewSavings(); bindSavings(); return; }
   document.body.classList.toggle("sheet-light", UI.screen==="mjplay");
   if(UI.screen==="mjplay"){ app.innerHTML = viewMjPlay(); bindMjTable(); return; }
+  if(UI.screen==="mjsheet"){ app.innerHTML = viewMjSheet(); bindMjTable(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mjtlist"){ app.innerHTML = viewMjtList(); bindMjtList(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
@@ -1306,7 +1308,8 @@ function viewMjTable(){
       ? '<button class="btn full" style="margin-bottom:10px;padding:11px 0;font-weight:700;border-color:var(--teal);color:var(--teal)" data-mt="tokakei">✓ 家計簿に反映済み(タップで再反映)</button>'
       : '<button class="btn primary full" style="margin-bottom:10px;padding:11px 0;font-weight:700" data-mt="tokakei">★ '+esc(t.players[t.meIdx]||"自分")+'の成績を家計簿に反映</button>';
   }
-  h += '<button class="btn tealb full" style="margin-bottom:14px;padding:11px 0;font-weight:700" data-mt="pdf">PDFで共有 / 印刷</button>';
+  h += '<button class="btn tealb full" style="margin-bottom:8px;padding:11px 0;font-weight:700" data-mt="tosheet">精算シートを表示(みんなに見せる)</button>';
+  h += '<button class="btn full" style="margin-bottom:14px;padding:11px 0;color:var(--text)" data-mt="pdf">PDFで共有 / 印刷</button>';
 
   h += mjtKeypadHtml(t);
   h += '<div style="height:40px"></div>';
@@ -1326,45 +1329,47 @@ function mjtKeypadHtml(t){
     let disp = curVal==="x" ? "抜番" : (curVal===""||curVal==null ? "0" : curVal);
     const dispCol = (curVal==="x") ? "var(--amber)" : (num(curVal)<0 ? "var(--red)" : num(curVal)>0 ? "var(--blue)" : "var(--text)");
     const showTobi = isScore && mjtHasTobi(t);
-    let headHtml;
-    if(isScore){
-      headHtml = '<div style="padding:2px 2px 7px"><div class="muted" style="font-size:10px;margin-bottom:4px">半荘'+(cell.r+1)+' <span style="color:var(--amber)">← 入力中の行</span></div>'+
-        '<div class="row" style="gap:4px">'+
-        P.map((p,ci)=>{
-          const selp = ci===cell.c;
-          let d, col;
-          if(mjtAbsent(t,cell.r,ci)){ d="抜"; col="var(--muted)"; }
-          else { const raw=mjtRawScore(t,cell.r,ci);
-            if(raw!==null){ d=String(t.rows[cell.r][ci]); col=raw<0?"var(--red)":raw>0?"var(--blue)":"var(--text)"; }
-            else if(mjtAutoIdx(t,cell.r)===ci){ const s=mjtScore(t,cell.r,ci); d=String(s); col="var(--amber)"; }
-            else { d="·"; col="var(--line)"; }
-          }
-          return '<div style="flex:1;min-width:0;text-align:center;padding:3px 2px;border-radius:6px;'+(selp?"background:rgba(242,179,61,.18);outline:1.5px solid var(--amber)":"background:var(--surface2)")+'">'+
-            '<div class="ellip" style="font-size:9px;color:'+(selp?"var(--amber)":"var(--muted)")+'">'+esc(p||("P"+(ci+1)))+'</div>'+
-            '<div class="mono" style="font-size:16px;font-weight:700;color:'+col+'">'+esc(d)+'</div></div>';
-        }).join("")+'</div></div>';
-    } else {
+    /* スコア入力時: ミニ表示行は撤去済み(直上の実テーブル行が選択ハイライト付きで見えるため重複) */
+    let headHtml = "";
+    if(!isScore){
       headHtml = '<div class="mjt-pad-head"><span class="muted" style="font-size:12px">入力中: <b style="color:var(--text)">'+esc(who)+'</b> · '+ctx+'</span>'+
         '<span class="mono" style="font-size:20px;font-weight:700;color:'+dispCol+'">'+esc(String(disp))+'</span></div>';
     }
+    const KS='padding:12px 0;font-size:20px;';
     h += '<div class="mjt-pad-wrap">'+headHtml+
       '<div class="mjt-pad">'+
-      ["1","2","3","4","5","6","7","8","9"].map(k=>'<button class="mjt-key" data-mt="key" data-v="'+k+'">'+k+'</button>').join("")+
-      '<button class="mjt-key" data-mt="key" data-v="±">±</button>'+
-      '<button class="mjt-key" data-mt="key" data-v="0">0</button>'+
-      '<button class="mjt-key" data-mt="key" data-v="⌫">⌫</button>'+
-      (isScore
-        ? '<button class="mjt-key" data-mt="key" data-v="抜" style="color:var(--muted)">抜番</button>'+
-          (showTobi?'<button class="mjt-key" data-mt="key" data-v="飛" style="color:var(--amber);border-color:var(--amber)">飛び</button>':'<div></div>')+
-          '<button class="mjt-key done" data-mt="keydone">完了</button>'+
-          '<button class="mjt-key" data-mt="key" data-v="◀" style="color:var(--teal);font-size:20px">◀</button>'+
-          '<div style="display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--muted)">半荘内で移動</div>'+
-          '<button class="mjt-key" data-mt="key" data-v="▶" style="color:var(--teal);font-size:20px">▶</button>'
-        : '<button class="mjt-key done" data-mt="keydone" style="grid-column:span 3">完了</button>')+
+      ["1","2","3","4","5","6","7","8","9"].map(k=>'<button class="mjt-key" style="'+KS+'" data-mt="key" data-v="'+k+'">'+k+'</button>').join("")+
+      '<button class="mjt-key" style="'+KS+'" data-mt="key" data-v="±">±</button>'+
+      '<button class="mjt-key" style="'+KS+'" data-mt="key" data-v="0">0</button>'+
+      '<button class="mjt-key" style="'+KS+'" data-mt="key" data-v="⌫">⌫</button>'+
+      (isScore ? '' : '<button class="mjt-key done" data-mt="keydone" style="grid-column:span 3;'+KS+'">完了</button>')+
       '</div>'+
-      (isScore?'<button class="btn" data-mt="rowdelcur" style="width:100%;margin-top:6px;padding:8px 0;font-size:12px;color:var(--red);border-color:var(--red)">この半荘(行)を削除</button>':'')+
+      (isScore
+        ? '<div style="display:grid;grid-template-columns:'+(showTobi?"1fr 1fr":"1fr")+';gap:5px;margin-top:5px">'+
+            '<button class="mjt-key" data-mt="key" data-v="抜" style="padding:7px 0;font-size:13px;color:var(--muted)">抜番</button>'+
+            (showTobi?'<button class="mjt-key" data-mt="key" data-v="飛" style="padding:7px 0;font-size:13px;color:var(--amber);border-color:var(--amber)">飛び</button>':'')+
+          '</div>'+
+          '<div style="display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:5px;margin-top:5px">'+
+            '<button class="mjt-key" data-mt="key" data-v="◀" style="padding:12px 0;color:var(--teal);font-size:22px">◀</button>'+
+            '<button class="mjt-key done" data-mt="keydone" style="padding:12px 0;font-size:17px">完了</button>'+
+            '<button class="mjt-key" data-mt="key" data-v="▶" style="padding:12px 0;color:var(--teal);font-size:22px">▶</button>'+
+          '</div>'+
+          '<button class="btn" data-mt="rowdelcur" style="width:100%;margin-top:6px;padding:6px 0;font-size:11px;color:var(--red);border-color:var(--red)">この半荘(行)を削除</button>'
+        : '')+
       '</div>';
   }
+  return h;
+}
+
+function viewMjSheet(){
+  const t = UI.mjt;
+  let h = '<div class="row" style="align-items:center;padding:calc(env(safe-area-inset-top,0px)) 0 6px">'+
+    '<button class="navbtn" data-mt="sheetback" style="font-size:14px">‹ 戻る</button>'+
+    '<div style="flex:1;text-align:center;font-weight:700;font-size:14px">精算シート</div>'+
+    '<button class="navbtn" data-mt="pdf" style="font-size:13px;color:var(--teal)">PDF保存</button></div>'+
+    '<div class="muted" style="font-size:10px;margin:0 0 8px;text-align:center">スクリーンショットがそのまま共有用の画像になります(URL等は写りません)</div>';
+  h += mjtPrintHtml(t);
+  h += '<div style="height:30px"></div>';
   return h;
 }
 
@@ -1464,6 +1469,8 @@ function bindMjTable(){
       else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="toPlay"){ UI.mjtCell=null; UI.screen="mjplay"; render(); }
       else if(a==="toTable"){ UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
+      else if(a==="tosheet"){ UI.mjtCell=null; UI.screen="mjsheet"; render(); }
+      else if(a==="sheetback"){ UI.screen="mjtable"; render(); }
       else if(a==="cs"){ UI.mjtCell={k:"cs",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="ce"){ UI.mjtCell={k:"ce",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="key"){ padInput(el.dataset.v); }
