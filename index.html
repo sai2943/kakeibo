@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.77 (localStorage保存・完全オフライン)
+   Tally 2.78 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -595,7 +595,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.77";
+const APP_VERSION = "2.78";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1224,24 +1224,27 @@ async function mjtShareMid(){
 function mjtSettle(t){
   const P=t.players, calcs=P.map((p,ci)=>mjtCalc(t,ci));
   const fees=calcs.map(c=>c.fee);
-  let pays=calcs.map((c,ci)=>c.shushi - fees[ci]), payNote="";
+  const total=fees.reduce((a,b)=>a+b,0);
+  const raw=calcs.map((c,ci)=>c.shushi - fees[ci]);
+  let pays=raw.slice(), payNote="";
   const unit = t.roundPay===true ? 100 : (num(t.roundPay)||0);  /* 旧bool互換 */
   if(unit>0){
-    let D=0;
-    pays=pays.map(p=>{ if(p<0){ const q=-Math.floor((-p)/unit)*unit; D+=(q-p); return q; } return p; });
-    if(D>0){
-      let rem=D; const names=[];
-      pays.map((p,ci)=>({p:p,ci:ci})).filter(o=>o.p>0).sort((a,b)=>b.p-a.p).forEach(o=>{
-        if(rem<=0) return;
-        const take=Math.min(o.p,rem); pays[o.ci]-=take; rem-=take;
-        names.push(P[o.ci]||("P"+(o.ci+1)));
+    /* トップ(最大受取)を特定。受取側が居なければ適用しない */
+    let ti=-1,best=0; raw.forEach((p,ci)=>{ if(p>best){best=p;ti=ci;} });
+    if(ti<0){
+      payNote="端数処理: 受取側がいないため適用なし";
+    } else {
+      /* トップ以外は全員(負けも2位以下の浮きも)単位切捨。端数の帳尻はトップが引受 */
+      pays=raw.map((p,ci)=>{
+        if(ci===ti) return 0; /* 後で帳尻 */
+        return p<0 ? -Math.floor((-p)/unit)*unit : Math.floor(p/unit)*unit;
       });
-      payNote="負け支払"+unit+"円未満切捨・調整¥"+D
-        +(names.length?"は"+names.join("・")+"の受取から控除":"")
-        +(rem>0?"(¥"+rem+"は受取不足のため未調整)":"");
-    } else payNote="負け支払"+unit+"円未満切捨";
+      pays[ti] = -total - pays.reduce((a,b,ci)=>ci===ti?a:a+b,0);
+      payNote="端数処理: 負け・2位以下の受取を"+unit+"円未満切捨(端数はトップが調整)";
+    }
   }
-  return {fees:fees, pays:pays, payNote:payNote};
+  const adjs=pays.map((p,ci)=>p-raw[ci]);
+  return {fees:fees, pays:pays, adjs:adjs, payNote:payNote};
 }
 const MJT_COLS=["#2E6DA4","#C0392B","#0E8C7A","#A9780E","#7B5EA7","#5D7472"];
 function mjtChartData(t){
@@ -1316,8 +1319,10 @@ function mjtPrintHtml(t, mode){
   sum+='<tr><td class="pr-lbl">収支</td>'+calcs.map(c=>'<td class="'+(c.shushi<0?"pr-neg":"")+'">'+money(c.shushi)+'</td>').join("")+'</tr>';
   const st=mjtSettle(t);
   const anyFee=calcs.some(c=>c.fee>0);
+  const anyAdj=st.adjs.some(a=>a!==0);
   if(anyFee){
     sum+='<tr><td class="pr-lbl">場代</td>'+st.fees.map(f=>'<td class="pr-neg">'+(f>0?money(-f):"–")+'</td>').join("")+'</tr>';
+    if(anyAdj) sum+='<tr><td class="pr-lbl">調整</td>'+st.adjs.map(a=>'<td class="'+(a<0?"pr-neg":"")+'">'+(a===0?"–":(a>0?"+":"")+money(a).replace("−","−"))+'</td>').join("")+'</tr>';
     sum+='<tr class="pr-final"><td class="pr-lbl">支払</td>'+st.pays.map(p=>'<td class="'+(p<0?"pr-neg":"")+'">'+money(p)+'</td>').join("")+'</tr>';
   }
   sum+='</tbody></table>';
@@ -1485,7 +1490,7 @@ function viewMjTable(){
   /* 端数処理 */
   const rpUnit = t.roundPay===true ? 100 : (num(t.roundPay)||0);
   h += '<div class="card" style="margin-bottom:8px;padding:10px 12px">'+
-    '<div class="muted" style="font-size:10px;margin-bottom:6px">端数処理: 支払額(負け側)の切捨 — 精算シートに反映</div>'+
+    '<div class="muted" style="font-size:10px;margin-bottom:6px">端数処理: トップ以外の支払・受取を切捨(端数はトップが調整) — 精算シートに反映</div>'+
     '<div class="row" style="gap:5px">'+
     [[0,"なし"],[100,"100円"],[500,"500円"],[1000,"1000円"]].map(o=>'<button class="btn '+(rpUnit===o[0]?"sel":"")+'" style="flex:1;font-size:12px;padding:8px 0" data-mt="rpay" data-v="'+o[0]+'">'+o[1]+'</button>').join("")+'</div></div>';
   if(feeTotal>0 || feeSum>0){
