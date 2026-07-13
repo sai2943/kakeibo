@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.70 (localStorage保存・完全オフライン)
+   Tally 2.71 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -595,7 +595,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.70";
+const APP_VERSION = "2.71";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1104,7 +1104,7 @@ function mjtChartSvg(t){
   const step=[1,2,2.5,5,10].map(c=>c*pw).find(c=>c>=raw)||raw;
   const ticks=[]; for(let v=Math.ceil(mn/step)*step; v<=mx+1e-9; v+=step) ticks.push(Math.round(v*100)/100);
   if(ticks.indexOf(0)<0) ticks.push(0);
-  let g='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">';
+  let g='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;margin:4px 0 16px">';
   ticks.forEach(v=>{ const y=py(v);
     g+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+'" stroke="'+(v===0?"#888":"#ececec")+'" stroke-width="'+(v===0?1.6:1)+'"/>'+
        '<text x="'+(L-4)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="#666">'+v+'</text>'; });
@@ -1128,7 +1128,7 @@ function mjtPrintHtml(t, mode){
   const money=n=>(n<0?"−":"")+"¥"+Math.abs(n).toLocaleString("ja-JP");
   const names='<tr><th>No</th>'+P.map((p,i)=>'<th>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr>';
   const cellsOf=ri=>P.map((p,ci)=>{
-    if(mjtAbsent(t,ri,ci)) return '<td class="pr-abs">抜</td>';
+    if(mjtAbsent(t,ri,ci)) return '<td class="pr-abs">–</td>';
     const sc=mjtScore(t,ri,ci);
     if(sc===null) return '<td></td>';
     return '<td class="'+(sc<0?"pr-neg":"")+'">'+sc.toFixed(1)+'</td>';
@@ -1385,7 +1385,7 @@ function viewMjSheet(){
     '<button class="navbtn" data-mt="sheetback" style="font-size:14px">‹ 戻る</button>'+
     '<div style="flex:1;text-align:center;font-weight:700;font-size:14px">'+(mid?"途中経過":"精算シート")+'</div>'+
     (mid?'<div style="width:70px"></div>':'<button class="navbtn" data-mt="pdf" style="font-size:13px;color:var(--teal)">PDF保存</button>')+'</div>'+
-    '<div class="muted" style="font-size:10px;margin:0 0 8px;text-align:center">スクリーンショットがそのまま共有用の画像になります(URL等は写りません)</div>';
+    '';
   h += mjtPrintHtml(t, mid?"mid":"screen");
   h += '<div style="height:30px"></div>';
   return h;
@@ -1427,6 +1427,7 @@ function viewMjPlay(){
   });
   h += '</tbody></table>';
   h += '<button class="btn dash full" data-mt="addrow" style="margin-top:12px;padding:13px 0;font-size:15px;font-weight:700">＋ 回戦を追加</button>';
+  h += '<button class="btn full" data-mt="tomid" style="margin-top:8px;padding:11px 0;font-size:14px;font-weight:700;color:var(--teal);border-color:var(--teal)">途中経過を表示</button>';
   h += '<div class="muted" style="font-size:10px;text-align:right;margin-top:6px">ヘッダー: 上段=合計 / 下段=1着·2着·3着'+(mjtSeats(t)>3?"·4着":"")+'の回数</div>';
   h += '<div style="height:40px"></div>';
   return h;
