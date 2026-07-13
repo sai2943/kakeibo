@@ -169,6 +169,11 @@
   .pr-abs{ color:#999 !important; }
   .pr-hist tbody tr:nth-child(even):not(.pr-latest) td{ background:#F2F6F5 !important; }
   .pr-latest td{ background:#FBF3DC !important; }
+  #saveBadge{ position:fixed; left:10px; bottom:calc(env(safe-area-inset-bottom,0px) + 68px);
+    width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:700; color:var(--muted); opacity:.32; z-index:40;
+    transition:opacity .35s, transform .35s, color .35s; }
+  #saveBadge.pulse{ opacity:1; transform:scale(1.35); color:var(--teal); }
   .pr-no, .pr-lbl{ white-space:nowrap; }
   /* ↓画面上の精算シート専用の調整(印刷は#print-area経由なので不変) */
   #app .pr-wrap{ padding:14px 8px; }
@@ -189,7 +194,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.91 (localStorage保存・完全オフライン)
+   Tally 2.93 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -418,8 +423,24 @@ function load(){
     if(raw) applyData(JSON.parse(raw));
   }catch(e){ /* 壊れていたら初期状態 */ }
 }
+let LAST_LOCAL_SAVE = null;
 function saveLocal(){
   localStorage.setItem(KEY, JSON.stringify(S));
+  const d=new Date();
+  LAST_LOCAL_SAVE = ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)+":"+("0"+d.getSeconds()).slice(-2);
+  document.querySelectorAll(".savets").forEach(el=>{ el.textContent=LAST_LOCAL_SAVE; });
+  const _b=document.getElementById("saveBadge");
+  if(_b){ _b.classList.add("pulse"); clearTimeout(_saveBadgeTimer); _saveBadgeTimer=setTimeout(()=>_b.classList.remove("pulse"), 550); }
+}
+const saveIndicatorHtml = () => '<div class="muted" style="font-size:10px;text-align:center;margin:10px 0 2px">✓ この端末に自動保存済み <span class="savets mono">'+(LAST_LOCAL_SAVE||"—")+'</span>(通信不要・オフラインでも消えません)</div>';
+/* 保存パルス: 全画面左下に常駐する✓バッジ。保存のたびに一瞬光る=機構の生存証明 */
+let _saveBadgeTimer=null;
+function ensureSaveBadge(){
+  if(document.getElementById("saveBadge")) return;
+  const b=document.createElement("div");
+  b.id="saveBadge"; b.textContent="✓";
+  b.onclick=()=>toast("この端末に自動保存済み "+(LAST_LOCAL_SAVE||"—")+"(通信不要・オフラインでも消えません)");
+  document.body.appendChild(b);
 }
 /* ---------- 自動スナップショット(ローカル3世代) ----------
    起動時(日次)・復元前・同期上書き前に全データを退避。誤操作からの復旧用 */
@@ -602,9 +623,10 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.91";
+const APP_VERSION = "2.93";
 let _renderLoc = "";
 function render(){
+  ensureSaveBadge();
   _renderBody();
   /* タブ・画面・遊技サブタブが変わった時だけ先頭へ。同一画面の再描画は位置を保持 */
   const loc = UI.tab + "/" + UI.screen + "/" + (UI.gameSub||"");
@@ -715,6 +737,8 @@ function viewMain(){
     h += (gsub==="mahjong") ? viewMahjong() : viewSlot();
   }
 
+  h += saveIndicatorHtml();
+  h += '<div style="height:64px"></div>';
   h += '<button class="fab" data-a="add">＋</button>';
   return h;
 }
@@ -1541,12 +1565,14 @@ function viewMjTable(){
   const feeSum=P.reduce((a,p,ci)=>a+(num((t.fees||[])[ci])||0),0);
   const diff=feeSum-feeTotal;
   const pexpSum=P.reduce((a,p,ci)=>a+(num((t.pexp||[])[ci])||0),0);
-  h += '<div class="card" style="margin-bottom:8px"><div class="row" style="gap:8px;align-items:flex-start">'+
-    '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:3px;height:13px;line-height:13px">店からの総額</div>'+
-    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="例:11400" value="'+esc(t.feeTotal||"")+'" data-mt="ftotal" style="height:40px;box-sizing:border-box"></div>'+
-    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:9px;margin-bottom:3px;height:13px;line-height:13px">1人あたり目安(経費除き)</div>'+
-    '<div class="mono" style="font-size:16px;font-weight:700;height:40px;display:flex;align-items:center;justify-content:center">'+(feeTotal>0?"¥"+Math.ceil(Math.max(0,feeTotal-pexpSum)/np).toLocaleString("ja-JP"):"–")+'</div></div></div>'+
-    '<button class="btn full" data-mt="feesplit" style="margin-top:8px;font-size:12px;padding:8px 0">(総額−経費)の均等割を場代へ入力</button>'+
+  h += '<div class="card" style="margin-bottom:8px;padding:6px 12px 10px">'+
+    '<div class="row" style="gap:8px;align-items:center;padding:5px 0">'+
+    '<span style="flex:1;font-size:13px">店からの総額</span>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc(t.feeTotal||"")+'" data-mt="ftotal" style="width:110px;flex:none"></div>'+
+    '<div class="row" style="gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line)">'+
+    '<span class="muted" style="flex:1;font-size:12px">1人あたり目安(経費除き)</span>'+
+    '<span class="mono" style="font-size:15px;font-weight:700">'+(feeTotal>0?"¥"+Math.ceil(Math.max(0,feeTotal-pexpSum)/np).toLocaleString("ja-JP"):"–")+'</span></div>'+
+    '<button class="btn full" data-mt="feesplit" style="margin-top:6px;font-size:12px;padding:8px 0">(総額−経費)の均等割を場代へ入力</button>'+
     '<div style="height:1px;background:var(--line);margin:10px 0 8px"></div>'+
     '<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:12px">場代の入力合計</span><span class="mono" style="font-size:14px">¥'+feeSum.toLocaleString("ja-JP")+'</span></div>'+
     '<div class="row" style="justify-content:space-between;margin-top:4px"><span style="font-size:13px;font-weight:700">過不足</span>'+
@@ -1704,7 +1730,7 @@ function viewMjPlay(){
   h += '<div class="row" style="gap:6px;margin-top:8px">'+
     '<button class="btn" data-mt="tomid" style="flex:1;padding:11px 0;font-size:14px;font-weight:700;color:var(--teal);border-color:var(--teal)">途中経過を表示</button>'+
     '<button class="btn" data-mt="midshare" style="flex:1;padding:11px 0;font-size:14px;font-weight:700;color:var(--teal);border-color:var(--teal)">画像で共有</button></div>';
-  h += '<div class="muted" style="font-size:10px;text-align:center;margin-top:8px">✓ 自動保存済み <span id="savets" class="mono">'+(LAST_MJT_SAVE||"—")+'</span> — 入力のたびに端末へ即時保存されます</div>';
+  h += saveIndicatorHtml();
   h += '<div class="muted" style="font-size:10px;text-align:right;margin-top:6px">ヘッダー: 上段=合計 / 下段=1着·2着·3着'+(mjtSeats(t)>3?"·4着":"")+'の回数</div>';
   h += '<div style="height:40px"></div>';
   return h;
@@ -1958,15 +1984,11 @@ function mjtDelPreset(id){
   }
 }
 
-let LAST_MJT_SAVE = null;
 function saveMjt(persist){
   const t=UI.mjt; if(!t) return;
   const i=(S.mjTables||[]).findIndex(x=>String(x.id)===String(t.id));
   if(i>=0) S.mjTables[i]=t; else (S.mjTables=S.mjTables||[]).push(t);
   if(persist) save(); else saveLocal();
-  const d=new Date();
-  LAST_MJT_SAVE = ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)+":"+("0"+d.getSeconds()).slice(-2);
-  const el=document.getElementById("savets"); if(el) el.textContent=LAST_MJT_SAVE;
 }
 
 /* ---------- 資産タブ(概観) ---------- */
