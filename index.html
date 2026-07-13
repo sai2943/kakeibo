@@ -45,7 +45,7 @@
      appearanceを剥がして日付と同じ「ただの箱」として描画させる */
   input[type="time"]{-webkit-appearance:none; appearance:none;}
   /* スコア表=共有ドキュメントは白基調(同卓者への視認性優先)。変数差し替えで一括再テーマ */
-  body.sheet-light #app{ padding-top:0; }
+  body.nopad-top #app{ padding-top:0; }
   body.sheet-light{
     --bg:#F4F6F6; --surface:#FFFFFF; --surface2:#E9EEED; --line:#C2CFCD;
     --amber:#A9780E; --teal:#0E8C7A; --red:#C0392B; --text:#1B2E2C; --muted:#5E7573; --blue:#2E6DA4;
@@ -175,6 +175,8 @@
   #app .pr-title{ font-size:20px; }
   #app .pr-tbl th, #app .pr-tbl td{ font-size:12px; padding:4px 2px; white-space:nowrap; overflow:hidden; }
   #app .pr-sum .pr-final td{ font-size:13px; }
+  #app .pr-mid .pr-hist th, #app .pr-mid .pr-hist td{ font-size:15px; padding:7px 2px; }
+  #app .pr-mid .pr-sum td, #app .pr-mid .pr-sum th{ font-size:13.5px; padding:6px 2px; }
   .pr-sum .pr-final td{ font-weight:700; border-top:2px solid #333 !important; font-size:12px; }
   .pr-foot{ font-size:10px; color:#666 !important; margin-top:6px; }
 </style>
@@ -187,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.82 (localStorage保存・完全オフライン)
+   Tally 2.83 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -598,7 +600,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.82";
+const APP_VERSION = "2.83";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -623,7 +625,8 @@ function _renderBody(){
   if(UI.screen==="wishlist"){ app.innerHTML = viewWishlist(); bindWishlist(); return; }
   if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
   if(UI.screen==="savings"){ app.innerHTML = viewSavings(); bindSavings(); return; }
-  document.body.classList.toggle("sheet-light", UI.screen==="mjplay"||UI.screen==="mjsheet");
+  document.body.classList.toggle("sheet-light", UI.screen==="mjsheet");
+  document.body.classList.toggle("nopad-top", UI.screen==="mjplay"||UI.screen==="mjsheet");
   if(UI.screen==="mjplay"){ app.innerHTML = viewMjPlay(); bindMjTable(); return; }
   if(UI.screen==="mjsheet"){ app.innerHTML = viewMjSheet(); bindMjTable(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
@@ -971,7 +974,7 @@ function viewMjtList(){
     const seats = num(t.rule)||3;
     const title = (t.ruleName||"").trim() || "ルール未設定";
     const hasMe = t.meIdx!=null && (t.players||[])[t.meIdx]!=null;
-    const meNet = hasMe ? mjtCalc(t, t.meIdx).net : null;
+    const meNet = hasMe ? mjtSettle(t).pays[t.meIdx] : null;   /* 端数調整・場代移転込みの精算値 */
     h += '<div class="listitem" data-a="mjtopen" data-v="'+t.id+'">'+
       '<div style="flex:1;min-width:0"><div class="row" style="font-size:13px;gap:6px;align-items:center">'+
       '<span class="mono muted" style="font-size:11px;flex-shrink:0">'+t.date.slice(5).replace("-","/")+'</span>'+
@@ -1361,7 +1364,7 @@ function mjtPrintHtml(t, mode){
     : (mode==="screen")
       ? head + sum + chart + tbl(true)
       : head + tbl(false) + '<div class="pr-break"></div>' + chart + sum;
-  return '<div class="pr-wrap">'+body+(mode==="mid"?"":foot)+'</div>';
+  return '<div class="pr-wrap'+(mode==="mid"?" pr-mid":"")+'">'+body+(mode==="mid"?"":foot)+'</div>';
 }
 function mjtPrint(){
   const pa=document.getElementById("print-area");
@@ -1594,7 +1597,6 @@ function mjtKeypadHtml(t){
           '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:5px;margin-top:6px">'+
             '<button class="mjt-key done" data-mt="lockrow" style="padding:12px 0;font-size:14px;font-weight:700">この回戦を確定 → 次へ</button>'+
             '<button class="mjt-key" data-mt="lockrowlast" style="padding:12px 0;font-size:13px;color:var(--amber);border-color:var(--amber)">ラス半で確定</button></div>'+
-          '<button class="btn" data-mt="tomid" style="width:100%;margin-top:6px;padding:8px 0;font-size:12px;color:var(--teal);border-color:var(--teal)">途中経過を表示</button>'+
           '<button class="btn" data-mt="rowdelcur" style="width:100%;margin-top:6px;padding:6px 0;font-size:11px;color:var(--red);border-color:var(--red)">この回戦(行)を削除</button>'
         : '')+
       '</div>';
@@ -1630,8 +1632,19 @@ function viewMjPlay(){
         '<div style="font-size:18px;font-weight:800;color:'+(c.sum<0?"var(--red)":"var(--text)")+'">'+fmtPt(c.sum)+'</div>'+
         '<div class="muted" style="font-size:10px;margin-top:1px">'+rc.join("·")+'</div></th>';
     }).join("")+'</tr></thead><tbody>';
+  /* ロック済みの連続区間は折りたたむ(スクロール削減)。UI.lockedOpenで全展開 */
+  const lkOpen = !!UI.lockedOpen;
+  let skipUntil=-1;
   rows.forEach((r,ri)=>{
     const lk = !!((t.locked||[])[ri]);
+    if(!lkOpen && lk){
+      if(ri<=skipUntil) return;
+      let e2=ri; while(e2+1<rows.length && (t.locked||[])[e2+1]) e2++;
+      if(e2>ri){
+        h += '<tr><td colspan="'+(P.length+1)+'" data-mt="lkopen" style="text-align:center;padding:11px 2px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px">🔒 '+(ri+1)+'〜'+(e2+1)+'回戦 確定済み(タップで開く)</td></tr>';
+        skipUntil=e2; return;
+      }
+    }
     h += '<tr>'+
       (lk
         ? '<td data-mt="unlock" data-r="'+ri+'" style="text-align:center;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line)">🔒<div style="font-size:9px;line-height:1.1;margin-top:1px">'+(ri+1)+'</div></td>'
@@ -1653,6 +1666,7 @@ function viewMjPlay(){
     }
   });
   h += '</tbody></table>';
+  if(lkOpen && (t.locked||[]).some(Boolean)) h += '<button class="btn full" data-mt="lkclose" style="margin-top:8px;padding:8px 0;font-size:12px;color:var(--muted)">🔒 確定済みをたたむ</button>';
   h += '<button class="btn dash full" data-mt="addrow" style="margin-top:12px;padding:13px 0;font-size:15px;font-weight:700">＋ 回戦を追加</button>';
   h += '<div class="row" style="gap:6px;margin-top:8px">'+
     '<button class="btn" data-mt="tomid" style="flex:1;padding:11px 0;font-size:14px;font-weight:700;color:var(--teal);border-color:var(--teal)">途中経過を表示</button>'+
@@ -1722,7 +1736,9 @@ function bindMjTable(){
         UI.mjtCell={k:"s",r:r,c:c}; renderKeepScroll();
         const pw=document.querySelector(".mjt-pad-wrap"); if(pw) pw.scrollIntoView({block:"nearest",behavior:"smooth"});
       }
-      else if(a==="toPlay"){ UI.mjtCell=null; UI.screen="mjplay"; render(); }
+      else if(a==="toPlay"){ UI.mjtCell=null; UI.lockedOpen=false; UI.screen="mjplay"; render(); }
+      else if(a==="lkopen"){ UI.lockedOpen=true; renderKeepScroll(); }
+      else if(a==="lkclose"){ UI.lockedOpen=false; UI.mjtCell=null; render(); }
       else if(a==="toTable"){ UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="tosheet"){ UI.sheetMode="full"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
       else if(a==="tomid"){ UI.sheetMode="mid"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
@@ -1770,8 +1786,10 @@ function bindMjTable(){
         t.locked=t.locked||[]; t.locked[ri]=true;
         UI.mjtCell=null;
         if(!isLast && ri===t.rows.length-1){ t.rows.push(new Array(t.players.length).fill("")); t.locked.push(false); }
-        saveMjt(false); renderKeepScroll();
-        if(isLast) toast("ラス半を確定しました。精算は「‹ 設定・精算」から");
+        saveMjt(false);
+        /* 確定→全員で途中経過を確認→戻って次戦、が卓の基本動線 */
+        UI.sheetMode="mid"; UI.sheetFrom="mjplay"; UI.lockedOpen=false; UI.screen="mjsheet"; render();
+        if(isLast) toast("ラス半を確定しました。精算は対局モードに戻り「‹ 設定・精算」から");
       }
       else if(a==="unlock"){
         const ri=num(el.dataset.r);
