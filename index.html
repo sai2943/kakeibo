@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.96 (localStorage保存・完全オフライン)
+   Tally 2.97 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -607,7 +607,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.96";
+const APP_VERSION = "2.97";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1005,8 +1005,8 @@ function bindMjtList(){
     const a=el.dataset.a, v=el.dataset.v;
     el.onclick=()=>{
       if(a==="mjtlback"){ UI.screen="main"; UI.tab="tool"; render(); return; }
-      if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); return; }
-      if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } return; }
+      if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); const _ip=mjtInProgress(UI.mjt); UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false; UI.screen="mjtable"; render(); return; }
+      if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; const _ip=mjtInProgress(UI.mjt); UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false; UI.screen="mjtable"; render(); } return; }
     };
   });
 }
@@ -1106,6 +1106,9 @@ function mjtCalc(t,pi){
   return { sum, chipNet, scoreYen, chipYen, shushi, fee, net };
 }
 const fmtPt = v => Number.isInteger(v) ? String(v) : String(Math.round(v*10)/10);
+function mjtInProgress(t){
+  return !!(t && (t.playersLocked || (t.rows||[]).some((r,ri)=>(t.players||[]).some((p,ci)=>mjtScore(t,ri,ci)!==null))));
+}
 /* ---------- 途中経過の画像生成(Canvas)と共有 ----------
    LINE等への共有用。HTML→画像変換(foreignObject)はiOS WebKitで不安定なため、canvasへ直接描画する */
 function mjtMidImage(t, full){
@@ -1470,21 +1473,25 @@ function viewMjTable(){
     '</div></div>';
   h += '</div>';
 
-  /* ルール詳細(飛びボタン用)——折りたたみ式。進行中(スコアあり or メンバー確定)なら既定で畳む */
-  const anyScoreYet = (t.rows||[]).some((r,ri)=>P.some((p2,ci)=>mjtScore(t,ri,ci)!==null));
-  if(UI.rulesOpen==null) UI.rulesOpen = !(anyScoreYet || t.playersLocked);
+  /* 3区画折りたたみ(ルール/チップ/ゲーム代)。初期値はエントリポイントで設定、ここは保険 */
+  if(UI.rulesOpen==null || UI.chipsOpen==null || UI.feesOpen==null){
+    const _ip=mjtInProgress(t);
+    if(UI.rulesOpen==null) UI.rulesOpen=!_ip;
+    if(UI.chipsOpen==null) UI.chipsOpen=!_ip;
+    if(UI.feesOpen==null) UI.feesOpen=false;
+  }
+  const secBar=(key,open,title,sum)=>'<div class="card" data-mt="sect" data-v="'+key+'" style="margin-bottom:10px;padding:11px 12px"><div class="row" style="gap:8px;align-items:center">'+
+    '<span style="font-size:12px;font-weight:700;flex:none">'+(open?"▾":"▸")+' '+title+'</span>'+
+    (open?'<span class="muted" style="flex:1;font-size:9px;text-align:right">タップでたたむ</span>'
+         :'<span class="muted ellip" style="flex:1;font-size:10px;text-align:right;min-width:0">'+esc(sum)+'</span>')+
+    '</div></div>';
   const rpU = t.roundPay===true?100:(num(t.roundPay)||0);
   const ruleSum = (t.rule==="3"?"3麻":"4麻")
     + " ・ " + (t.mochi||"?") + "/" + (t.kaeshi||"?")
     + " ・ 1点¥" + (num(t.scoreRate)||0)
     + (num(t.chipRate)>0 ? " ・ チップ¥"+num(t.chipRate) : "")
     + (rpU>0 ? " ・ 精算"+rpU+"円" : "");
-  h += '<div class="card" data-mt="rulestoggle" style="margin-bottom:10px;padding:11px 12px">'+
-    '<div class="row" style="gap:8px;align-items:center">'+
-    '<span style="font-size:12px;font-weight:700;flex:none">'+(UI.rulesOpen?"▾":"▸")+' ルール設定</span>'+
-    (UI.rulesOpen?'<span class="muted" style="flex:1;font-size:9px;text-align:right">タップでたたむ</span>'
-                 :'<span class="muted ellip" style="flex:1;font-size:10px;text-align:right;min-width:0">'+esc(ruleSum)+'</span>')+
-    '</div></div>';
+  h += secBar("rules", UI.rulesOpen, "ルール設定", ruleSum);
   if(UI.rulesOpen){
   h += '<div class="card" style="margin-bottom:10px">'+
     '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px">'+
@@ -1525,7 +1532,8 @@ function viewMjTable(){
   /* スコア表 */
 
   /* チップ(スコアの下) */
-  h += band("プレイヤー・チップ(枚数)");
+  h += secBar("chips", UI.chipsOpen, "プレイヤー・チップ", P.map(p=>p||"?").join("・"));
+  if(UI.chipsOpen){
   const chipBox='width:62px;height:36px;display:flex;align-items:center;justify-content:center;border:1px solid var(--line);border-radius:9px;background:var(--bg);font-size:14px;flex:none;';
   const chipSel='outline:2px solid var(--amber);background:rgba(242,179,61,.12);';
   h += '<div class="card" style="margin-bottom:8px;padding:6px 12px">'+
@@ -1558,10 +1566,12 @@ function viewMjTable(){
     (P.length<6?'<button class="btn dash" data-mt="addp" style="flex:1;padding:8px 0;font-size:12px">＋ プレイヤーを追加</button>':'<div style="flex:1"></div>')+
     (!t.playersLocked && P.length>mjtSeats(t)?'<button class="btn '+(UI.pdelMode?"sel":"")+'" data-mt="pdelmode" style="flex:none;font-size:11px;padding:8px 12px;color:var(--red);border-color:var(--red)">'+(UI.pdelMode?"削除中…":"削除")+'</button>':'')+
     '<button class="btn '+(t.playersLocked?"sel":"")+'" data-mt="plock" style="flex:none;font-size:11px;padding:8px 14px">'+(t.playersLocked?"🔒 メンバー確定済":"メンバー確定")+'</button></div>';
+  }
   h += '<button class="btn tealb full" style="padding:13px 0;font-size:15px;font-weight:700;margin-bottom:14px" data-mt="toPlay">▶ 対局モード(スコアの入力・閲覧)</button>';
 
   /* ゲーム代(会計フロー) */
-  h += band("ゲーム代(精算)");
+  h += secBar("fees", UI.feesOpen, "ゲーム代(精算)", (num(t.feeTotal)||0)>0 ? "総額 ¥"+(num(t.feeTotal)||0).toLocaleString("ja-JP") : "未入力");
+  if(UI.feesOpen){
   const np=P.length;
   const feeTotal=num(t.feeTotal)||0;
   const feeSum=P.reduce((a,p,ci)=>a+(num((t.fees||[])[ci])||0),0);
@@ -1600,6 +1610,7 @@ function viewMjTable(){
       '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc((t.pexp||[])[ci]||"")+'" data-mt="pexp" data-c="'+ci+'" style="width:92px"></div>').join("")+'</div>';
 
   /* ===== 操作(最下部に集約) ===== */
+  }
   h += band("家計簿・共有");
   h += '<div class="muted" style="font-size:11px;margin:0 2px 6px">「自分」を選ぶと成績を家計簿に反映できます</div>';
   h += '<div style="overflow-x:auto;margin-bottom:10px"><div class="row" style="gap:6px">'+
@@ -1774,7 +1785,7 @@ function bindMjTable(){
       if(a==="editpresets"){ UI.mjtEditPresets = !UI.mjtEditPresets; render(); return; }
       if(a==="applypreset"){ mjtApplyPreset(el.dataset.v); return; }
       if(a==="delpreset"){ mjtDelPreset(el.dataset.v); return; }
-      if(a==="back"){ saveMjt(true); UI.screen="mjtlist"; UI.mjt=null; UI.mjtCell=null; UI.rulesOpen=null; render(); }
+      if(a==="back"){ saveMjt(true); UI.screen="mjtlist"; UI.mjt=null; UI.mjtCell=null; UI.rulesOpen=UI.chipsOpen=UI.feesOpen=null; render(); }
       else if(a==="pdf"){ mjtPrint(); }
       else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="mjtlist"; UI.mjt=null; UI.mjtCell=null; render(); } }
       else if(a==="rule"){ const nv=el.dataset.v; if(nv!==t.rule && confirm((nv==="3"?"3麻":"4麻")+"に変更しますか?\nウマ・着順計算が"+(nv==="3"?"3人":"4人")+"用に変わります(スコアのデータは消えません)。")){ t.rule=nv; const seats=num(t.rule)||3; while(t.players.length<seats){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); } UI.mjtCell=null; saveMjt(false); render(); } }
@@ -1832,7 +1843,7 @@ function bindMjTable(){
         saveMjt(false); renderKeepScroll();
       }
       else if(a==="pdelmode"){ UI.pdelMode=!UI.pdelMode; renderKeepScroll(); }
-      else if(a==="rulestoggle"){ UI.rulesOpen=!UI.rulesOpen; renderKeepScroll(); }
+      else if(a==="sect"){ const k=el.dataset.v; if(k==="rules")UI.rulesOpen=!UI.rulesOpen; else if(k==="chips")UI.chipsOpen=!UI.chipsOpen; else if(k==="fees")UI.feesOpen=!UI.feesOpen; renderKeepScroll(); }
       else if(a==="plock"){
         if(!t.playersLocked){ if(confirm("メンバーを確定しますか?(確定後はプレイヤーを削除できません。追加は可能)")){ t.playersLocked=true; saveMjt(false); renderKeepScroll(); } }
         else if(confirm("メンバー確定を解除しますか?")){ t.playersLocked=false; saveMjt(false); renderKeepScroll(); }
@@ -2682,9 +2693,9 @@ function bindMain(){
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
       else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
-      else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
+      else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); const _ip=mjtInProgress(UI.mjt); UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false; UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
-      else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
+      else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; const _ip=mjtInProgress(UI.mjt); UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false; UI.screen="mjtable"; render(); } }
       else if(a==="mdb"){ UI.screen="mdb"; UI.mdbForm=null; render(); }
       else if(a==="stores"){ UI.screen="stores"; UI.storeForm=null; render(); }
       else if(a==="mjtlist"){ UI.screen="mjtlist"; render(); }
