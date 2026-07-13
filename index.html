@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.81 (localStorage保存・完全オフライン)
+   Tally 2.82 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -598,7 +598,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.81";
+const APP_VERSION = "2.82";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1525,7 +1525,8 @@ function viewMjTable(){
   h += '<div class="card" style="margin-bottom:8px;padding:10px 12px">'+
     '<div class="muted" style="font-size:10px;margin-bottom:6px">精算単位 — 何円単位で精算するか(トップ以外を切捨・端数はトップが調整)</div>'+
     '<div class="row" style="gap:5px">'+
-    [[0,"1円"],[100,"100円"],[500,"500円"],[1000,"1000円"]].map(o=>'<button class="btn '+(rpUnit===o[0]?"sel":"")+'" style="flex:1;font-size:12px;padding:8px 0" data-mt="rpay" data-v="'+o[0]+'">'+o[1]+'</button>').join("")+'</div></div>';
+    [50,100,500,1000].map(u=>'<button class="btn '+(rpUnit===u?"sel":"")+'" style="flex:1;font-size:12px;padding:8px 0" data-mt="rpay" data-v="'+u+'">'+u+'円</button>').join("")+'</div>'+
+    '<div class="muted" style="font-size:9px;margin-top:6px">未選択なら1円単位(丸めなし)。選択中をもう一度タップで解除</div></div>';
   if(feeTotal>0 || feeSum>0){
     const okc = diff===0 ? "var(--teal)" : "var(--red)";
     h += '<div class="card" style="margin-bottom:12px"><div class="row between" style="font-size:12px"><span class="muted">入力合計</span><span class="mono">¥'+feeSum.toLocaleString("ja-JP")+'</span></div>'+
@@ -1586,9 +1587,8 @@ function mjtKeypadHtml(t){
             '<button class="mjt-key" data-mt="key" data-v="抜" style="padding:7px 0;font-size:13px;color:var(--muted)">抜番</button>'+
             (showTobi?'<button class="mjt-key" data-mt="key" data-v="飛" style="padding:7px 0;font-size:13px;color:var(--amber);border-color:var(--amber)">飛び</button>':'')+
           '</div>'+
-          '<div style="display:grid;grid-template-columns:1fr 1.5fr 1fr;gap:5px;margin-top:5px">'+
+          '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:5px">'+
             '<button class="mjt-key" data-mt="key" data-v="◀" style="padding:12px 0;color:var(--teal);font-size:22px">◀</button>'+
-            '<button class="mjt-key done" data-mt="keydone" style="padding:12px 0;font-size:17px">完了</button>'+
             '<button class="mjt-key" data-mt="key" data-v="▶" style="padding:12px 0;color:var(--teal);font-size:22px">▶</button>'+
           '</div>'+
           '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:5px;margin-top:6px">'+
@@ -1716,14 +1716,19 @@ function bindMjTable(){
       else if(a==="addrow"){ t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="rowdel"){ t.rows.splice(num(el.dataset.v),1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="rowdelcur"){ const c=UI.mjtCell; if(c&&c.k==="s"&&confirm((c.r+1)+"回戦を削除しますか?(この行の全員のスコアが消えます)")){ t.rows.splice(c.r,1); if(t.locked) t.locked.splice(c.r,1); if(!t.rows.length){ t.rows.push(new Array(t.players.length).fill("")); if(t.locked) t.locked.push(false); } UI.mjtCell=null; saveMjt(false); renderKeepScroll(); } }
-      else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; renderKeepScroll();
-        const pw=document.querySelector(".mjt-pad-wrap"); if(pw) pw.scrollIntoView({block:"nearest",behavior:"smooth"}); }
+      else if(a==="cell"){
+        const r=num(el.dataset.r), c=num(el.dataset.c), cur=UI.mjtCell;
+        if(cur && cur.k==="s" && cur.r===r && cur.c===c){ UI.mjtCell=null; renderKeepScroll(); return; }  /* 同じセル再タップで閉じる */
+        UI.mjtCell={k:"s",r:r,c:c}; renderKeepScroll();
+        const pw=document.querySelector(".mjt-pad-wrap"); if(pw) pw.scrollIntoView({block:"nearest",behavior:"smooth"});
+      }
       else if(a==="toPlay"){ UI.mjtCell=null; UI.screen="mjplay"; render(); }
       else if(a==="toTable"){ UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="tosheet"){ UI.sheetMode="full"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
       else if(a==="tomid"){ UI.sheetMode="mid"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
-      else if(a==="rpay"){ t.roundPay=num(el.dataset.v)||0; saveMjt(false); renderKeepScroll(); }
+      else if(a==="rpay"){ const cur=(t.roundPay===true?100:(num(t.roundPay)||0)); const v=num(el.dataset.v)||0; t.roundPay=(cur===v?0:v); saveMjt(false); renderKeepScroll(); }
       else if(a==="feesplit"){
+        const P=t.players;                      /* 同上 */
         const totalIn=num(t.feeTotal)||0;
         const psum=P.reduce((s2,p,ci)=>s2+(num((t.pexp||[])[ci])||0),0);
         const rem=totalIn-psum;
@@ -1753,6 +1758,7 @@ function bindMjTable(){
       }
       else if(a==="midshare"){ mjtShareMid(); }
       else if(a==="lockrow"||a==="lockrowlast"){
+        const P=t.players;                      /* bindMjTableのスコープにPは無い(v2.82で修正) */
         const isLast = a==="lockrowlast";
         const cell=UI.mjtCell; if(!cell||cell.k!=="s") return;
         const ri=cell.r;
