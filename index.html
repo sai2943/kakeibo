@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.90 (localStorage保存・完全オフライン)
+   Tally 2.91 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -602,7 +602,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.90";
+const APP_VERSION = "2.91";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1114,7 +1114,8 @@ function mjtMidImage(t, full){
   /* 高さの見積り */
   const rowH=52, histH=46, chartH=cd?340:0;
   const sumRows = 4 + (full? 2 + (anyFee?1:0) + (anyPexp?1:0) + (anyAdj?1:0) + ((anyFee||anyPexp)?1:0) : 0);
-  const H = PAD + 46 + 22 + 10                 /* タイトル+サブ */
+  const PADT = 110;  /* iPhone写真アプリのフルスクリーン表示でDynamic Islandに隠れない上部安全余白 */
+  const H = PAD + PADT + 46 + 22 + 10          /* 安全余白+タイトル+サブ */
     + (rowH*sumRows) + (full&&notes.length? notes.length*20+6 : 0) + 14
     + (!full && lastIdx>=0 ? rowH*2 + 14 : 0)  /* 直近(途中経過のみ) */
     + (chartH? chartH+14 : 0)
@@ -1124,7 +1125,7 @@ function mjtMidImage(t, full){
   const ctx=cv.getContext("2d"); ctx.scale(SCALE,SCALE);
   ctx.fillStyle="#fff"; ctx.fillRect(0,0,W,H);
   ctx.textBaseline="middle";
-  let y=PAD;
+  let y=PAD+PADT;
   /* タイトル */
   ctx.fillStyle="#000"; ctx.textAlign="left"; ctx.font="bold 32px "+F;
   ctx.fillText(full?"麻雀スコア表":"途中経過", PAD, y+17); y+=44;
@@ -1540,11 +1541,11 @@ function viewMjTable(){
   const feeSum=P.reduce((a,p,ci)=>a+(num((t.fees||[])[ci])||0),0);
   const diff=feeSum-feeTotal;
   const pexpSum=P.reduce((a,p,ci)=>a+(num((t.pexp||[])[ci])||0),0);
-  h += '<div class="card" style="margin-bottom:8px"><div class="row" style="gap:8px;align-items:flex-end">'+
-    '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">店からの総額</div>'+
-    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="例:11400" value="'+esc(t.feeTotal||"")+'" data-mt="ftotal"></div>'+
-    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:9px;margin-bottom:2px">1人あたり目安(経費除き)</div>'+
-    '<div class="mono" style="font-size:16px;font-weight:700;height:41px;display:flex;align-items:center;justify-content:center">'+(feeTotal>0?"¥"+Math.ceil(Math.max(0,feeTotal-pexpSum)/np).toLocaleString("ja-JP"):"–")+'</div></div></div>'+
+  h += '<div class="card" style="margin-bottom:8px"><div class="row" style="gap:8px;align-items:flex-start">'+
+    '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:3px;height:13px;line-height:13px">店からの総額</div>'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="例:11400" value="'+esc(t.feeTotal||"")+'" data-mt="ftotal" style="height:40px;box-sizing:border-box"></div>'+
+    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:9px;margin-bottom:3px;height:13px;line-height:13px">1人あたり目安(経費除き)</div>'+
+    '<div class="mono" style="font-size:16px;font-weight:700;height:40px;display:flex;align-items:center;justify-content:center">'+(feeTotal>0?"¥"+Math.ceil(Math.max(0,feeTotal-pexpSum)/np).toLocaleString("ja-JP"):"–")+'</div></div></div>'+
     '<button class="btn full" data-mt="feesplit" style="margin-top:8px;font-size:12px;padding:8px 0">(総額−経費)の均等割を場代へ入力</button>'+
     '<div style="height:1px;background:var(--line);margin:10px 0 8px"></div>'+
     '<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:12px">場代の入力合計</span><span class="mono" style="font-size:14px">¥'+feeSum.toLocaleString("ja-JP")+'</span></div>'+
