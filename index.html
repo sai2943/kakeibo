@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.95 (localStorage保存・完全オフライン)
+   Tally 2.96 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -607,7 +607,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.95";
+const APP_VERSION = "2.96";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1470,8 +1470,23 @@ function viewMjTable(){
     '</div></div>';
   h += '</div>';
 
-  /* ルール詳細(飛びボタン用) */
-  h += '<div class="card" style="margin-bottom:10px"><div class="muted" style="font-size:10px;margin-bottom:8px">ルール設定</div>'+
+  /* ルール詳細(飛びボタン用)——折りたたみ式。進行中(スコアあり or メンバー確定)なら既定で畳む */
+  const anyScoreYet = (t.rows||[]).some((r,ri)=>P.some((p2,ci)=>mjtScore(t,ri,ci)!==null));
+  if(UI.rulesOpen==null) UI.rulesOpen = !(anyScoreYet || t.playersLocked);
+  const rpU = t.roundPay===true?100:(num(t.roundPay)||0);
+  const ruleSum = (t.rule==="3"?"3麻":"4麻")
+    + " ・ " + (t.mochi||"?") + "/" + (t.kaeshi||"?")
+    + " ・ 1点¥" + (num(t.scoreRate)||0)
+    + (num(t.chipRate)>0 ? " ・ チップ¥"+num(t.chipRate) : "")
+    + (rpU>0 ? " ・ 精算"+rpU+"円" : "");
+  h += '<div class="card" data-mt="rulestoggle" style="margin-bottom:10px;padding:11px 12px">'+
+    '<div class="row" style="gap:8px;align-items:center">'+
+    '<span style="font-size:12px;font-weight:700;flex:none">'+(UI.rulesOpen?"▾":"▸")+' ルール設定</span>'+
+    (UI.rulesOpen?'<span class="muted" style="flex:1;font-size:9px;text-align:right">タップでたたむ</span>'
+                 :'<span class="muted ellip" style="flex:1;font-size:10px;text-align:right;min-width:0">'+esc(ruleSum)+'</span>')+
+    '</div></div>';
+  if(UI.rulesOpen){
+  h += '<div class="card" style="margin-bottom:10px">'+
     '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px">'+
     [["3","3麻"],["4","4麻"]].map(([v,l])=>'<button class="btn '+(t.rule===v?"sel":"")+'" style="flex:1;font-size:12px;padding:7px 0" data-mt="rule" data-v="'+v+'">'+l+'</button>').join("")+
     '<span class="muted" style="font-size:11px;white-space:nowrap">'+mjtSeats(t)+'人打ち</span></div>'+
@@ -1501,6 +1516,7 @@ function viewMjTable(){
     [50,100,500,1000].map(u=>'<button class="btn '+((t.roundPay===true?100:(num(t.roundPay)||0))===u?"sel":"")+'" style="flex:1;font-size:12px;padding:8px 0" data-mt="rpay" data-v="'+u+'">'+u+'円</button>').join("")+'</div>'+
     '<div class="muted" style="font-size:9px;margin-top:6px">未選択＝端数切捨なし・選択中を再タップで解除</div>'+
     '</div>';
+  }
 
   /* 集計(常時表示・sticky) — 見るだけ、操作は最下部に集約 */
   /* 成績表は撤去(v2.70): 途中経過は途中経過シート、最終結果は清算シートが担当 */
@@ -1758,7 +1774,7 @@ function bindMjTable(){
       if(a==="editpresets"){ UI.mjtEditPresets = !UI.mjtEditPresets; render(); return; }
       if(a==="applypreset"){ mjtApplyPreset(el.dataset.v); return; }
       if(a==="delpreset"){ mjtDelPreset(el.dataset.v); return; }
-      if(a==="back"){ saveMjt(true); UI.screen="mjtlist"; UI.mjt=null; UI.mjtCell=null; render(); }
+      if(a==="back"){ saveMjt(true); UI.screen="mjtlist"; UI.mjt=null; UI.mjtCell=null; UI.rulesOpen=null; render(); }
       else if(a==="pdf"){ mjtPrint(); }
       else if(a==="del"){ if(confirm("このスコア表を削除しますか?")){ S.mjTables=(S.mjTables||[]).filter(x=>String(x.id)!==String(t.id)); save(); UI.screen="mjtlist"; UI.mjt=null; UI.mjtCell=null; render(); } }
       else if(a==="rule"){ const nv=el.dataset.v; if(nv!==t.rule && confirm((nv==="3"?"3麻":"4麻")+"に変更しますか?\nウマ・着順計算が"+(nv==="3"?"3人":"4人")+"用に変わります(スコアのデータは消えません)。")){ t.rule=nv; const seats=num(t.rule)||3; while(t.players.length<seats){ t.players.push(String.fromCharCode(65+t.players.length)); t.rows.forEach(r=>r.push("")); t.chipStart.push(""); t.chipEnd.push(""); (t.fees=t.fees||[]).push(""); } UI.mjtCell=null; saveMjt(false); render(); } }
@@ -1816,6 +1832,7 @@ function bindMjTable(){
         saveMjt(false); renderKeepScroll();
       }
       else if(a==="pdelmode"){ UI.pdelMode=!UI.pdelMode; renderKeepScroll(); }
+      else if(a==="rulestoggle"){ UI.rulesOpen=!UI.rulesOpen; renderKeepScroll(); }
       else if(a==="plock"){
         if(!t.playersLocked){ if(confirm("メンバーを確定しますか?(確定後はプレイヤーを削除できません。追加は可能)")){ t.playersLocked=true; saveMjt(false); renderKeepScroll(); } }
         else if(confirm("メンバー確定を解除しますか?")){ t.playersLocked=false; saveMjt(false); renderKeepScroll(); }
