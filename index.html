@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.87 (localStorage保存・完全オフライン)
+   Tally 2.88 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -602,7 +602,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.87";
+const APP_VERSION = "2.88";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1103,12 +1103,12 @@ function mjtMidImage(t){
   const P=t.players, seats=mjtSeats(t), rows=(t.rows||[]);
   const calcs=P.map((p,ci)=>mjtCalc(t,ci));
   const W=720, PAD=24, np=P.length;
-  const lblW=104, colW=(W-PAD*2-lblW)/np;
+  const lblW=112, colW=(W-PAD*2-lblW)/np;
   const F='-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif';
   let lastIdx=-1; rows.forEach((r,ri)=>{ if(P.some((p,ci)=>mjtScore(t,ri,ci)!==null)) lastIdx=ri; });
   const cd=mjtChartData(t);
   /* 高さの見積り */
-  const rowH=48, histH=42, chartH=cd?340:0;
+  const rowH=52, histH=46, chartH=cd?340:0;
   const H = PAD + 40 + 22 + 10                 /* タイトル+サブ */
     + (rowH*4) + 14                            /* 集計(ヘッダ+3行) */
     + (lastIdx>=0 ? rowH*2 + 14 : 0)           /* 直近 */
@@ -1121,7 +1121,7 @@ function mjtMidImage(t){
   ctx.textBaseline="middle";
   let y=PAD;
   /* タイトル */
-  ctx.fillStyle="#000"; ctx.textAlign="left"; ctx.font="bold 30px "+F;
+  ctx.fillStyle="#000"; ctx.textAlign="left"; ctx.font="bold 32px "+F;
   ctx.fillText("途中経過", PAD, y+17); y+=44;
   ctx.fillStyle="#444"; ctx.font="15px "+F;
   ctx.fillText((t.date||"")+(t.ruleName?" ・ "+t.ruleName:"")+" ・ "+seats+"人打ち", PAD, y+6); y+=28;
@@ -1131,32 +1131,32 @@ function mjtMidImage(t){
     ctx.fillStyle=opt.bg||"#fff"; ctx.fillRect(x,yy,w,h);
     ctx.strokeStyle="#777"; ctx.lineWidth=1; ctx.strokeRect(x+0.5,yy+0.5,w,h);
     ctx.fillStyle=opt.color||"#000";
-    ctx.font=(opt.bold?"bold ":"")+(opt.size||18)+"px "+F;
+    ctx.font=(opt.bold?"bold ":"")+(opt.size||20)+"px "+F;
     ctx.textAlign="center";
     ctx.fillText(String(text), x+w/2, yy+h/2+1);
   }
   const hdrBg="#dfe9e7", lblBg="#eee", zebra="#F2F6F5", latestBg="#FBF3DC", red="#c00", gray="#999";
   function nameRow(yy,label){
-    cell(PAD,yy,lblW,rowH,label||"",{bg:hdrBg,bold:true,size:19});
-    P.forEach((p,ci)=>cell(PAD+lblW+colW*ci,yy,colW,rowH,p||("P"+(ci+1)),{bg:hdrBg,bold:true,size:19}));
+    cell(PAD,yy,lblW,rowH,label||"",{bg:hdrBg,bold:true,size:22});
+    P.forEach((p,ci)=>cell(PAD+lblW+colW*ci,yy,colW,rowH,p||("P"+(ci+1)),{bg:hdrBg,bold:true,size:22}));
   }
   /* 集計 */
   nameRow(y,""); y+=rowH;
-  cell(PAD,y,lblW,rowH,"平均着順",{bg:lblBg,bold:true,size:17});
-  P.forEach((p,ci)=>{ const av=mjtAvgRank(t,ci); cell(PAD+lblW+colW*ci,y,colW,rowH,av===null?"–":av.toFixed(2),{size:20}); }); y+=rowH;
-  cell(PAD,y,lblW,rowH,"着順内訳",{bg:lblBg,bold:true,size:17});
-  P.forEach((p,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,mjtRankCounts(t,ci).slice(0,seats).join("·"),{size:17})); y+=rowH;
-  cell(PAD,y,lblW,rowH,"合計",{bg:lblBg,bold:true,size:17});
-  calcs.forEach((c,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,fmtPt(c.sum),{bold:true,size:24,color:c.sum<0?red:"#000"})); y+=rowH+14;
+  cell(PAD,y,lblW,rowH,"平均着順",{bg:lblBg,bold:true,size:20});
+  P.forEach((p,ci)=>{ const av=mjtAvgRank(t,ci); cell(PAD+lblW+colW*ci,y,colW,rowH,av===null?"–":av.toFixed(2),{size:24}); }); y+=rowH;
+  cell(PAD,y,lblW,rowH,"着順内訳",{bg:lblBg,bold:true,size:20});
+  P.forEach((p,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,mjtRankCounts(t,ci).slice(0,seats).join("·"),{size:20})); y+=rowH;
+  cell(PAD,y,lblW,rowH,"合計",{bg:lblBg,bold:true,size:20});
+  calcs.forEach((c,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,fmtPt(c.sum),{bold:true,size:28,color:c.sum<0?red:"#000"})); y+=rowH+14;
   /* 直近 */
   if(lastIdx>=0){
     nameRow(y,"直近"); y+=rowH;
-    cell(PAD,y,lblW,rowH,(lastIdx+1)+"回戦",{bg:latestBg,bold:true,size:17});
+    cell(PAD,y,lblW,rowH,(lastIdx+1)+"回戦",{bg:latestBg,bold:true,size:20});
     P.forEach((p,ci)=>{
       let tx="",col="#000";
       if(mjtAbsent(t,lastIdx,ci)){ tx="–"; col=gray; }
       else{ const sc=mjtScore(t,lastIdx,ci); if(sc===null){tx="";} else { tx=fmtPt(sc); col=sc<0?red:"#000"; } }
-      cell(PAD+lblW+colW*ci,y,colW,rowH,tx,{bg:latestBg,color:col,bold:true,size:22});
+      cell(PAD+lblW+colW*ci,y,colW,rowH,tx,{bg:latestBg,color:col,bold:true,size:26});
     }); y+=rowH+14;
   }
   /* グラフ */
@@ -1191,16 +1191,16 @@ function mjtMidImage(t){
     y+=gh+14;
   }
   /* 履歴 */
-  cell(PAD,y,lblW,histH,"回",{bg:hdrBg,bold:true,size:18});
-  P.forEach((p,ci)=>cell(PAD+lblW+colW*ci,y,colW,histH,p||("P"+(ci+1)),{bg:hdrBg,bold:true,size:18})); y+=histH;
+  cell(PAD,y,lblW,histH,"回",{bg:hdrBg,bold:true,size:21});
+  P.forEach((p,ci)=>cell(PAD+lblW+colW*ci,y,colW,histH,p||("P"+(ci+1)),{bg:hdrBg,bold:true,size:21})); y+=histH;
   rows.forEach((r,ri)=>{
     const bg = ri===lastIdx? latestBg : (ri%2===1? zebra : "#fff");
-    cell(PAD,y,lblW,histH,(ri+1)+"回戦",{bg:(ri===lastIdx?latestBg:lblBg),bold:true,size:17});
+    cell(PAD,y,lblW,histH,(ri+1)+"回戦",{bg:(ri===lastIdx?latestBg:lblBg),bold:true,size:19});
     P.forEach((p,ci)=>{
       let tx="",col="#000";
       if(mjtAbsent(t,ri,ci)){ tx="–"; col=gray; }
       else{ const sc=mjtScore(t,ri,ci); if(sc!==null){ tx=fmtPt(sc); col=sc<0?red:"#000"; } }
-      cell(PAD+lblW+colW*ci,y,colW,histH,tx,{bg:bg,color:col,size:21});
+      cell(PAD+lblW+colW*ci,y,colW,histH,tx,{bg:bg,color:col,size:24});
     });
     y+=histH;
   });
