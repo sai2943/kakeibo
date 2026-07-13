@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.88 (localStorage保存・完全オフライン)
+   Tally 2.89 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -602,7 +602,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.88";
+const APP_VERSION = "2.89";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1460,7 +1460,7 @@ function viewMjTable(){
     '<div class="muted" style="font-size:9px;margin-bottom:6px">トップ以外を切捨・端数はトップが調整</div>'+
     '<div class="row" style="gap:5px">'+
     [50,100,500,1000].map(u=>'<button class="btn '+((t.roundPay===true?100:(num(t.roundPay)||0))===u?"sel":"")+'" style="flex:1;font-size:12px;padding:8px 0" data-mt="rpay" data-v="'+u+'">'+u+'円</button>').join("")+'</div>'+
-    '<div class="muted" style="font-size:9px;margin-top:6px">未選択=1円単位(丸めなし)・選択中を再タップで解除</div>'+
+    '<div class="muted" style="font-size:9px;margin-top:6px">未選択＝端数切捨なし・選択中を再タップで解除</div>'+
     '</div>';
 
   /* 集計(常時表示・sticky) — 見るだけ、操作は最下部に集約 */
@@ -1491,14 +1491,17 @@ function viewMjTable(){
       return '<div class="row" style="gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line)'+(clk?';opacity:.75':'')+'">'+
         '<div class="row" style="flex:1;gap:6px;align-items:center;min-width:0">'+
         '<input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+ci+'" placeholder="名前" style="flex:1;min-width:0">'+
-        (!t.playersLocked && P.length>mjtSeats(t)?'<span class="mjt-pdel" data-mt="pdel" data-v="'+ci+'" style="flex:none;font-size:15px;padding:2px 8px">×</span>':'')+'</div>'+
+        '</div>'+
         '<div class="mono" '+(clk?'':'data-mt="cs" data-c="'+ci+'" ')+'style="'+chipBox+(selS?chipSel:"")+(negS?"color:var(--red);":"")+'">'+(xs===""?'<span class="mjt-ph">·</span>':esc(String(xs)))+'</div>'+
         '<div class="mono" '+(clk?'':'data-mt="ce" data-c="'+ci+'" ')+'style="'+chipBox+(selE?chipSel:"")+'">'+endInner+'</div>'+
         '<div class="mono" style="width:50px;text-align:center;flex:none;font-size:14px;color:'+(net<0?"var(--red)":net>0?"var(--teal)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</div>'+
-        '<span data-mt="clock" data-c="'+ci+'" style="width:26px;flex:none;text-align:center;font-size:15px">'+(clk?"🔒":"🔓")+'</span></div>';
+        (UI.pdelMode && !t.playersLocked && P.length>mjtSeats(t)
+          ? '<span data-mt="pdel" data-v="'+ci+'" style="width:44px;height:36px;flex:none;display:flex;align-items:center;justify-content:center;border:1px solid var(--red);border-radius:9px;color:var(--red);font-size:12px">削除</span>'
+          : '<span data-mt="clock" data-c="'+ci+'" style="width:26px;flex:none;text-align:center;font-size:15px">'+(clk?"🔒":"🔓")+'</span>')+'</div>';
     }).join("")+'</div>';
   h += '<div class="row" style="gap:6px;margin-bottom:8px">'+
     (P.length<6?'<button class="btn dash" data-mt="addp" style="flex:1;padding:8px 0;font-size:12px">＋ プレイヤーを追加</button>':'<div style="flex:1"></div>')+
+    (!t.playersLocked && P.length>mjtSeats(t)?'<button class="btn '+(UI.pdelMode?"sel":"")+'" data-mt="pdelmode" style="flex:none;font-size:11px;padding:8px 12px;color:var(--red);border-color:var(--red)">'+(UI.pdelMode?"削除中…":"削除")+'</button>':'')+
     '<button class="btn '+(t.playersLocked?"sel":"")+'" data-mt="plock" style="flex:none;font-size:11px;padding:8px 14px">'+(t.playersLocked?"🔒 メンバー確定済":"メンバー確定")+'</button></div>';
   h += '<button class="btn tealb full" style="padding:13px 0;font-size:15px;font-weight:700;margin-bottom:14px" data-mt="toPlay">▶ 対局モード(スコアの入力・閲覧)</button>';
 
@@ -1727,6 +1730,7 @@ function bindMjTable(){
           (t.pexp||[]).splice(i,1); (t.chipLocked||[]).splice(i,1); (t.feeRelief||[]).splice(i,1);
           /* 免除の負担者indexを詰める(削除者を指していたら未選択に) */
           (t.feeRelief||[]).forEach(r=>{ if(r&&r.by!=null){ if(r.by===i) r.by=null; else if(r.by>i) r.by--; } });
+          UI.pdelMode=false;
           if(t.meIdx===i) t.meIdx=null; else if(t.meIdx>i) t.meIdx--;
           UI.mjtCell=null; saveMjt(false); render();
         }
@@ -1769,6 +1773,7 @@ function bindMjTable(){
         else t.feeRelief[ci]=null;
         saveMjt(false); renderKeepScroll();
       }
+      else if(a==="pdelmode"){ UI.pdelMode=!UI.pdelMode; renderKeepScroll(); }
       else if(a==="plock"){
         if(!t.playersLocked){ if(confirm("メンバーを確定しますか?(確定後はプレイヤーを削除できません。追加は可能)")){ t.playersLocked=true; saveMjt(false); renderKeepScroll(); } }
         else if(confirm("メンバー確定を解除しますか?")){ t.playersLocked=false; saveMjt(false); renderKeepScroll(); }
