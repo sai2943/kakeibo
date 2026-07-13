@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.78 (localStorage保存・完全オフライン)
+   Tally 2.80 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -377,6 +377,8 @@ function applyData(d){
     if(n.meIdx===undefined) n.meIdx = null;
     if(n.startAt==null) n.startAt = "";
     if(n.endAt==null) n.endAt = "";
+    if(!Array.isArray(n.locked)) n.locked = [];
+    if(!Array.isArray(n.feeRelief)) n.feeRelief = [];
     ["mochi","kaeshi","uma1","uma2","uma3","uma4"].forEach(k=>{ if(n[k]==null) n[k]=""; });
     if(n.feeTotal==null) n.feeTotal="";
     if(n.hakoshita==null) n.hakoshita=false;
@@ -595,7 +597,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.78";
+const APP_VERSION = "2.80";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1223,28 +1225,39 @@ async function mjtShareMid(){
    免除合計は受取の大きい順にゼロを割らない範囲で波及控除(帳尻Σ支払=−場代合計は常に一致) */
 function mjtSettle(t){
   const P=t.players, calcs=P.map((p,ci)=>mjtCalc(t,ci));
-  const fees=calcs.map(c=>c.fee);
-  const total=fees.reduce((a,b)=>a+b,0);
+  const rawFees=calcs.map(c=>c.fee);
+  const total=rawFees.reduce((a,b)=>a+b,0);
+  const unit = t.roundPay===true ? 100 : (num(t.roundPay)||0);
+  /* ①場代の移転(免除/端数免除→負担者へ)。端数の単位は精算単位、単位なし時は100円 */
+  const fu = unit>0 ? unit : 100;
+  let fees=rawFees.slice(); const feeNotes=[];
+  (t.feeRelief||[]).forEach((r,ci)=>{
+    if(!r || !r.m || ci>=P.length) return;
+    if(r.by==null || r.by===ci || r.by>=P.length){ if(rawFees[ci]>0) feeNotes.push((P[ci]||("P"+(ci+1)))+"の免除は負担者未選択のため未適用"); return; }
+    const relief = r.m==="full" ? rawFees[ci] : (rawFees[ci] - Math.floor(rawFees[ci]/fu)*fu);
+    if(relief<=0) return;
+    fees[ci]-=relief; fees[r.by]+=relief;
+    feeNotes.push((P[ci]||("P"+(ci+1)))+"の場代"+(r.m==="full"?"全額":"端数")+"¥"+relief.toLocaleString("ja-JP")+"を"+(P[r.by]||("P"+(r.by+1)))+"が負担");
+  });
+  /* ②支払算出 */
   const raw=calcs.map((c,ci)=>c.shushi - fees[ci]);
   let pays=raw.slice(), payNote="";
-  const unit = t.roundPay===true ? 100 : (num(t.roundPay)||0);  /* 旧bool互換 */
+  /* ③精算単位の丸め: トップ以外は全員切捨、端数はトップが引受 */
   if(unit>0){
-    /* トップ(最大受取)を特定。受取側が居なければ適用しない */
     let ti=-1,best=0; raw.forEach((p,ci)=>{ if(p>best){best=p;ti=ci;} });
     if(ti<0){
-      payNote="端数処理: 受取側がいないため適用なし";
+      payNote="精算単位: 受取側がいないため適用なし";
     } else {
-      /* トップ以外は全員(負けも2位以下の浮きも)単位切捨。端数の帳尻はトップが引受 */
       pays=raw.map((p,ci)=>{
-        if(ci===ti) return 0; /* 後で帳尻 */
+        if(ci===ti) return 0;
         return p<0 ? -Math.floor((-p)/unit)*unit : Math.floor(p/unit)*unit;
       });
       pays[ti] = -total - pays.reduce((a,b,ci)=>ci===ti?a:a+b,0);
-      payNote="端数処理: 負け・2位以下の受取を"+unit+"円未満切捨(端数はトップが調整)";
+      payNote="精算単位"+unit+"円(トップ以外を切捨・端数はトップが調整)";
     }
   }
   const adjs=pays.map((p,ci)=>p-raw[ci]);
-  return {fees:fees, pays:pays, adjs:adjs, payNote:payNote};
+  return {fees:fees, pays:pays, adjs:adjs, payNote:payNote, feeNotes:feeNotes};
 }
 const MJT_COLS=["#2E6DA4","#C0392B","#0E8C7A","#A9780E","#7B5EA7","#5D7472"];
 function mjtChartData(t){
@@ -1326,7 +1339,7 @@ function mjtPrintHtml(t, mode){
     sum+='<tr class="pr-final"><td class="pr-lbl">支払</td>'+st.pays.map(p=>'<td class="'+(p<0?"pr-neg":"")+'">'+money(p)+'</td>').join("")+'</tr>';
   }
   sum+='</tbody></table>';
-  const notes=[st.payNote].filter(Boolean);
+  const notes=(st.feeNotes||[]).concat([st.payNote]).filter(Boolean);
   if(anyFee && notes.length) sum+='<div class="pr-foot" style="margin:-4px 0 10px">'+notes.map(esc).join(" ／ ")+'</div>';
   const foot='<div class="pr-foot">スコア1点=¥'+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ Tally</div>";
 
@@ -1352,7 +1365,7 @@ function mjtPrint(){
   setTimeout(()=>{ window.print(); }, 60);
 }
 function newMjTable(){
-  return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"], startAt:"", endAt:"",
+  return { id:uid(), date:todayStr(), rule:"3", ruleName:"", meIdx:null, players:["A","B","C"], startAt:"", endAt:"", locked:[], feeRelief:[],
     rows:[["","",""]], chipStart:["","",""], chipEnd:["","",""],
     scoreRate:"100", chipRate:"0", fees:["","",""], feeTotal:"",
     mochi:"", kaeshi:"", uma1:"", uma2:"", uma3:"", uma4:"", hakoshita:false };
@@ -1484,15 +1497,22 @@ function viewMjTable(){
     '<div style="flex:1;text-align:center"><div class="muted" style="font-size:9px">1人あたり目安</div>'+
     '<div class="mono" style="font-size:16px;font-weight:700">'+(feeTotal>0?"¥"+Math.ceil(feeTotal/np).toLocaleString("ja-JP"):"–")+'</div></div></div></div>';
   h += '<div class="card" style="margin-bottom:8px;padding:6px 12px">'+
-    P.map((p,ci)=>'<div class="row" style="gap:8px;align-items:center;padding:5px 0'+(ci?';border-top:1px solid var(--line)':'')+'">'+
-      '<span class="ellip" style="flex:1;font-size:13px">'+esc(p||("P"+(ci+1)))+'</span>'+
-      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc((t.fees||[])[ci]||"")+'" data-mt="fee" data-c="'+ci+'" style="width:110px"></div>').join("")+'</div>';
+    P.map((p,ci)=>{
+      const r=(t.feeRelief||[])[ci];
+      const mLbl = !r||!r.m ? "免除なし" : (r.m==="frac"?"端数免除":"全額免除");
+      const mCol = !r||!r.m ? "var(--muted)" : "var(--amber)";
+      return '<div class="row" style="gap:6px;align-items:center;padding:5px 0'+(ci?';border-top:1px solid var(--line)':'')+'">'+
+        '<span class="ellip" style="flex:1;font-size:13px;min-width:0">'+esc(p||("P"+(ci+1)))+'</span>'+
+        '<button class="btn" data-mt="frelief" data-c="'+ci+'" style="flex:none;font-size:10px;padding:5px 8px;color:'+mCol+';border-color:'+mCol+'">'+mLbl+'</button>'+
+        (r&&r.m?'<button class="btn" data-mt="fby" data-c="'+ci+'" style="flex:none;font-size:10px;padding:5px 8px;color:var(--teal);border-color:var(--teal)">負担:'+(r.by!=null&&r.by!==ci&&r.by<P.length?esc(P[r.by]||("P"+(r.by+1))):"未選択")+'</button>':'')+
+        '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc((t.fees||[])[ci]||"")+'" data-mt="fee" data-c="'+ci+'" style="width:92px;flex:none"></div>';
+    }).join("")+'</div>';
   /* 端数処理 */
   const rpUnit = t.roundPay===true ? 100 : (num(t.roundPay)||0);
   h += '<div class="card" style="margin-bottom:8px;padding:10px 12px">'+
-    '<div class="muted" style="font-size:10px;margin-bottom:6px">端数処理: トップ以外の支払・受取を切捨(端数はトップが調整) — 精算シートに反映</div>'+
+    '<div class="muted" style="font-size:10px;margin-bottom:6px">精算単位 — 何円単位で精算するか(トップ以外を切捨・端数はトップが調整)</div>'+
     '<div class="row" style="gap:5px">'+
-    [[0,"なし"],[100,"100円"],[500,"500円"],[1000,"1000円"]].map(o=>'<button class="btn '+(rpUnit===o[0]?"sel":"")+'" style="flex:1;font-size:12px;padding:8px 0" data-mt="rpay" data-v="'+o[0]+'">'+o[1]+'</button>').join("")+'</div></div>';
+    [[0,"1円"],[100,"100円"],[500,"500円"],[1000,"1000円"]].map(o=>'<button class="btn '+(rpUnit===o[0]?"sel":"")+'" style="flex:1;font-size:12px;padding:8px 0" data-mt="rpay" data-v="'+o[0]+'">'+o[1]+'</button>').join("")+'</div></div>';
   if(feeTotal>0 || feeSum>0){
     const okc = diff===0 ? "var(--teal)" : "var(--red)";
     h += '<div class="card" style="margin-bottom:12px"><div class="row between" style="font-size:12px"><span class="muted">入力合計</span><span class="mono">¥'+feeSum.toLocaleString("ja-JP")+'</span></div>'+
@@ -1558,6 +1578,9 @@ function mjtKeypadHtml(t){
             '<button class="mjt-key done" data-mt="keydone" style="padding:12px 0;font-size:17px">完了</button>'+
             '<button class="mjt-key" data-mt="key" data-v="▶" style="padding:12px 0;color:var(--teal);font-size:22px">▶</button>'+
           '</div>'+
+          '<div style="display:grid;grid-template-columns:1.5fr 1fr;gap:5px;margin-top:6px">'+
+            '<button class="mjt-key done" data-mt="lockrow" style="padding:12px 0;font-size:14px;font-weight:700">この回戦を確定 → 次へ</button>'+
+            '<button class="mjt-key" data-mt="lockrowlast" style="padding:12px 0;font-size:13px;color:var(--amber);border-color:var(--amber)">ラス半で確定</button></div>'+
           '<button class="btn" data-mt="tomid" style="width:100%;margin-top:6px;padding:8px 0;font-size:12px;color:var(--teal);border-color:var(--teal)">途中経過を表示</button>'+
           '<button class="btn" data-mt="rowdelcur" style="width:100%;margin-top:6px;padding:6px 0;font-size:11px;color:var(--red);border-color:var(--red)">この回戦(行)を削除</button>'
         : '')+
@@ -1595,9 +1618,13 @@ function viewMjPlay(){
         '<div class="muted" style="font-size:10px;margin-top:1px">'+rc.join("·")+'</div></th>';
     }).join("")+'</tr></thead><tbody>';
   rows.forEach((r,ri)=>{
-    h += '<tr><td style="text-align:center;color:var(--muted);font-size:12px;border-bottom:1px solid var(--line)">'+(ri+1)+'</td>'+
+    const lk = !!((t.locked||[])[ri]);
+    h += '<tr>'+
+      (lk
+        ? '<td data-mt="unlock" data-r="'+ri+'" style="text-align:center;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line)">🔒<div style="font-size:9px;line-height:1.1;margin-top:1px">'+(ri+1)+'</div></td>'
+        : '<td style="text-align:center;color:var(--muted);font-size:12px;border-bottom:1px solid var(--line)">'+(ri+1)+'</td>')+
       P.map((p,ci)=>{
-        const sel = UI.mjtCell && UI.mjtCell.k==="s" && UI.mjtCell.r===ri && UI.mjtCell.c===ci;
+        const sel = !lk && UI.mjtCell && UI.mjtCell.k==="s" && UI.mjtCell.r===ri && UI.mjtCell.c===ci;
         let d, col;
         if(mjtAbsent(t,ri,ci)){ d="抜"; col="var(--muted)"; }
         else { const raw=mjtRawScore(t,ri,ci);
@@ -1605,7 +1632,7 @@ function viewMjPlay(){
           else if(mjtAutoIdx(t,ri)===ci){ const sc=mjtScore(t,ri,ci); d=(sc===null?"·":String(sc)); col=(sc!==null&&sc<0)?"var(--red)":"var(--text)"; }
           else { d="·"; col="var(--line)"; }
         }
-        return '<td data-mt="cell" data-r="'+ri+'" data-c="'+ci+'" style="text-align:center;padding:14px 2px;border-bottom:1px solid var(--line);font-size:19px;font-weight:700;color:'+col+';'+(sel?"background:rgba(242,179,61,.16);outline:2px solid var(--amber);border-radius:8px":"")+'">'+esc(d)+'</td>';
+        return '<td '+(lk?'':'data-mt="cell" data-r="'+ri+'" data-c="'+ci+'" ')+'style="text-align:center;padding:14px 2px;border-bottom:1px solid var(--line);font-size:19px;font-weight:700;'+(lk?'opacity:.8;':'')+'color:'+col+';'+(sel?"background:rgba(242,179,61,.16);outline:2px solid var(--amber);border-radius:8px":"")+'">'+esc(d)+'</td>';
       }).join("")+'</tr>';
     /* 選択中の半荘の直下にキーパッドを展開 */
     if(UI.mjtCell && UI.mjtCell.k==="s" && UI.mjtCell.r===ri){
@@ -1673,7 +1700,7 @@ function bindMjTable(){
       else if(a==="tokakei"){ mjtToKakei(); }
       else if(a==="addrow"){ t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
       else if(a==="rowdel"){ t.rows.splice(num(el.dataset.v),1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); render(); }
-      else if(a==="rowdelcur"){ const c=UI.mjtCell; if(c&&c.k==="s"&&confirm((c.r+1)+"回戦を削除しますか?(この行の全員のスコアが消えます)")){ t.rows.splice(c.r,1); if(!t.rows.length) t.rows.push(new Array(t.players.length).fill("")); UI.mjtCell=null; saveMjt(false); renderKeepScroll(); } }
+      else if(a==="rowdelcur"){ const c=UI.mjtCell; if(c&&c.k==="s"&&confirm((c.r+1)+"回戦を削除しますか?(この行の全員のスコアが消えます)")){ t.rows.splice(c.r,1); if(t.locked) t.locked.splice(c.r,1); if(!t.rows.length){ t.rows.push(new Array(t.players.length).fill("")); if(t.locked) t.locked.push(false); } UI.mjtCell=null; saveMjt(false); renderKeepScroll(); } }
       else if(a==="cell"){ UI.mjtCell={k:"s",r:num(el.dataset.r),c:num(el.dataset.c)}; renderKeepScroll();
         const pw=document.querySelector(".mjt-pad-wrap"); if(pw) pw.scrollIntoView({block:"nearest",behavior:"smooth"}); }
       else if(a==="toPlay"){ UI.mjtCell=null; UI.screen="mjplay"; render(); }
@@ -1681,7 +1708,44 @@ function bindMjTable(){
       else if(a==="tosheet"){ UI.sheetMode="full"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
       else if(a==="tomid"){ UI.sheetMode="mid"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
       else if(a==="rpay"){ t.roundPay=num(el.dataset.v)||0; saveMjt(false); renderKeepScroll(); }
+      else if(a==="frelief"){
+        const ci=num(el.dataset.c); t.feeRelief=t.feeRelief||[];
+        const cur=t.feeRelief[ci];
+        if(!cur||!cur.m) t.feeRelief[ci]={m:"frac",by:null};
+        else if(cur.m==="frac") t.feeRelief[ci]={m:"full",by:cur.by};
+        else t.feeRelief[ci]=null;
+        saveMjt(false); renderKeepScroll();
+      }
+      else if(a==="fby"){
+        const ci=num(el.dataset.c); t.feeRelief=t.feeRelief||[];
+        const cur=t.feeRelief[ci]; if(!cur||!cur.m) return;
+        let nx = cur.by==null ? 0 : cur.by+1;
+        while(nx<t.players.length && nx===ci) nx++;
+        cur.by = nx>=t.players.length ? null : nx;
+        saveMjt(false); renderKeepScroll();
+      }
       else if(a==="midshare"){ mjtShareMid(); }
+      else if(a==="lockrow"||a==="lockrowlast"){
+        const isLast = a==="lockrowlast";
+        const cell=UI.mjtCell; if(!cell||cell.k!=="s") return;
+        const ri=cell.r;
+        let ok=true;
+        for(let ci=0;ci<P.length;ci++){ if(!mjtAbsent(t,ri,ci) && mjtScore(t,ri,ci)===null){ ok=false; break; } }
+        if(!ok){ toast("未入力のセルがあります"); return; }
+        const summary=P.map((p,ci)=>(p||("P"+(ci+1)))+" "+(mjtAbsent(t,ri,ci)?"抜":fmtPt(mjtScore(t,ri,ci)))).join(" / ");
+        if(!confirm((ri+1)+"回戦を確定します\n"+summary+"\nよろしいですか?"+(isLast?"\n(ラス半: 次の回戦は作りません)":""))) return;
+        t.locked=t.locked||[]; t.locked[ri]=true;
+        UI.mjtCell=null;
+        if(!isLast && ri===t.rows.length-1){ t.rows.push(new Array(t.players.length).fill("")); t.locked.push(false); }
+        saveMjt(false); renderKeepScroll();
+        if(isLast) toast("ラス半を確定しました。精算は「‹ 設定・精算」から");
+      }
+      else if(a==="unlock"){
+        const ri=num(el.dataset.r);
+        if(confirm((ri+1)+"回戦のロックを解除して修正しますか?(修正後はもう一度確定してください)")){
+          t.locked=t.locked||[]; t.locked[ri]=false; saveMjt(false); renderKeepScroll();
+        }
+      }
       else if(a==="sheetback"){ UI.screen=UI.sheetFrom||"mjtable"; render(); }
       else if(a==="cs"){ UI.mjtCell={k:"cs",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="ce"){ UI.mjtCell={k:"ce",c:num(el.dataset.c)}; renderKeepScroll(); }
