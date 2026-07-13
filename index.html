@@ -169,11 +169,6 @@
   .pr-abs{ color:#999 !important; }
   .pr-hist tbody tr:nth-child(even):not(.pr-latest) td{ background:#F2F6F5 !important; }
   .pr-latest td{ background:#FBF3DC !important; }
-  #saveBadge{ position:fixed; left:10px; bottom:calc(env(safe-area-inset-bottom,0px) + 68px);
-    width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-    font-size:12px; font-weight:700; color:var(--muted); opacity:.32; z-index:40;
-    transition:opacity .35s, transform .35s, color .35s; }
-  #saveBadge.pulse{ opacity:1; transform:scale(1.35); color:var(--teal); }
   .pr-no, .pr-lbl{ white-space:nowrap; }
   /* ↓画面上の精算シート専用の調整(印刷は#print-area経由なので不変) */
   #app .pr-wrap{ padding:14px 8px; }
@@ -194,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.93 (localStorage保存・完全オフライン)
+   Tally 2.94 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -429,19 +424,8 @@ function saveLocal(){
   const d=new Date();
   LAST_LOCAL_SAVE = ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)+":"+("0"+d.getSeconds()).slice(-2);
   document.querySelectorAll(".savets").forEach(el=>{ el.textContent=LAST_LOCAL_SAVE; });
-  const _b=document.getElementById("saveBadge");
-  if(_b){ _b.classList.add("pulse"); clearTimeout(_saveBadgeTimer); _saveBadgeTimer=setTimeout(()=>_b.classList.remove("pulse"), 550); }
 }
 const saveIndicatorHtml = () => '<div class="muted" style="font-size:10px;text-align:center;margin:10px 0 2px">✓ この端末に自動保存済み <span class="savets mono">'+(LAST_LOCAL_SAVE||"—")+'</span>(通信不要・オフラインでも消えません)</div>';
-/* 保存パルス: 全画面左下に常駐する✓バッジ。保存のたびに一瞬光る=機構の生存証明 */
-let _saveBadgeTimer=null;
-function ensureSaveBadge(){
-  if(document.getElementById("saveBadge")) return;
-  const b=document.createElement("div");
-  b.id="saveBadge"; b.textContent="✓";
-  b.onclick=()=>toast("この端末に自動保存済み "+(LAST_LOCAL_SAVE||"—")+"(通信不要・オフラインでも消えません)");
-  document.body.appendChild(b);
-}
 /* ---------- 自動スナップショット(ローカル3世代) ----------
    起動時(日次)・復元前・同期上書き前に全データを退避。誤操作からの復旧用 */
 const SNAP_KEY = KEY + ":snaps";
@@ -623,10 +607,9 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.93";
+const APP_VERSION = "2.94";
 let _renderLoc = "";
 function render(){
-  ensureSaveBadge();
   _renderBody();
   /* タブ・画面・遊技サブタブが変わった時だけ先頭へ。同一画面の再描画は位置を保持 */
   const loc = UI.tab + "/" + UI.screen + "/" + (UI.gameSub||"");
@@ -640,7 +623,10 @@ function _renderBody(){
   const app = document.getElementById("app");
   const navbar = document.getElementById("navbar");
   if(navbar){
-    if(UI.screen==="main"){ navbar.innerHTML = tabBar(); navbar.style.display=""; }
+    if(UI.screen==="main"){
+      navbar.innerHTML = '<div class="muted" style="font-size:9px;text-align:center;padding:1px 0 4px">✓ 自動保存 <span class="savets mono">'+(LAST_LOCAL_SAVE||"—")+'</span> ・ 通信不要</div>' + tabBar();
+      navbar.style.display="";
+    }
     else { navbar.innerHTML = ""; navbar.style.display = "none"; }
   }
   if(UI.screen==="session"){ app.innerHTML = viewSession(); bindSession(); return; }
@@ -737,7 +723,6 @@ function viewMain(){
     h += (gsub==="mahjong") ? viewMahjong() : viewSlot();
   }
 
-  h += saveIndicatorHtml();
   h += '<div style="height:64px"></div>';
   h += '<button class="fab" data-a="add">＋</button>';
   return h;
@@ -1613,6 +1598,7 @@ function viewMjTable(){
 
   h += mjtKeypadHtml(t);
   h += '<div style="height:40px"></div>';
+  h += saveIndicatorHtml();
   return h;
 }
 
