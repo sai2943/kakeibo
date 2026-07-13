@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.71 (localStorage保存・完全オフライン)
+   Tally 2.72 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -595,7 +595,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.71";
+const APP_VERSION = "2.72";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1104,7 +1104,7 @@ function mjtChartSvg(t){
   const step=[1,2,2.5,5,10].map(c=>c*pw).find(c=>c>=raw)||raw;
   const ticks=[]; for(let v=Math.ceil(mn/step)*step; v<=mx+1e-9; v+=step) ticks.push(Math.round(v*100)/100);
   if(ticks.indexOf(0)<0) ticks.push(0);
-  let g='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;margin:4px 0 16px">';
+  let g='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block">';
   ticks.forEach(v=>{ const y=py(v);
     g+='<line x1="'+L+'" y1="'+y.toFixed(1)+'" x2="'+(W-R)+'" y2="'+y.toFixed(1)+'" stroke="'+(v===0?"#888":"#ececec")+'" stroke-width="'+(v===0?1.6:1)+'"/>'+
        '<text x="'+(L-4)+'" y="'+(y+3.5).toFixed(1)+'" text-anchor="end" font-size="10" fill="#666">'+v+'</text>'; });
@@ -1119,7 +1119,8 @@ function mjtChartSvg(t){
   lbl.forEach(o=>{ const y=Math.min(Math.max(o.y,T+4),H-B-2);
     g+='<text x="'+(W-R+5)+'" y="'+(y+3.5).toFixed(1)+'" font-size="10" font-weight="700" fill="'+cols[o.ci%cols.length]+'">'+esc(P[o.ci]||("P"+(o.ci+1)))+'</text>'; });
   g+='</svg>';
-  return '<div style="margin-top:8px;font-weight:700;font-size:12px">スコア推移(累積・チップ除く)</div>'+g;
+  return '<div style="border:1px solid #999;border-radius:6px;padding:8px 8px 2px;margin:2px 0 16px;background:#fff">'+
+    '<div style="font-weight:700;font-size:12px;margin:0 0 2px 2px">スコア推移(チップ除く)</div>'+g+'</div>';
 }
 function mjtPrintHtml(t, mode){
   mode = mode || "print";  /* print=紙(過程→グラフ→結果) / screen=精算シート(結果→直近→グラフ→全過程) */
