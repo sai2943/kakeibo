@@ -175,7 +175,7 @@
   #app .pr-title{ font-size:20px; }
   #app .pr-tbl th, #app .pr-tbl td{ font-size:12px; padding:4px 2px; white-space:nowrap; overflow:hidden; }
   #app .pr-sum .pr-final td{ font-size:13px; }
-  #app .pr-mid .pr-hist th, #app .pr-mid .pr-hist td{ font-size:15px; padding:7px 2px; }
+  #app .pr-mid .pr-tbl th, #app .pr-mid .pr-tbl td{ font-size:15px; padding:7px 2px; }
   #app .pr-mid .pr-sum td, #app .pr-mid .pr-sum th{ font-size:13.5px; padding:6px 2px; }
   .pr-sum .pr-final td{ font-weight:700; border-top:2px solid #333 !important; font-size:12px; }
   .pr-foot{ font-size:10px; color:#666 !important; margin-top:6px; }
@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.89 (localStorage保存・完全オフライン)
+   Tally 2.90 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -602,7 +602,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.89";
+const APP_VERSION = "2.90";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1099,9 +1099,13 @@ function mjtCalc(t,pi){
 const fmtPt = v => Number.isInteger(v) ? String(v) : String(Math.round(v*10)/10);
 /* ---------- 途中経過の画像生成(Canvas)と共有 ----------
    LINE等への共有用。HTML→画像変換(foreignObject)はiOS WebKitで不安定なため、canvasへ直接描画する */
-function mjtMidImage(t){
+function mjtMidImage(t, full){
   const P=t.players, seats=mjtSeats(t), rows=(t.rows||[]);
   const calcs=P.map((p,ci)=>mjtCalc(t,ci));
+  const st=full?mjtSettle(t):null;
+  const money=n=>(n<0?"−":"")+"¥"+Math.abs(n).toLocaleString("ja-JP");
+  const anyFee=full&&st.rawFees.some(f=>f>0), anyPexp=full&&st.pexp.some(v=>v>0), anyAdj=full&&st.adjs.some(a=>a!==0);
+  const notes=full?(st.feeNotes||[]).concat([st.payNote]).filter(Boolean):[];
   const W=720, PAD=24, np=P.length;
   const lblW=112, colW=(W-PAD*2-lblW)/np;
   const F='-apple-system,"Hiragino Sans","Noto Sans JP",sans-serif';
@@ -1109,11 +1113,12 @@ function mjtMidImage(t){
   const cd=mjtChartData(t);
   /* 高さの見積り */
   const rowH=52, histH=46, chartH=cd?340:0;
-  const H = PAD + 40 + 22 + 10                 /* タイトル+サブ */
-    + (rowH*4) + 14                            /* 集計(ヘッダ+3行) */
-    + (lastIdx>=0 ? rowH*2 + 14 : 0)           /* 直近 */
+  const sumRows = 4 + (full? 2 + (anyFee?1:0) + (anyPexp?1:0) + (anyAdj?1:0) + ((anyFee||anyPexp)?1:0) : 0);
+  const H = PAD + 46 + 22 + 10                 /* タイトル+サブ */
+    + (rowH*sumRows) + (full&&notes.length? notes.length*20+6 : 0) + 14
+    + (!full && lastIdx>=0 ? rowH*2 + 14 : 0)  /* 直近(途中経過のみ) */
     + (chartH? chartH+14 : 0)
-    + histH*(rows.length+1) + PAD;             /* 履歴 */
+    + histH*(rows.length+1) + (full?30:0) + PAD;
   const cv=document.createElement("canvas");
   const SCALE=2; cv.width=W*SCALE; cv.height=Math.ceil(H)*SCALE;
   const ctx=cv.getContext("2d"); ctx.scale(SCALE,SCALE);
@@ -1122,7 +1127,7 @@ function mjtMidImage(t){
   let y=PAD;
   /* タイトル */
   ctx.fillStyle="#000"; ctx.textAlign="left"; ctx.font="bold 32px "+F;
-  ctx.fillText("途中経過", PAD, y+17); y+=44;
+  ctx.fillText(full?"麻雀スコア表":"途中経過", PAD, y+17); y+=44;
   ctx.fillStyle="#444"; ctx.font="15px "+F;
   ctx.fillText((t.date||"")+(t.ruleName?" ・ "+t.ruleName:"")+" ・ "+seats+"人打ち", PAD, y+6); y+=28;
   /* 表描画ヘルパー */
@@ -1147,9 +1152,30 @@ function mjtMidImage(t){
   cell(PAD,y,lblW,rowH,"着順内訳",{bg:lblBg,bold:true,size:20});
   P.forEach((p,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,mjtRankCounts(t,ci).slice(0,seats).join("·"),{size:20})); y+=rowH;
   cell(PAD,y,lblW,rowH,"合計",{bg:lblBg,bold:true,size:20});
-  calcs.forEach((c,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,fmtPt(c.sum),{bold:true,size:28,color:c.sum<0?red:"#000"})); y+=rowH+14;
-  /* 直近 */
-  if(lastIdx>=0){
+  calcs.forEach((c,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,fmtPt(c.sum),{bold:true,size:28,color:c.sum<0?red:"#000"})); y+=rowH;
+  /* 精算(清算シートのみ) */
+  if(full){
+    cell(PAD,y,lblW,rowH,"チップ",{bg:lblBg,bold:true,size:20});
+    calcs.forEach((c,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,(c.chipNet>0?"+":"")+c.chipNet,{size:22,color:c.chipNet<0?red:"#000"})); y+=rowH;
+    cell(PAD,y,lblW,rowH,"収支",{bg:lblBg,bold:true,size:20});
+    calcs.forEach((c,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,money(c.shushi),{bold:true,size:20,color:c.shushi<0?red:"#000"})); y+=rowH;
+    if(anyFee){ cell(PAD,y,lblW,rowH,"場代",{bg:lblBg,bold:true,size:20});
+      st.rawFees.forEach((f,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,f>0?money(-f):"–",{size:18,color:f>0?red:gray})); y+=rowH; }
+    if(anyPexp){ cell(PAD,y,lblW,rowH,"経費",{bg:lblBg,bold:true,size:20});
+      st.pexp.forEach((v,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,v>0?money(-v):"–",{size:18,color:v>0?red:gray})); y+=rowH; }
+    if(anyAdj){ cell(PAD,y,lblW,rowH,"調整",{bg:lblBg,bold:true,size:20});
+      st.adjs.forEach((a,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,a===0?"–":(a>0?"+":"")+money(a),{size:18,color:a<0?red:a>0?"#000":gray})); y+=rowH; }
+    if(anyFee||anyPexp){
+      ctx.strokeStyle="#333"; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(PAD,y+0.5); ctx.lineTo(W-PAD,y+0.5); ctx.stroke();
+      cell(PAD,y,lblW,rowH,"支払",{bg:lblBg,bold:true,size:20});
+      st.pays.forEach((pv,ci)=>cell(PAD+lblW+colW*ci,y,colW,rowH,money(pv),{bold:true,size:20,color:pv<0?red:"#000"})); y+=rowH;
+    }
+    if(notes.length){ y+=4; ctx.textAlign="left"; ctx.font="13px "+F; ctx.fillStyle="#555";
+      notes.forEach(nt=>{ ctx.fillText(nt, PAD, y+10); y+=20; }); y+=2; }
+  }
+  y+=14;
+  /* 直近(途中経過のみ) */
+  if(!full && lastIdx>=0){
     nameRow(y,"直近"); y+=rowH;
     cell(PAD,y,lblW,rowH,(lastIdx+1)+"回戦",{bg:latestBg,bold:true,size:20});
     P.forEach((p,ci)=>{
@@ -1204,12 +1230,14 @@ function mjtMidImage(t){
     });
     y+=histH;
   });
+  if(full){ ctx.textAlign="left"; ctx.font="13px "+F; ctx.fillStyle="#666";
+    ctx.fillText("スコア1点=¥"+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ Tally", PAD, y+16); }
   return new Promise(res=>cv.toBlob(res,"image/png"));
 }
-async function mjtShareMid(){
+async function mjtShareMid(full){
   const t=UI.mjt; if(!t) return;
   try{
-    const blob=await mjtMidImage(t);
+    const blob=await mjtMidImage(t, !!full);
     if(!blob){ toast("画像の生成に失敗しました"); return; }
     const file=new File([blob],"tally-"+(t.date||"progress")+".png",{type:"image/png"});
     if(navigator.canShare && navigator.canShare({files:[file]})){
@@ -1515,8 +1543,8 @@ function viewMjTable(){
   h += '<div class="card" style="margin-bottom:8px"><div class="row" style="gap:8px;align-items:flex-end">'+
     '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">店からの総額</div>'+
     '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="例:11400" value="'+esc(t.feeTotal||"")+'" data-mt="ftotal"></div>'+
-    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:9px">1人あたり目安(経費除き)</div>'+
-    '<div class="mono" style="font-size:16px;font-weight:700">'+(feeTotal>0?"¥"+Math.ceil(Math.max(0,feeTotal-pexpSum)/np).toLocaleString("ja-JP"):"–")+'</div></div></div>'+
+    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:9px;margin-bottom:2px">1人あたり目安(経費除き)</div>'+
+    '<div class="mono" style="font-size:16px;font-weight:700;height:41px;display:flex;align-items:center;justify-content:center">'+(feeTotal>0?"¥"+Math.ceil(Math.max(0,feeTotal-pexpSum)/np).toLocaleString("ja-JP"):"–")+'</div></div></div>'+
     '<button class="btn full" data-mt="feesplit" style="margin-top:8px;font-size:12px;padding:8px 0">(総額−経費)の均等割を場代へ入力</button>'+
     '<div style="height:1px;background:var(--line);margin:10px 0 8px"></div>'+
     '<div class="row" style="justify-content:space-between"><span class="muted" style="font-size:12px">場代の入力合計</span><span class="mono" style="font-size:14px">¥'+feeSum.toLocaleString("ja-JP")+'</span></div>'+
@@ -1555,7 +1583,6 @@ function viewMjTable(){
       : '<button class="btn primary full" style="margin-bottom:10px;padding:11px 0;font-weight:700" data-mt="tokakei">★ '+esc(t.players[t.meIdx]||"自分")+'の成績を家計簿に反映</button>';
   }
   h += '<button class="btn tealb full" style="margin-bottom:8px;padding:11px 0;font-weight:700" data-mt="tosheet">精算シートを表示(みんなに見せる)</button>';
-  h += '<button class="btn full" style="margin-bottom:14px;padding:11px 0;color:var(--text)" data-mt="pdf">PDFで共有 / 印刷</button>';
 
   h += mjtKeypadHtml(t);
   h += '<div style="height:40px"></div>';
@@ -1614,7 +1641,7 @@ function viewMjSheet(){
   let h = '<div class="row" style="align-items:center;padding:calc(max(env(safe-area-inset-top,0px), 54px) + 6px) 0 6px">'+
     '<button class="navbtn" data-mt="sheetback" style="font-size:14px">‹ 戻る</button>'+
     '<div style="flex:1;text-align:center;font-weight:700;font-size:14px">'+(mid?"途中経過":"精算シート")+'</div>'+
-    (mid?'<button class="navbtn" data-mt="midshare" style="font-size:13px;color:var(--teal)">画像で共有</button>':'<button class="navbtn" data-mt="pdf" style="font-size:13px;color:var(--teal)">PDF保存</button>')+'</div>'+
+    '<button class="navbtn" data-mt="'+(mid?"midshare":"fullshare")+'" style="font-size:13px;color:var(--teal)">画像で共有</button></div>'+
     '';
   h += mjtPrintHtml(t, mid?"mid":"screen");
   h += '<div style="height:30px"></div>';
@@ -1676,6 +1703,7 @@ function viewMjPlay(){
   h += '<div class="row" style="gap:6px;margin-top:8px">'+
     '<button class="btn" data-mt="tomid" style="flex:1;padding:11px 0;font-size:14px;font-weight:700;color:var(--teal);border-color:var(--teal)">途中経過を表示</button>'+
     '<button class="btn" data-mt="midshare" style="flex:1;padding:11px 0;font-size:14px;font-weight:700;color:var(--teal);border-color:var(--teal)">画像で共有</button></div>';
+  h += '<div class="muted" style="font-size:10px;text-align:center;margin-top:8px">✓ 自動保存済み <span id="savets" class="mono">'+(LAST_MJT_SAVE||"—")+'</span> — 入力のたびに端末へ即時保存されます</div>';
   h += '<div class="muted" style="font-size:10px;text-align:right;margin-top:6px">ヘッダー: 上段=合計 / 下段=1着·2着·3着'+(mjtSeats(t)>3?"·4着":"")+'の回数</div>';
   h += '<div style="height:40px"></div>';
   return h;
@@ -1797,7 +1825,8 @@ function bindMjTable(){
         cur.by = nx>=t.players.length ? null : nx;
         saveMjt(false); renderKeepScroll();
       }
-      else if(a==="midshare"){ mjtShareMid(); }
+      else if(a==="midshare"){ mjtShareMid(false); }
+      else if(a==="fullshare"){ mjtShareMid(true); }
       else if(a==="lockrow"||a==="lockrowlast"){
         const P=t.players;                      /* bindMjTableのスコープにPは無い(v2.82で修正) */
         const isLast = a==="lockrowlast";
@@ -1928,11 +1957,15 @@ function mjtDelPreset(id){
   }
 }
 
+let LAST_MJT_SAVE = null;
 function saveMjt(persist){
   const t=UI.mjt; if(!t) return;
   const i=(S.mjTables||[]).findIndex(x=>String(x.id)===String(t.id));
   if(i>=0) S.mjTables[i]=t; else (S.mjTables=S.mjTables||[]).push(t);
   if(persist) save(); else saveLocal();
+  const d=new Date();
+  LAST_MJT_SAVE = ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)+":"+("0"+d.getSeconds()).slice(-2);
+  const el=document.getElementById("savets"); if(el) el.textContent=LAST_MJT_SAVE;
 }
 
 /* ---------- 資産タブ(概観) ---------- */
