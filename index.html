@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.74 (localStorage保存・完全オフライン)
+   Tally 2.75 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -595,7 +595,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.74";
+const APP_VERSION = "2.75";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1090,32 +1090,17 @@ function mjtCalc(t,pi){
 }
 const fmtPt = v => Number.isInteger(v) ? String(v) : String(Math.round(v*10)/10);
 /* ---------- 端数処理つき精算計算 ----------
-   ルール: ①場代切捨=各自100円未満切捨、端数合計は負担者(t.feeBearers)で分担
-          ②負け支払切捨=負け側のみ100円未満切捨、免除合計はトップの受取から控除(帳尻は常に一致) */
+   切捨対象は最終支払額(収支−場代)の負け側のみ。単位=なし/100/500/1000円(500=500円刻み切捨)。
+   免除合計は受取の大きい順にゼロを割らない範囲で波及控除(帳尻Σ支払=−場代合計は常に一致) */
 function mjtSettle(t){
   const P=t.players, calcs=P.map((p,ci)=>mjtCalc(t,ci));
-  const rawFees=calcs.map(c=>c.fee);
-  const total=rawFees.reduce((a,b)=>a+b,0);
-  let fees=rawFees.slice(), feeNote="";
-  if(t.roundFee && total>0){
-    const fl=rawFees.map(f=>Math.floor(f/100)*100);
-    const R=total - fl.reduce((a,b)=>a+b,0);
-    const bearers=(t.feeBearers||[]).filter(ci=>ci>=0&&ci<P.length);
-    fees=fl.slice();
-    if(R>0 && bearers.length){
-      const base=Math.floor(R/bearers.length);
-      bearers.forEach((ci,k)=>{ fees[ci]+= base + (k===0? R-base*bearers.length : 0); });
-      feeNote="場代100円未満切捨・端数¥"+R+"は"+bearers.map(ci=>P[ci]||("P"+(ci+1))).join("・")+"が負担";
-    } else if(R>0) feeNote="場代100円未満切捨・端数¥"+R+"は未割当(負担者を選択してください)";
-    else feeNote="場代100円未満切捨";
-  }
+  const fees=calcs.map(c=>c.fee);
   let pays=calcs.map((c,ci)=>c.shushi - fees[ci]), payNote="";
   const unit = t.roundPay===true ? 100 : (num(t.roundPay)||0);  /* 旧bool互換 */
   if(unit>0){
     let D=0;
     pays=pays.map(p=>{ if(p<0){ const q=-Math.floor((-p)/unit)*unit; D+=(q-p); return q; } return p; });
     if(D>0){
-      /* 免除合計を受取の大きい順に、ゼロを割らない範囲で波及控除 */
       let rem=D; const names=[];
       pays.map((p,ci)=>({p:p,ci:ci})).filter(o=>o.p>0).sort((a,b)=>b.p-a.p).forEach(o=>{
         if(rem<=0) return;
@@ -1127,7 +1112,7 @@ function mjtSettle(t){
         +(rem>0?"(¥"+rem+"は受取不足のため未調整)":"");
     } else payNote="負け支払"+unit+"円未満切捨";
   }
-  return {fees:fees, pays:pays, feeNote:feeNote, payNote:payNote};
+  return {fees:fees, pays:pays, payNote:payNote};
 }
 function mjtChartSvg(t){
   const P=t.players, rows=(t.rows||[]);
@@ -1200,7 +1185,7 @@ function mjtPrintHtml(t, mode){
     sum+='<tr class="pr-final"><td class="pr-lbl">支払</td>'+st.pays.map(p=>'<td class="'+(p<0?"pr-neg":"")+'">'+money(p)+'</td>').join("")+'</tr>';
   }
   sum+='</tbody></table>';
-  const notes=[st.feeNote,st.payNote].filter(Boolean);
+  const notes=[st.payNote].filter(Boolean);
   if(anyFee && notes.length) sum+='<div class="pr-foot" style="margin:-4px 0 10px">'+notes.map(esc).join(" ／ ")+'</div>';
   const foot='<div class="pr-foot">スコア1点=¥'+(num(t.scoreRate)||0)+(num(t.chipRate)>0?" / チップ1枚=¥"+num(t.chipRate):"")+" ・ Tally</div>";
 
@@ -1319,21 +1304,27 @@ function viewMjTable(){
   /* スコア表 */
 
   /* チップ(スコアの下) */
-  h += band("プレイヤー・チップ(開始→終了 枚数)");
-  h += '<div style="overflow-x:auto;margin-bottom:8px"><table class="mjt"><thead><tr><th style="width:38px"></th>'+
-    P.map((p,i)=>'<th '+colW+'><input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+i+'" placeholder="名前">'+
-      (P.length>mjtSeats(t)?'<div class="mjt-pdel" data-mt="pdel" data-v="'+i+'">×削除</div>':'')+'</th>').join("")+
-    (P.length<6?'<th style="width:30px" class="mjt-add" data-mt="addp">＋</th>':'')+'</tr></thead><tbody>'+
-    '<tr><td class="mjt-no">開始</td>'+
-    P.map((p,ci)=>{ const sel=UI.mjtCell&&UI.mjtCell.k==="cs"&&UI.mjtCell.c===ci; const x=(t.chipStart||[])[ci]||""; const neg=(num(x)||0)<0;
-      return '<td class="mjt-cell '+(sel?"sel ":"")+(neg?"red":"")+'" data-mt="cs" data-c="'+ci+'">'+(x===""?'<span class="mjt-ph">·</span>':esc(String(x)))+'</td>'; }).join("")+(P.length<6?'<td></td>':'')+'</tr>'+
-    '<tr><td class="mjt-no">終了</td>'+
-    P.map((p,ci)=>{ const sel=UI.mjtCell&&UI.mjtCell.k==="ce"&&UI.mjtCell.c===ci; const er=mjtChipEndRaw(t,ci); const auto=mjtChipAutoIdx(t)===ci;
-      let inner="",cls=""; if(er!==null){ inner=esc(String((t.chipEnd||[])[ci])); } else if(auto){ inner='<span class="mjt-auto">'+mjtChipEndDisp(t,ci)+'</span>'; } else inner='<span class="mjt-ph">·</span>';
-      return '<td class="mjt-cell '+(sel?"sel ":"")+cls+'" data-mt="ce" data-c="'+ci+'">'+inner+'</td>'; }).join("")+(P.length<6?'<td></td>':'')+'</tr>'+
-    '<tr><td class="mjt-no">増減</td>'+
-    P.map((p,ci)=>{ const net=mjtChipNet(t,ci); return '<td class="mjt-cell" style="color:'+(net<0?"var(--red)":net>0?"var(--blue)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</td>'; }).join("")+(P.length<6?'<td></td>':'')+'</tr>'+
+  h += band("プレイヤー・チップ(枚数)");
+  h += '<div style="margin-bottom:8px"><table class="mjt" style="width:100%;table-layout:fixed"><thead><tr>'+
+    '<th style="text-align:left;padding-left:8px">プレイヤー</th>'+
+    '<th style="width:62px">開始</th><th style="width:62px">終了</th><th style="width:56px">増減</th></tr></thead><tbody>'+
+    P.map((p,ci)=>{
+      const selS=UI.mjtCell&&UI.mjtCell.k==="cs"&&UI.mjtCell.c===ci;
+      const selE=UI.mjtCell&&UI.mjtCell.k==="ce"&&UI.mjtCell.c===ci;
+      const xs=(t.chipStart||[])[ci]||""; const negS=(num(xs)||0)<0;
+      const er=mjtChipEndRaw(t,ci); const autoE=mjtChipAutoIdx(t)===ci;
+      let endInner=""; if(er!==null){ endInner=esc(String((t.chipEnd||[])[ci])); } else if(autoE){ endInner='<span class="mjt-auto">'+mjtChipEndDisp(t,ci)+'</span>'; } else endInner='<span class="mjt-ph">·</span>';
+      const net=mjtChipNet(t,ci);
+      return '<tr>'+
+        '<td style="text-align:left;padding:4px 4px 4px 8px"><div class="row" style="gap:6px;align-items:center">'+
+        '<input class="mjt-name" value="'+esc(p)+'" data-mt="pname" data-v="'+ci+'" placeholder="名前" style="flex:1;min-width:0">'+
+        (P.length>mjtSeats(t)?'<span class="mjt-pdel" data-mt="pdel" data-v="'+ci+'" style="flex:none">×</span>':'')+'</div></td>'+
+        '<td class="mjt-cell '+(selS?"sel ":"")+(negS?"red":"")+'" data-mt="cs" data-c="'+ci+'">'+(xs===""?'<span class="mjt-ph">·</span>':esc(String(xs)))+'</td>'+
+        '<td class="mjt-cell '+(selE?"sel ":"")+'" data-mt="ce" data-c="'+ci+'">'+endInner+'</td>'+
+        '<td class="mjt-cell" style="color:'+(net<0?"var(--red)":net>0?"var(--blue)":"var(--muted)")+'">'+(net>0?"+":"")+net+'</td></tr>';
+    }).join("")+
     '</tbody></table></div>';
+  if(P.length<6) h += '<button class="btn dash full" style="padding:8px 0;font-size:12px;margin-bottom:8px" data-mt="addp">＋ プレイヤーを追加</button>';
   h += '<button class="btn tealb full" style="padding:13px 0;font-size:15px;font-weight:700;margin-bottom:14px" data-mt="toPlay">▶ 対局モード(スコアの入力・閲覧)</button>';
 
   /* ゲーム代(会計フロー) */
@@ -1347,24 +1338,16 @@ function viewMjTable(){
     '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="例:11400" value="'+esc(t.feeTotal||"")+'" data-mt="ftotal"></div>'+
     '<div style="flex:1;text-align:center"><div class="muted" style="font-size:9px">1人あたり目安</div>'+
     '<div class="mono" style="font-size:16px;font-weight:700">'+(feeTotal>0?"¥"+Math.ceil(feeTotal/np).toLocaleString("ja-JP"):"–")+'</div></div></div></div>';
-  h += '<div style="overflow-x:auto;margin-bottom:6px"><table class="mjt"><thead><tr>'+
-    P.map((p,i)=>'<th '+colW+'>'+esc(p||("P"+(i+1)))+'</th>').join("")+'</tr></thead><tbody><tr>'+
-    P.map((p,ci)=>'<td style="padding:4px"><input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc((t.fees||[])[ci]||"")+'" data-mt="fee" data-c="'+ci+'" style="min-width:48px"></td>').join("")+
-    '</tr></tbody></table></div>';
+  h += '<div class="card" style="margin-bottom:8px;padding:6px 12px">'+
+    P.map((p,ci)=>'<div class="row" style="gap:8px;align-items:center;padding:5px 0'+(ci?';border-top:1px solid var(--line)':'')+'">'+
+      '<span class="ellip" style="flex:1;font-size:13px">'+esc(p||("P"+(ci+1)))+'</span>'+
+      '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc((t.fees||[])[ci]||"")+'" data-mt="fee" data-c="'+ci+'" style="width:110px"></div>').join("")+'</div>';
   /* 端数処理 */
   const rpUnit = t.roundPay===true ? 100 : (num(t.roundPay)||0);
   h += '<div class="card" style="margin-bottom:8px;padding:10px 12px">'+
-    '<div class="muted" style="font-size:10px;margin-bottom:6px">端数処理(精算シートの場代・支払に反映)</div>'+
-    '<button class="btn '+(t.roundFee?"sel":"")+'" style="width:100%;font-size:12px;padding:8px 0" data-mt="rfee">場代 100円未満切捨</button>'+
-    '<div class="row" style="gap:5px;align-items:center;margin-top:8px">'+
-    '<span class="muted" style="font-size:11px;width:92px">負け支払の切捨</span>'+
-    '<button class="btn '+(rpUnit===0?"sel":"")+'" style="flex:1;font-size:12px;padding:7px 0" data-mt="rpay" data-v="0">なし</button>'+
-    '<button class="btn '+(rpUnit===100?"sel":"")+'" style="flex:1;font-size:12px;padding:7px 0" data-mt="rpay" data-v="100">100円</button>'+
-    '<button class="btn '+(rpUnit===1000?"sel":"")+'" style="flex:1;font-size:12px;padding:7px 0" data-mt="rpay" data-v="1000">1000円</button></div>'+
-    (t.roundFee?'<div class="muted" style="font-size:10px;margin:8px 0 4px">場代の端数を負担する人(複数可)</div>'+
-      '<div class="row" style="gap:5px;flex-wrap:wrap">'+
-      P.map((p,ci)=>'<button class="btn '+((t.feeBearers||[]).indexOf(ci)>=0?"sel":"")+'" style="font-size:11px;padding:5px 10px" data-mt="fbear" data-v="'+ci+'">'+esc(p||("P"+(ci+1)))+'</button>').join("")+'</div>':'')+
-    '</div>';
+    '<div class="muted" style="font-size:10px;margin-bottom:6px">端数処理: 支払額(負け側)の切捨 — 精算シートに反映</div>'+
+    '<div class="row" style="gap:5px">'+
+    [[0,"なし"],[100,"100円"],[500,"500円"],[1000,"1000円"]].map(o=>'<button class="btn '+(rpUnit===o[0]?"sel":"")+'" style="flex:1;font-size:12px;padding:8px 0" data-mt="rpay" data-v="'+o[0]+'">'+o[1]+'</button>').join("")+'</div></div>';
   if(feeTotal>0 || feeSum>0){
     const okc = diff===0 ? "var(--teal)" : "var(--red)";
     h += '<div class="card" style="margin-bottom:12px"><div class="row between" style="font-size:12px"><span class="muted">入力合計</span><span class="mono">¥'+feeSum.toLocaleString("ja-JP")+'</span></div>'+
@@ -1550,9 +1533,7 @@ function bindMjTable(){
       else if(a==="toTable"){ UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="tosheet"){ UI.sheetMode="full"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
       else if(a==="tomid"){ UI.sheetMode="mid"; UI.sheetFrom=UI.screen; UI.mjtCell=null; UI.screen="mjsheet"; render(); }
-      else if(a==="rfee"){ t.roundFee=!t.roundFee; if(t.roundFee && !(t.feeBearers&&t.feeBearers.length) && t.meIdx!=null) t.feeBearers=[t.meIdx]; saveMjt(false); renderKeepScroll(); }
       else if(a==="rpay"){ t.roundPay=num(el.dataset.v)||0; saveMjt(false); renderKeepScroll(); }
-      else if(a==="fbear"){ const ci=num(el.dataset.v); t.feeBearers=t.feeBearers||[]; const ix=t.feeBearers.indexOf(ci); if(ix>=0) t.feeBearers.splice(ix,1); else t.feeBearers.push(ci); saveMjt(false); renderKeepScroll(); }
       else if(a==="sheetback"){ UI.screen=UI.sheetFrom||"mjtable"; render(); }
       else if(a==="cs"){ UI.mjtCell={k:"cs",c:num(el.dataset.c)}; renderKeepScroll(); }
       else if(a==="ce"){ UI.mjtCell={k:"ce",c:num(el.dataset.c)}; renderKeepScroll(); }
