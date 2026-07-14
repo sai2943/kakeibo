@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.98 (localStorage保存・完全オフライン)
+   Tally 2.99 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -607,7 +607,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.98";
+const APP_VERSION = "2.99";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1451,27 +1451,6 @@ function viewMjTable(){
     '<input class="input sm" placeholder="例: DUO虹" value="'+esc(t.ruleName||"")+'" data-mt="rname" style="flex:1;min-width:0"></div>'+
     '</div>';
 
-  /* 保存済みルール(横スクロール + 編集モード) — 案A: 保存も同じ1行に */
-  h += '<div style="margin-bottom:12px">';
-  const hasPresets = (S.mjPresets||[]).length>0;
-  const editing = UI.mjtEditPresets;
-  if(hasPresets){
-    h += '<div class="row between" style="align-items:center;margin-bottom:5px">'+
-      '<span class="muted" style="font-size:10px">保存済みルール '+(editing?"(× で削除)":"(タップで適用)")+'</span>'+
-      '<button class="chip" style="font-size:10px;padding:4px 10px'+(editing?";border-color:var(--teal);color:var(--teal)":"")+'" data-mt="editpresets">'+(editing?"完了":"編集")+'</button></div>';
-  }else{
-    h += '<div class="muted" style="font-size:10px;margin-bottom:5px">保存済みルール</div>';
-  }
-  h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div class="row" style="gap:6px;flex-wrap:nowrap;padding-bottom:2px">'+
-    (hasPresets ? S.mjPresets.map(p=>{
-      const sel=(t.ruleName||"").trim()===(p.name||"").trim();
-      return editing
-        ? '<button class="chip" style="white-space:nowrap;border-color:var(--red);color:var(--red)" data-mt="delpreset" data-v="'+p.id+'">'+esc(p.name)+' ×</button>'
-        : '<button class="chip'+(sel?" sel":"")+'" style="white-space:nowrap" data-mt="applypreset" data-v="'+p.id+'">'+esc(p.name)+'</button>';
-    }).join("") : '')+
-    (editing ? '' : '<button class="chip" style="white-space:nowrap;border-style:dashed;color:var(--muted)" data-mt="savepreset">＋ 現在のルールを保存</button>')+
-    '</div></div>';
-  h += '</div>';
 
   /* 3区画折りたたみ(ルール/チップ/ゲーム代)。初期値はエントリポイントで設定、ここは保険 */
   if(UI.rulesOpen==null || UI.chipsOpen==null || UI.feesOpen==null){
@@ -1493,7 +1472,30 @@ function viewMjTable(){
     + (rpU>0 ? " ・ 精算"+rpU+"円" : "");
   h += secBar("rules", UI.rulesOpen, "ルール設定", ruleSum);
   if(UI.rulesOpen){
-  h += '<div class="card" style="margin-bottom:10px">'+
+  h += '<div class="card" style="margin-bottom:10px">';
+  /* 保存済みルール(横スクロール + 編集モード) — 案A: 保存も同じ1行に */
+  h += '<div style="margin-bottom:12px">';
+  const hasPresets = (S.mjPresets||[]).length>0;
+  const editing = UI.mjtEditPresets;
+  if(hasPresets){
+    h += '<div class="row between" style="align-items:center;margin-bottom:5px">'+
+      '<span class="muted" style="font-size:10px">保存済みルール '+(editing?"(× で削除)":"(タップで適用)")+'</span>'+
+      '<button class="chip" style="font-size:10px;padding:4px 10px'+(editing?";border-color:var(--teal);color:var(--teal)":"")+'" data-mt="editpresets">'+(editing?"完了":"編集")+'</button></div>';
+  }else{
+    h += '<div class="muted" style="font-size:10px;margin-bottom:5px">保存済みルール</div>';
+  }
+  h += '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><div class="row" style="gap:6px;flex-wrap:nowrap;padding-bottom:2px">'+
+    (hasPresets ? S.mjPresets.map(p=>{
+      const sel=(t.ruleName||"").trim()===(p.name||"").trim();
+      return editing
+        ? '<button class="chip" style="white-space:nowrap;border-color:var(--red);color:var(--red)" data-mt="delpreset" data-v="'+p.id+'">'+esc(p.name)+' ×</button>'
+        : '<button class="chip'+(sel?" sel":"")+'" style="white-space:nowrap" data-mt="applypreset" data-v="'+p.id+'">'+esc(p.name)+'</button>';
+    }).join("") : '')+
+    (editing ? '' : '<button class="chip" style="white-space:nowrap;border-style:dashed;color:var(--muted)" data-mt="savepreset">＋ 現在のルールを保存</button>')+
+    '</div></div>';
+  h += '</div>';
+  h += '<div style="height:1px;background:var(--line);margin:2px 0 12px"></div>';
+  h += '' +
     '<div class="row" style="gap:8px;align-items:center;margin-bottom:10px">'+
     [["3","3麻"],["4","4麻"]].map(([v,l])=>'<button class="btn '+(t.rule===v?"sel":"")+'" style="flex:1;font-size:12px;padding:7px 0" data-mt="rule" data-v="'+v+'">'+l+'</button>').join("")+
     '<span class="muted" style="font-size:11px;white-space:nowrap">'+mjtSeats(t)+'人打ち</span></div>'+
@@ -1570,7 +1572,7 @@ function viewMjTable(){
   h += '<button class="btn tealb full" style="padding:13px 0;font-size:15px;font-weight:700;margin-bottom:14px" data-mt="toPlay">▶ 対局モード(スコアの入力・閲覧)</button>';
 
   /* ゲーム代(会計フロー) */
-  h += secBar("fees", UI.feesOpen, "ゲーム代(精算)", (num(t.feeTotal)||0)>0 ? "総額 ¥"+(num(t.feeTotal)||0).toLocaleString("ja-JP") : "未入力");
+  h += secBar("fees", UI.feesOpen, "精算・共有", (num(t.feeTotal)||0)>0 ? "総額 ¥"+(num(t.feeTotal)||0).toLocaleString("ja-JP") : "未入力");
   if(UI.feesOpen){
   const np=P.length;
   const feeTotal=num(t.feeTotal)||0;
@@ -1610,7 +1612,6 @@ function viewMjTable(){
       '<input class="input sm mono r" type="number" inputmode="numeric" placeholder="円" value="'+esc((t.pexp||[])[ci]||"")+'" data-mt="pexp" data-c="'+ci+'" style="width:92px"></div>').join("")+'</div>';
 
   /* ===== 操作(最下部に集約) ===== */
-  }
   h += band("家計簿・共有");
   h += '<div class="muted" style="font-size:11px;margin:0 2px 6px">「自分」を選ぶと成績を家計簿に反映できます</div>';
   h += '<div style="overflow-x:auto;margin-bottom:10px"><div class="row" style="gap:6px">'+
@@ -1626,6 +1627,7 @@ function viewMjTable(){
 
   h += mjtKeypadHtml(t);
   h += '<div style="height:40px"></div>';
+  }
   h += saveIndicatorHtml();
   return h;
 }
