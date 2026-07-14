@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.99 (localStorage保存・完全オフライン)
+   Tally 3.00 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -607,9 +607,17 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.99";
+const APP_VERSION = "3.00";
 let _renderLoc = "";
+let RENDER_PREV_SCREEN = null;
 function render(){
+  /* 清算画面へ「他画面から」入るたび、折りたたみ区画をライフサイクル既定へ戻す。
+     同一画面内の再描画(トグル等)では発火しない=操作中に勝手に閉じない */
+  if(UI.screen==="mjtable" && RENDER_PREV_SCREEN!=="mjtable"){
+    const _ip=mjtInProgress(UI.mjt);
+    UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false;
+  }
+  RENDER_PREV_SCREEN = UI.screen;
   _renderBody();
   /* タブ・画面・遊技サブタブが変わった時だけ先頭へ。同一画面の再描画は位置を保持 */
   const loc = UI.tab + "/" + UI.screen + "/" + (UI.gameSub||"");
@@ -1005,8 +1013,8 @@ function bindMjtList(){
     const a=el.dataset.a, v=el.dataset.v;
     el.onclick=()=>{
       if(a==="mjtlback"){ UI.screen="main"; UI.tab="tool"; render(); return; }
-      if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); const _ip=mjtInProgress(UI.mjt); UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false; UI.screen="mjtable"; render(); return; }
-      if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; const _ip=mjtInProgress(UI.mjt); UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false; UI.screen="mjtable"; render(); } return; }
+      if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); return; }
+      if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } return; }
     };
   });
 }
@@ -2708,9 +2716,9 @@ function bindMain(){
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
       else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
-      else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); const _ip=mjtInProgress(UI.mjt); UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false; UI.screen="mjtable"; render(); }
+      else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
-      else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; const _ip=mjtInProgress(UI.mjt); UI.rulesOpen=!_ip; UI.chipsOpen=!_ip; UI.feesOpen=false; UI.screen="mjtable"; render(); } }
+      else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
       else if(a==="mdb"){ UI.screen="mdb"; UI.mdbForm=null; render(); }
       else if(a==="stores"){ UI.screen="stores"; UI.storeForm=null; render(); }
       else if(a==="mjtlist"){ UI.screen="mjtlist"; render(); }
