@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 2.97 (localStorage保存・完全オフライン)
+   Tally 2.98 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -607,7 +607,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "2.97";
+const APP_VERSION = "2.98";
 let _renderLoc = "";
 function render(){
   _renderBody();
@@ -1880,6 +1880,19 @@ function bindMjTable(){
         const summary=P.map((p,ci)=>(p||("P"+(ci+1)))+" "+(mjtAbsent(t,ri,ci)?"抜":fmtPt(mjtScore(t,ri,ci)))).join(" / ");
         if(!confirm((ri+1)+"回戦を確定します\n"+summary+"\nよろしいですか?"+(isLast?"\n(ラス半: 次の回戦は作りません)":""))) return;
         t.locked=t.locked||[]; t.locked[ri]=true;
+        /* これより前の未確定行の救済: 完全入力済みならまとめて確定を提案
+           (ロック機能導入前の行・確定し忘れて進んだ時の一括回収。逐次確定の通常プレイでは出ない) */
+        const pend=[]; let pendIncomplete=0;
+        for(let r2=0;r2<ri;r2++){
+          if(t.locked[r2]) continue;
+          let ok2=true;
+          for(let ci=0;ci<P.length;ci++){ if(!mjtAbsent(t,r2,ci) && mjtScore(t,r2,ci)===null){ ok2=false; break; } }
+          if(ok2) pend.push(r2); else pendIncomplete++;
+        }
+        if(pend.length && confirm("これより前に未確定の回戦が"+pend.length+"件あります。\nまとめて確定しますか?(スコアは変更されません)")){
+          pend.forEach(r2=>{ t.locked[r2]=true; });
+          if(pendIncomplete>0) toast(pendIncomplete+"件は未入力のため未確定のままです");
+        }
         UI.mjtCell=null;
         if(!isLast && ri===t.rows.length-1){ t.rows.push(new Array(t.players.length).fill("")); t.locked.push(false); }
         saveMjt(false);
