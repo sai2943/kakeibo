@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.07 (localStorage保存・完全オフライン)
+   Tally 3.08 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -614,7 +614,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.07";
+const APP_VERSION = "3.08";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2999,9 +2999,10 @@ function bindEntry(){
           if(tpl0){
             const sk = (tpl0.skips||[]).concat([ent.date]);
             const nx = fixedOccurrences(tpl0).map(fmtDate).find(d=> d>ent.date && !sk.includes(d));
-            nextTxt = nx ? "次回は "+nx.slice(5).replace("-","/")+" に自動計上されます。" : "以降の予定はありません(これが最後の分でした)。";
+            nextTxt = nx ? "次回は "+nx.slice(5).replace("-","/")+" に自動計上されます。" : "以降の予定はありません(最終分)。";
           }
-          fmsg = "この定期記録の今回分("+ent.date.slice(5).replace("-","/")+")をスキップします。\n定期設定は残ります。"+nextTxt+"\nよろしいですか?";
+          /* confirmの折返し幅(約18全角)に収まる意図した行割り */
+          fmsg = "今回分("+ent.date.slice(5).replace("-","/")+")をスキップします。\n(定期設定は残ります)\n"+nextTxt+"\nよろしいですか?";
         }
         if(!confirm(isFixed ? fmsg : "この記録を削除しますか?")) return;
         if(isFixed){
