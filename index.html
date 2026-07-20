@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.08 (localStorage保存・完全オフライン)
+   Tally 3.09 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -289,15 +289,22 @@ function fixedOccurrences(tpl){
   const hs = tpl.holidayShift || "none";
   return (hs==="none") ? out : out.map(dt => shiftForHoliday(dt, hs));
 }
+/* 定期エントリの「出生日」= どの発生回として生まれたか。
+   日付や金額を編集しても不変の身元。旧データはIDの -fYYYY-MM-DD から復元(遡及治癒) */
+function fixedOccKey(e){
+  if(e.fixedDate) return e.fixedDate;
+  const m = String(e.id||"").match(/-f(\d{4}-\d{2}-\d{2})$/);
+  return m ? m[1] : e.date;
+}
 function genFixedEntries(tpl){
   const skips = tpl.skips || [];
   fixedOccurrences(tpl).forEach(dt=>{
     const date = fmtDate(dt);
     if(skips.includes(date)) return;
-    const exists = S.entries.some(e=>String(e.fixedId)===String(tpl.id) && e.date===date);
+    const exists = S.entries.some(e=>String(e.fixedId)===String(tpl.id) && fixedOccKey(e)===date);
     if(!exists){
       S.entries.push({
-        id: uid()+"-f"+date, date,
+        id: uid()+"-f"+date, date, fixedDate: date,
         type: tpl.type, category: tpl.category,
         amount: num(tpl.amount), memo: tpl.name, store: tpl.store||"", item: tpl.item||"",
         src: "fixed", fixedId: tpl.id
@@ -614,7 +621,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.08";
+const APP_VERSION = "3.09";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2997,8 +3004,9 @@ function bindEntry(){
           const tpl0 = (S.fixed||[]).find(t=>String(t.id)===String(ent.fixedId));
           let nextTxt = "";
           if(tpl0){
-            const sk = (tpl0.skips||[]).concat([ent.date]);
-            const nx = fixedOccurrences(tpl0).map(fmtDate).find(d=> d>ent.date && !sk.includes(d));
+            const occ = fixedOccKey(ent);
+            const sk = (tpl0.skips||[]).concat([occ]);
+            const nx = fixedOccurrences(tpl0).map(fmtDate).find(d=> d>occ && !sk.includes(d));
             nextTxt = nx ? "次回は "+nx.slice(5).replace("-","/")+" に自動計上されます。" : "以降の予定はありません(最終分)。";
           }
           /* confirmの折返し幅(約18全角)に収まる意図した行割り */
@@ -3007,7 +3015,7 @@ function bindEntry(){
         if(!confirm(isFixed ? fmsg : "この記録を削除しますか?")) return;
         if(isFixed){
           const tpl = (S.fixed||[]).find(t=>String(t.id)===String(ent.fixedId));
-          if(tpl){ tpl.skips = tpl.skips || []; if(!tpl.skips.includes(ent.date)) tpl.skips.push(ent.date); }
+          if(tpl){ const occ=fixedOccKey(ent); tpl.skips = tpl.skips || []; if(!tpl.skips.includes(occ)) tpl.skips.push(occ); }
         }
         S.entries = S.entries.filter(x=>x.id!==UI.editEntryId);
         save(); UI.screen=(UI.entryReturn||"main"); UI.entryReturn=null; render();
