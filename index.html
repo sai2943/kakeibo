@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.01 (localStorage保存・完全オフライン)
+   Tally 3.02 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -607,7 +607,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.01";
+const APP_VERSION = "3.02";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -698,8 +698,15 @@ function viewCatDrill(){
   const spent = list.reduce((a,e)=>a+e.amount,0);
   const pct = cap>0 ? Math.min(100, spent/cap*100) : 0;
   const over = spent - cap;
+  if(UI.drillMode==null) UI.drillMode="chain";
+  /* チェーン名の導出: 最初の空白(半角/全角)より前。空白なしは全体を1店として扱う */
+  const chainKey = n => { const m=n.split(/[\s\u3000]+/).filter(Boolean); return m.length>1 ? m[0] : n; };
   const g = {};
-  list.forEach(e=>{ const k=(e.store||"").trim()||"店名未入力"; (g[k]=g[k]||[]).push(e); });
+  list.forEach(e=>{
+    const ex=(e.store||"").trim()||"店名未入力";
+    const k = (UI.drillMode==="chain" && ex!=="店名未入力") ? chainKey(ex) : ex;
+    (g[k]=g[k]||[]).push(e);
+  });
   const groups = Object.keys(g).map(k=>({k:k, sum:g[k].reduce((a,e)=>a+e.amount,0), es:g[k].sort((a,b)=>a.date<b.date?1:-1)})).sort((a,b)=>b.sum-a.sum);
 
   let h = '<div class="row" style="align-items:center;margin-bottom:10px">'+
@@ -717,6 +724,9 @@ function viewCatDrill(){
     h += '<div class="row between"><span style="font-size:12px;font-weight:700">合計</span><span class="mono" style="font-size:16px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span></div>';
   }
   h += '</div>';
+  h += '<div class="row" style="gap:6px;margin-bottom:8px">'+
+    '<button class="btn '+(UI.drillMode==="chain"?"sel":"")+'" data-a="drillmode" data-v="chain" style="flex:1;font-size:11px;padding:7px 0">チェーン集約</button>'+
+    '<button class="btn '+(UI.drillMode!=="chain"?"sel":"")+'" data-a="drillmode" data-v="exact" style="flex:1;font-size:11px;padding:7px 0">店舗別</button></div>';
   if(!groups.length){
     h += '<div class="muted" style="text-align:center;font-size:12px;padding:24px 0">この月の'+esc(cat)+'の支出はまだありません</div>';
   } else {
@@ -731,9 +741,12 @@ function viewCatDrill(){
       if(open){
         gr.es.forEach(e=>{
           const label = (e.item||"").trim() || (e.memo||"").trim() || "—";
-          h += '<div class="row" style="gap:8px;align-items:center;padding:6px 0 6px 20px;border-top:1px solid var(--surface2)">'+
+          const ex=(e.store||"").trim();
+          const br=(UI.drillMode==="chain" && ex && chainKey(ex)!==ex) ? ex.split(/[\s\u3000]+/).filter(Boolean).slice(1).join(" ") : "";
+          h += '<div class="row" data-a="drilledit" data-v="'+e.id+'" style="gap:8px;align-items:center;padding:6px 0 6px 20px;border-top:1px solid var(--surface2);cursor:pointer">'+
             '<span class="mono muted" style="flex:none;font-size:11px">'+esc((e.date||"").slice(5).replace("-","/"))+'</span>'+
             '<span class="ellip muted" style="flex:1;font-size:12px;min-width:0">'+esc(label)+'</span>'+
+            (br?'<span class="ellip muted" style="flex:none;max-width:100px;font-size:10px">'+esc(br)+'</span>':'')+
             '<span class="mono" style="flex:none;font-size:12px">¥'+e.amount.toLocaleString("ja-JP")+'</span></div>';
         });
       }
@@ -749,6 +762,14 @@ function bindCatDrill(){
       const a=el.dataset.a, v=el.dataset.v;
       if(a==="drillback"){ UI.screen="main"; UI.drillOpenStore=null; render(); }
       else if(a==="drillstore"){ UI.drillOpenStore = (UI.drillOpenStore===v ? null : v); render(); }
+      else if(a==="drillmode"){ UI.drillMode=v; UI.drillOpenStore=null; render(); }
+      else if(a==="drilledit"){
+        const e=S.entries.find(x=>String(x.id)===String(v)); if(!e) return;
+        UI.editEntryId=e.id;
+        UI.entryForm={date:e.date,type:e.type,category:e.category,amount:String(e.amount),store:e.store||"",item:(e.item!=null?e.item:(e.memo||"")),memo:e.memo||""};
+        UI.entryReturn="catdrill";
+        UI.screen="entry"; render();
+      }
       else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
     };
   });
@@ -2784,7 +2805,7 @@ function bindMain(){
       else if(a==="wishlist"){ UI.screen="wishlist"; render(); }
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
-      else if(a==="catdrill"){ UI.drillCat=v; UI.drillOpenStore=null; UI.screen="catdrill"; render(); }
+      else if(a==="catdrill"){ UI.drillCat=v; UI.drillOpenStore=null; UI.drillMode="chain"; UI.screen="catdrill"; render(); }
       else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
@@ -2939,7 +2960,7 @@ function bindEntry(){
   document.querySelectorAll("[data-a]").forEach(el=>{
     el.onclick = ()=>{
       const a=el.dataset.a, v=el.dataset.v;
-      if(a==="back"){ UI.screen="main"; render(); }
+      if(a==="back"){ UI.screen=(UI.entryReturn||"main"); UI.entryReturn=null; render(); }
       else if(a==="etype"){ f.type=v; f.category = v==="expense"?"消費":"給与"; render(); }
       else if(a==="ecat"){ f.category=v; render(); }
       else if(a==="usual"){ const c=(UI._usualChips||[])[num(el.dataset.i)]; if(c){ f.store=c.store; f.item=c.item; f.category=c.cat; render(); const amt=document.getElementById("e-amount"); if(amt) amt.focus(); } }
@@ -2952,7 +2973,7 @@ function bindEntry(){
           if(tpl){ tpl.skips = tpl.skips || []; if(!tpl.skips.includes(ent.date)) tpl.skips.push(ent.date); }
         }
         S.entries = S.entries.filter(x=>x.id!==UI.editEntryId);
-        save(); UI.screen="main"; render();
+        save(); UI.screen=(UI.entryReturn||"main"); UI.entryReturn=null; render();
       }
       else if(a==="esave"){
         const amt = num(f.amount);
@@ -2965,7 +2986,7 @@ function bindEntry(){
         } else {
           S.entries.push({id:uid(),date:f.date,type:f.type,category:f.category,amount:amt,store,item,memo});
         }
-        save(); UI.screen="main"; render();
+        save(); UI.screen=(UI.entryReturn||"main"); UI.entryReturn=null; render();
       }
     };
   });
