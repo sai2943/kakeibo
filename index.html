@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.06 (localStorage保存・完全オフライン)
+   Tally 3.07 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -614,7 +614,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.06";
+const APP_VERSION = "3.07";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2991,7 +2991,19 @@ function bindEntry(){
       else if(a==="edel"){
         const ent = S.entries.find(x=>x.id===UI.editEntryId);
         const isFixed = ent && ent.fixedId;
-        if(!confirm(isFixed ? "この定期記録の今回分をスキップします。\n(定期設定は残り、来月以降は自動で計上されます)\nよろしいですか?" : "この記録を削除しますか?")) return;
+        let fmsg = "";
+        if(isFixed){
+          /* 次回発生日を実計算して提示(月次・週次・曜日指定すべてに正しい文言) */
+          const tpl0 = (S.fixed||[]).find(t=>String(t.id)===String(ent.fixedId));
+          let nextTxt = "";
+          if(tpl0){
+            const sk = (tpl0.skips||[]).concat([ent.date]);
+            const nx = fixedOccurrences(tpl0).map(fmtDate).find(d=> d>ent.date && !sk.includes(d));
+            nextTxt = nx ? "次回は "+nx.slice(5).replace("-","/")+" に自動計上されます。" : "以降の予定はありません(これが最後の分でした)。";
+          }
+          fmsg = "この定期記録の今回分("+ent.date.slice(5).replace("-","/")+")をスキップします。\n定期設定は残ります。"+nextTxt+"\nよろしいですか?";
+        }
+        if(!confirm(isFixed ? fmsg : "この記録を削除しますか?")) return;
         if(isFixed){
           const tpl = (S.fixed||[]).find(t=>String(t.id)===String(ent.fixedId));
           if(tpl){ tpl.skips = tpl.skips || []; if(!tpl.skips.includes(ent.date)) tpl.skips.push(ent.date); }
