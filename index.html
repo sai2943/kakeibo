@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.05 (localStorage保存・完全オフライン)
+   Tally 3.06 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -262,11 +262,18 @@ const fmtDate = dt => dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0
 function fixedOccurrences(tpl){
   const now = new Date();
   const y = now.getFullYear();
-  const yEnd = new Date(y, 11, 31);
+  let yEnd = new Date(y, 11, 31);
+  if(tpl.end){ const e = new Date(tpl.end+"T00:00:00"); if(e < yEnd) yEnd = e; }  /* 終了日で打ち切り */
   const floor = new Date(y, now.getMonth(), 1);   // 今月1日(過去への遡り防止)
   const freq = tpl.freq || "monthly";
   const out = [];
-  if(freq==="weekly" || freq==="biweekly"){
+  if(freq==="days"){
+    /* 曜日指定: 開始日〜終了日の範囲で該当曜日に毎回発生(駐輪場・出勤日系) */
+    const days = Array.isArray(tpl.days) ? tpl.days : [];
+    let d = tpl.start ? new Date(tpl.start+"T00:00:00") : new Date(floor);
+    if(d < floor) d = new Date(floor);
+    while(d <= yEnd){ if(days.includes(d.getDay())) out.push(new Date(d)); d = new Date(d.getTime()+86400000); }
+  } else if(freq==="weekly" || freq==="biweekly"){
     const step = (freq==="weekly"?7:14) * 86400000;
     let d = tpl.start ? new Date(tpl.start+"T00:00:00") : new Date(y, now.getMonth(), now.getDate());
     while(d < floor) d = new Date(d.getTime()+step);   // 起点を今月まで進める
@@ -275,7 +282,8 @@ function fixedOccurrences(tpl){
     const day = num(tpl.day)||1;
     const stepM = (freq==="bimonthly"?2:1);
     for(let m=now.getMonth(); m<=11; m+=stepM){
-      out.push(new Date(y, m, Math.min(day, daysInMonth(y, m+1))));
+      const dt = new Date(y, m, Math.min(day, daysInMonth(y, m+1)));
+      if(dt <= yEnd) out.push(dt);
     }
   }
   const hs = tpl.holidayShift || "none";
@@ -304,6 +312,7 @@ function fixedSchedLabel(t){
   const freq = t.freq || "monthly";
   if(freq==="weekly")   return "毎週("+(t.start||"").slice(5).replace("-","/")+"〜)";
   if(freq==="biweekly") return "2週ごと("+(t.start||"").slice(5).replace("-","/")+"〜)";
+  if(freq==="days") return "毎週 "+((t.days||[]).slice().sort().map(d=>"日月火水木金土"[d]).join("·"))+(t.end?"(〜"+t.end.slice(5).replace("-","/")+")":"");
   if(freq==="bimonthly")return "2ヶ月ごと "+num(t.day)+"日";
   return "毎月"+num(t.day)+"日";
 }
@@ -605,7 +614,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.05";
+const APP_VERSION = "3.06";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2472,18 +2481,24 @@ function viewFixed(){
     const freq = f.freq || "monthly";
     h += '<div class="muted" style="font-size:11px;margin:0 2px 6px">頻度</div>'+
       '<div class="row" style="gap:6px;margin-bottom:10px">'+
-      [["monthly","毎月"],["bimonthly","2ヶ月"],["weekly","毎週"],["biweekly","2週"]].map(([v,l])=>
-        '<button class="btn '+(freq===v?"sel":"")+'" style="flex:1;padding:9px 2px;font-size:12px" data-fa="ffreq" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
+      [["monthly","毎月"],["bimonthly","2ヶ月"],["weekly","毎週"],["biweekly","2週"],["days","曜日指定"]].map(([v,l])=>
+        '<button class="btn '+(freq===v?"sel":"")+'" style="flex:1;padding:9px 1px;font-size:11px" data-fa="ffreq" data-v="'+v+'">'+l+'</button>').join("")+'</div>';
     const isWeekly = (freq==="weekly"||freq==="biweekly");
+    const isDays = (freq==="days");
+    h += (isDays ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">発生する曜日(複数選択)</div>'+
+      '<div class="row" style="gap:4px;margin-bottom:10px">'+
+      [1,2,3,4,5,6,0].map(d=>'<button class="btn '+(((f.days)||[]).includes(d)?"sel":"")+'" style="flex:1;padding:9px 0;font-size:12px" data-fa="fdow" data-v="'+d+'">'+"日月火水木金土"[d]+'</button>').join("")+'</div>' : '');
     h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
-      (isWeekly
-        ? '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">起点日('+(freq==="weekly"?"毎週":"2週ごと")+')</div>'+
+      ((isWeekly||isDays)
+        ? '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">'+(isDays?"開始日":"起点日("+(freq==="weekly"?"毎週":"2週ごと")+")")+'</div>'+
           '<input class="input sm mono" type="date" id="fx-start" value="'+esc(f.start||todayStr())+'"></div>'
         : '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">'+(freq==="bimonthly"?"発生日(2ヶ月ごと)":"毎月の発生日")+'</div>'+
           '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-day" placeholder="1-31" value="'+esc(f.day)+'"></div>')+
       '<div style="flex:1.2"><div class="muted" style="font-size:9px;margin-bottom:2px">金額</div>'+
       '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-amount" placeholder="円" value="'+esc(f.amount)+'"></div></div>'+
-      (!isWeekly ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">引き落とし日が土日祝のとき</div>'+
+      '<div class="row" style="gap:8px;margin-bottom:12px"><div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">終了日(空欄=年内ずっと)</div>'+
+      '<input class="input sm mono" type="date" id="fx-end" value="'+esc(f.end||"")+'"></div><div style="flex:1.2"></div></div>'+
+      (!isWeekly && !isDays ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">引き落とし日が土日祝のとき</div>'+
         '<div class="row" style="gap:6px;margin-bottom:12px">'+
         [["none","変わらず"],["before","前営業日"],["after","翌営業日"]].map(([v,l])=>
           '<button class="btn '+((f.holidayShift||"none")===v?"sel":"")+'" style="flex:1;padding:9px 2px;font-size:12px" data-fa="fshift" data-v="'+v+'">'+l+'</button>').join("")+'</div>' : '')+
@@ -2519,7 +2534,7 @@ function bindFixed(){
       else if(a==="fshift"){ f.holidayShift=v; render(); }
       else if(a==="edit"){
         const t=(S.fixed||[]).find(x=>String(x.id)===String(v));
-        if(t){ UI.fixForm={editId:t.id, type:t.type, name:t.name, store:t.store||"", item:(t.item!=null?t.item:(t.name||"")), category:t.category, freq:t.freq||"monthly", day:t.day?String(t.day):"", start:t.start||todayStr(), amount:String(t.amount), holidayShift:t.holidayShift||"none"}; render(); }
+        if(t){ UI.fixForm={editId:t.id, type:t.type, name:t.name, store:t.store||"", item:(t.item!=null?t.item:(t.name||"")), category:t.category, freq:t.freq||"monthly", day:t.day?String(t.day):"", start:t.start||todayStr(), amount:String(t.amount), holidayShift:t.holidayShift||"none", days:(t.days||[]).slice(), end:t.end||""}; render(); }
       }
       else if(a==="stop"){
         const t=(S.fixed||[]).find(x=>String(x.id)===String(v));
@@ -2533,6 +2548,8 @@ function bindFixed(){
           deleteFixed(v); UI.fixForm=null; render();
         }
       }
+      else if(a==="fdow"){ const d=num(v); f.days=Array.isArray(f.days)?f.days:[];
+        f.days = f.days.includes(d) ? f.days.filter(x=>x!==d) : f.days.concat([d]); render(); }
       else if(a==="fsave"){
         const store=(f.store||"").trim(), item=(f.item||"").trim();
         const name=[store,item].filter(Boolean).join(" ");
@@ -2540,11 +2557,17 @@ function bindFixed(){
         if(num(f.amount)<=0){ alert("金額を入力してください。"); return; }
         const freq = f.freq || "monthly";
         const isW = (freq==="weekly"||freq==="biweekly");
+        const isD = (freq==="days");
         if(isW && !f.start){ alert("起点日を選んでください。"); return; }
+        if(isD && !(Array.isArray(f.days)&&f.days.length)){ alert("発生する曜日を選んでください。"); return; }
+        if(isD && !f.start) f.start = todayStr();
+        const endEl = document.getElementById("fx-end");
+        const endV = endEl ? endEl.value : (f.end||"");
         let day = num(f.day); if(day<1) day=1; if(day>31) day=31;
         const base={name, store, item, type:f.type, category:f.category, freq,
-          day:isW?"":String(day), start:isW?f.start:"", amount:String(num(f.amount)),
-          holidayShift: isW ? "none" : (f.holidayShift||"none")};
+          day:(isW||isD)?"":String(day), start:(isW||isD)?f.start:"", amount:String(num(f.amount)),
+          holidayShift: (isW||isD) ? "none" : (f.holidayShift||"none"),
+          days: isD ? f.days.slice().sort() : undefined, end: endV||""};
         if(f.editId){
           updateFixed(Object.assign({id:f.editId}, base));
         }else{
