@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.12 (localStorage保存・完全オフライン)
+   Tally 3.13 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -416,6 +416,7 @@ function applyData(d){
   S.bank = Object.assign({switch:"",ceiling:"300000",seed:"",txns:[]}, d.bank||{});
   S.savings = Object.assign({goals:[],txns:[]}, d.savings||{});
   S.budgets = (d.budgets && typeof d.budgets==="object") ? d.budgets : {};
+  S.openAddOnLaunch = !!d.openAddOnLaunch;   /* v3.13: ホワイトリスト漏れでトグルが毎起動リセットされていた */
   if(!Array.isArray(S.savings.goals) || !S.savings.goals.length){
     S.savings.goals = [{id:uid(),name:"引越し資金",target:"",done:false,doneDate:""},{id:uid(),name:"生活防衛費",target:"500000",done:false,doneDate:""}];
   }
@@ -657,7 +658,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.12";
+const APP_VERSION = "3.13";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2576,21 +2577,31 @@ function bindFixed(){
       if(a==="fback"){ UI.screen="main"; UI.tab="ledger"; UI.fixForm=null; render(); }
       else if(a==="fdiag"){
         const lines=[];
+        const tplIds = new Set((S.fixed||[]).map(t=>String(t.id)));
         (S.fixed||[]).forEach(t=>{
           const es=(S.entries||[]).filter(e=>String(e.fixedId)===String(t.id));
-          if(!es.length) return;
+          if(!es.length){ lines.push("■"+t.name+" (tpl:"+String(t.id).slice(-6)+") エントリ0件"); return; }
           lines.push("■"+t.name+" (tpl:"+String(t.id).slice(-6)+" ¥"+num(t.amount)+")");
           es.sort((a2,b2)=>a2.date<b2.date?-1:1).forEach(e=>{
-            const idTail="…"+String(e.id).slice(-14);
-            lines.push(" "+e.date+" ¥"+e.amount+" 出生:"+fixedOccKey(e)+(e.fixedDate?"(fD)":"(推定)")+" "+idTail);
+            lines.push(" "+e.date+" ¥"+e.amount+" 出生:"+fixedOccKey(e)+(e.fixedDate?"(fD)":"(推定)")+" …"+String(e.id).slice(-10));
           });
         });
+        /* 迷子: fixedIdはあるが参照先テンプレが存在しない */
+        const ghosts=(S.entries||[]).filter(e=>e.fixedId!=null && !tplIds.has(String(e.fixedId)));
+        if(ghosts.length){
+          lines.push("■迷子(参照先テンプレ不在)");
+          ghosts.forEach(e=>lines.push(" "+e.date+" ¥"+e.amount+" "+(e.store||"")+" 亡tpl:"+String(e.fixedId).slice(-6)+" …"+String(e.id).slice(-10)));
+        }
         const orphans=(S.entries||[]).filter(e=>e.fixedId==null && /-f\d{4}-\d{2}-\d{2}$/.test(String(e.id||"")));
         if(orphans.length){
           lines.push("■戸籍喪失(元定期でfixedId無し)");
-          orphans.forEach(e=>lines.push(" "+e.date+" ¥"+e.amount+" "+(e.store||"")+" …"+String(e.id).slice(-14)));
+          orphans.forEach(e=>lines.push(" "+e.date+" ¥"+e.amount+" "+(e.store||"")+" …"+String(e.id).slice(-10)));
         }
-        alert(lines.length?lines.join("\n"):"定期エントリなし");
+        const full = lines.length?lines.join("\n"):"定期エントリなし";
+        const done = ()=>alert(full.slice(0,700)+(full.length>700?"\n…\n(全文はコピー済み——メモ帳等に貼り付けて共有できます)":""));
+        if(navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(full).then(done, ()=>alert(full));
+        } else alert(full);
       }
       else if(a==="new"){ UI.fixForm={type:"expense",name:"",store:"",item:"",category:"消費",freq:"monthly",day:"",start:todayStr(),amount:""}; render(); }
       else if(a==="fcancel"){ UI.fixForm=null; render(); }
