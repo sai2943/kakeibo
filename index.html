@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.13 (localStorage保存・完全オフライン)
+   Tally 3.14 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -369,6 +369,14 @@ function updateFixed(tpl){
   const today = todayStr();
   S.entries = S.entries.filter(e=> !(String(e.fixedId)===String(tpl.id) && e.date > today));
   S.fixed = (S.fixed||[]).map(t=> String(t.id)===String(tpl.id) ? tpl : t);
+  /* 養子縁組(v3.14): スケジュール変更で出生日が旧暦のまま残った実績を新暦へ。
+     新スケジュールの発生日と同じ日付を持つ自テンプレの実績に fixedDate を刻み直し、
+     その発生の代表として認知させる(水道27日→2ヶ月15日変更で双子が生まれた事件の再発防止) */
+  const occs = fixedOccurrences(tpl).map(fmtDate);
+  S.entries.forEach(e=>{
+    if(String(e.fixedId)!==String(tpl.id)) return;
+    if(occs.includes(e.date) && fixedOccKey(e)!==e.date){ e.fixedDate = e.date; }
+  });
   genFixedEntries(tpl);
   save();
 }
@@ -658,7 +666,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.13";
+const APP_VERSION = "3.14";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
