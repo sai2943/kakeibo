@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.09 (localStorage保存・完全オフライン)
+   Tally 3.10 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -621,7 +621,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.09";
+const APP_VERSION = "3.10";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -1133,6 +1133,10 @@ function viewTool(){
     '<div class="muted" style="font-size:11px;margin-top:2px">毎月の定期支出を登録(家計簿に自動計上)</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
   h += '<div class="card" data-a="wishlist" style="cursor:pointer;margin-top:8px"><div class="row between" style="align-items:center"><div><div style="font-size:13px;font-weight:600">ほしい物</div>'+
     '<div class="muted" style="font-size:11px;margin-top:2px">買いたい物・欲しい物リスト</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
+  h += '<div class="card" data-a="togglelaunchadd" style="cursor:pointer;margin-top:8px"><div class="row between" style="align-items:center"><div>'+
+    '<div style="font-size:13px;font-weight:600">起動時に記帳画面を開く</div>'+
+    '<div class="muted" style="font-size:11px;margin-top:2px">アイコンから開くと即入力(閲覧は ‹戻る)</div></div>'+
+    '<span class="btn '+(S.openAddOnLaunch?"sel":"")+'" style="flex:none;font-size:11px;padding:6px 14px">'+(S.openAddOnLaunch?"ON":"OFF")+'</span></div></div>';
   h += band("麻雀");
   h += '<div class="card" data-a="mjtlist" style="cursor:pointer"><div class="row between" style="align-items:center"><div>'+
     '<div style="font-size:13px;font-weight:600">スコア表</div>'+
@@ -2836,6 +2840,7 @@ function bindMain(){
       else if(a==="wishlist"){ UI.screen="wishlist"; render(); }
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
+      else if(a==="togglelaunchadd"){ S.openAddOnLaunch=!S.openAddOnLaunch; save(); render(); }
       else if(a==="catdrill"){ UI.drillCat=v; UI.drillOpenStore=null; UI.drillMode="chain"; UI.screen="catdrill"; render(); }
       else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
@@ -4232,6 +4237,13 @@ load();
   if(!sn.length || new Date(sn[0].ts).toDateString() !== new Date().toDateString()) takeSnap("日次");
 })();
 ensureFixedEntries();
+/* 起動時に記帳画面を開く(ツールでON/OFF・コールドスタート時のみ) */
+if(S.openAddOnLaunch){
+  UI.tab="ledger"; UI.editEntryId=null;
+  UI.entryForm={date:todayStr(),type:"expense",category:"消費",amount:"",store:"",item:"",memo:""};
+  UI.screen="entry";
+  render();
+}
 render();
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("./sw.js").catch(()=>{ /* 未対応環境でも本体は動く */ });
