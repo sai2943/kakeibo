@@ -189,7 +189,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.00 (localStorage保存・完全オフライン)
+   Tally 3.01 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -607,7 +607,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.00";
+const APP_VERSION = "3.01";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -649,6 +649,7 @@ function _renderBody(){
   if(UI.screen==="mjsheet"){ app.innerHTML = viewMjSheet(); bindMjTable(); return; }
   if(UI.screen==="mjtable"){ app.innerHTML = viewMjTable(); bindMjTable(); return; }
   if(UI.screen==="mjtlist"){ app.innerHTML = viewMjtList(); bindMjtList(); return; }
+  if(UI.screen==="catdrill"){ app.innerHTML = viewCatDrill(); bindCatDrill(); return; }
   if(UI.screen==="mdb"){ app.innerHTML = viewMdb(); bindMdb(); return; }
   if(UI.screen==="stores"){ app.innerHTML = viewStores(); bindStores(); return; }
   if(UI.screen==="bordertool"){ app.innerHTML = viewBorderTool(); bindBorderTool(); return; }
@@ -674,7 +675,7 @@ const monthNav = () =>
 
 const TAB_ICONS = {
   ledger: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-3-1.5-3 1.5-3-1.5-3 1.5V3z"/><path d="M9 8h6M9 11.5h6"/></svg>',
-  games: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3.6"/><g fill="currentColor" stroke="none"><circle cx="8.6" cy="8.6" r="1.45"/><circle cx="15.4" cy="8.6" r="1.45"/><circle cx="12" cy="12" r="1.45"/><circle cx="8.6" cy="15.4" r="1.45"/><circle cx="15.4" cy="15.4" r="1.45"/></g></svg>',
+  games: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 19.6 7v9.8L12 21.4 4.4 16.8V7z"/><path d="M4.4 7 12 11.4l7.6-4.4M12 11.4v10"/><g fill="currentColor" stroke="none"><circle cx="12" cy="6.9" r="1.15"/><circle cx="8.2" cy="12.9" r="1.05"/><circle cx="8.2" cy="16.4" r="1.05"/><circle cx="14.3" cy="12.7" r="1"/><circle cx="15.8" cy="14.5" r="1"/><circle cx="17.3" cy="16.3" r="1"/></g></svg>',
   assets: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v11c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 10.7c0 1.66 3.58 3 8 3s8-1.34 8-3"/><path d="M4 13.85c0 1.66 3.58 3 8 3s8-1.34 8-3"/></svg>',
   tool: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><rect x="8" y="6" width="8" height="3" rx="0.6"/><circle cx="9" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="15" cy="13" r="0.9" fill="currentColor" stroke="none"/><circle cx="9" cy="16.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="12" cy="16.6" r="0.9" fill="currentColor" stroke="none"/><circle cx="15" cy="16.6" r="0.9" fill="currentColor" stroke="none"/></svg>'
 };
@@ -683,6 +684,74 @@ function tabBar(){
     [["ledger","家計簿"],["games","遊技"],["assets","資産"],["tool","ツール"]].map(([v,l])=>
       '<button class="'+(UI.tab===v?"on":"")+'" data-a="tab" data-v="'+v+'">'+TAB_ICONS[v]+'<span>'+l+'</span></button>').join("")+
     '</div>';
+}
+
+/* ---------- カテゴリ内訳(店別ドリルダウン) ---------- */
+function viewCatDrill(){
+  const cat = UI.drillCat || "消費";
+  const mk = monthKey();
+  const parts = mk.split("-");
+  const NET_SRCS = ["slot","mahjong"];
+  const isNetEntry = e => NET_SRCS.includes(e.src);
+  const list = S.entries.filter(e=> e.date.startsWith(mk) && e.type==="expense" && e.category===cat && !isNetEntry(e));
+  const cap = num((S.budgets||{})[cat])||0;
+  const spent = list.reduce((a,e)=>a+e.amount,0);
+  const pct = cap>0 ? Math.min(100, spent/cap*100) : 0;
+  const over = spent - cap;
+  const g = {};
+  list.forEach(e=>{ const k=(e.store||"").trim()||"店名未入力"; (g[k]=g[k]||[]).push(e); });
+  const groups = Object.keys(g).map(k=>({k:k, sum:g[k].reduce((a,e)=>a+e.amount,0), es:g[k].sort((a,b)=>a.date<b.date?1:-1)})).sort((a,b)=>b.sum-a.sum);
+
+  let h = '<div class="row" style="align-items:center;margin-bottom:10px">'+
+    '<button class="navbtn" data-a="drillback" style="font-size:14px">‹ 戻る</button>'+
+    '<div style="flex:1;text-align:center;font-weight:700;font-size:15px">'+esc(cat)+'の内訳 <span class="muted" style="font-size:11px">'+num(parts[0])+'年'+num(parts[1])+'月</span></div>'+
+    '<button class="navbtn" data-a="setbudget" data-v="'+esc(cat)+'" style="font-size:12px;color:var(--teal)">予算変更</button></div>';
+  h += '<div class="card" style="margin-bottom:12px">';
+  if(cap>0){
+    const col = over>0 ? "var(--red)" : (cat==="娯楽" ? "var(--amber)" : "var(--red)");
+    h += '<div class="row between" style="align-items:baseline;margin-bottom:6px"><span style="font-size:12px;font-weight:700">合計</span>'+
+      '<span><span class="mono '+(over>0?"red":"")+'" style="font-size:16px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:11px"> / ¥'+cap.toLocaleString("ja-JP")+'</span></span></div>'+
+      '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
+      '<div class="row between" style="font-size:10px;margin-top:5px">'+(over>0?'<span class="red" style="font-weight:700">超過 ¥'+over.toLocaleString("ja-JP")+'</span>':'<span class="muted">残り ¥'+Math.max(0,cap-spent).toLocaleString("ja-JP")+'</span>')+'<span class="mono muted">'+list.length+'件</span></div>';
+  } else {
+    h += '<div class="row between"><span style="font-size:12px;font-weight:700">合計</span><span class="mono" style="font-size:16px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span></div>';
+  }
+  h += '</div>';
+  if(!groups.length){
+    h += '<div class="muted" style="text-align:center;font-size:12px;padding:24px 0">この月の'+esc(cat)+'の支出はまだありません</div>';
+  } else {
+    h += '<div class="card" style="padding:2px 12px">';
+    groups.forEach((gr,gi)=>{
+      const open = UI.drillOpenStore===gr.k;
+      h += '<div class="row" data-a="drillstore" data-v="'+esc(gr.k)+'" style="gap:8px;align-items:center;padding:11px 0;cursor:pointer'+(gi>0?';border-top:1px solid var(--line)':'')+'">'+
+        '<span style="flex:none;font-size:11px;color:var(--muted);width:12px">'+(open?"▾":"▸")+'</span>'+
+        '<span class="ellip" style="flex:1;font-size:13px;font-weight:600;min-width:0">'+esc(gr.k)+'</span>'+
+        '<span class="muted" style="flex:none;font-size:10px">'+gr.es.length+'件</span>'+
+        '<span class="mono" style="flex:none;font-size:14px;font-weight:700">¥'+gr.sum.toLocaleString("ja-JP")+'</span></div>';
+      if(open){
+        gr.es.forEach(e=>{
+          const label = (e.item||"").trim() || (e.memo||"").trim() || "—";
+          h += '<div class="row" style="gap:8px;align-items:center;padding:6px 0 6px 20px;border-top:1px solid var(--surface2)">'+
+            '<span class="mono muted" style="flex:none;font-size:11px">'+esc((e.date||"").slice(5).replace("-","/"))+'</span>'+
+            '<span class="ellip muted" style="flex:1;font-size:12px;min-width:0">'+esc(label)+'</span>'+
+            '<span class="mono" style="flex:none;font-size:12px">¥'+e.amount.toLocaleString("ja-JP")+'</span></div>';
+        });
+      }
+    });
+    h += '</div>';
+  }
+  h += saveIndicatorHtml();
+  return h;
+}
+function bindCatDrill(){
+  document.querySelectorAll("[data-a]").forEach(el=>{
+    el.onclick = () => {
+      const a=el.dataset.a, v=el.dataset.v;
+      if(a==="drillback"){ UI.screen="main"; UI.drillOpenStore=null; render(); }
+      else if(a==="drillstore"){ UI.drillOpenStore = (UI.drillOpenStore===v ? null : v); render(); }
+      else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
+    };
+  });
 }
 
 /* ---------- メイン画面 ---------- */
@@ -788,12 +857,12 @@ function viewLedger(){
     const over = spent - cap;
     const col = over>0 ? "var(--red)" : (cat==="娯楽" ? "var(--amber)" : "var(--red)");
     const colCls = over>0 ? "red" : (cat==="娯楽" ? "amber" : "red");
-    h += '<div style="cursor:pointer'+(i>0?";margin-top:13px;padding-top:13px;border-top:1px solid var(--line)":"")+'" data-a="setbudget" data-v="'+cat+'">';
+    h += '<div style="cursor:pointer'+(i>0?";margin-top:13px;padding-top:13px;border-top:1px solid var(--line)":"")+'" data-a="'+(cap>0?"catdrill":"setbudget")+'" data-v="'+cat+'">';
     if(cap>0){
       h += '<div class="row between" style="align-items:baseline;margin-bottom:6px"><span style="font-size:12px;font-weight:700">今月の'+cat+'</span>'+
         '<span><span class="mono '+colCls+'" style="font-size:15px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:11px"> / ¥'+cap.toLocaleString("ja-JP")+'</span></span></div>'+
         '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
-        '<div class="row between" style="font-size:10px;margin-top:5px">'+(over>0?'<span class="red" style="font-weight:700">超過 ¥'+over.toLocaleString("ja-JP")+'</span>':'<span class="muted">残り ¥'+Math.max(0,cap-spent).toLocaleString("ja-JP")+'</span>')+'<span class="mono muted">'+Math.floor(pct)+'% ・ タップで変更</span></div>';
+        '<div class="row between" style="font-size:10px;margin-top:5px">'+(over>0?'<span class="red" style="font-weight:700">超過 ¥'+over.toLocaleString("ja-JP")+'</span>':'<span class="muted">残り ¥'+Math.max(0,cap-spent).toLocaleString("ja-JP")+'</span>')+'<span class="mono muted">'+Math.floor(pct)+'% ・ 内訳を見る</span></div>';
     } else {
       h += '<div class="row between" style="align-items:center"><span style="font-size:12px"><span style="font-weight:700">今月の'+cat+'</span> <span class="mono muted">¥'+spent.toLocaleString("ja-JP")+'</span></span><span class="amber" style="font-size:11px">＋ 上限を設定</span></div>';
     }
@@ -2715,6 +2784,7 @@ function bindMain(){
       else if(a==="wishlist"){ UI.screen="wishlist"; render(); }
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
+      else if(a==="catdrill"){ UI.drillCat=v; UI.drillOpenStore=null; UI.screen="catdrill"; render(); }
       else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
