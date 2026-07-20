@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.10 (localStorage保存・完全オフライン)
+   Tally 3.11 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽"];
@@ -312,7 +312,40 @@ function genFixedEntries(tpl){
     }
   });
 }
+/* 分身の自動掃除: 同じ定期・同じ出生日のエントリが複数いたら、
+   テンプレ通りの未編集クローンだけを消す(ユーザーが触った方=金額/日付/店が違う方は必ず残す)。
+   第二サイロ(Safari別ストレージ・旧版キャッシュの他端末)からの注入に対する免疫。 */
+function fixedDedupe(){
+  const byTpl = {};
+  (S.fixed||[]).forEach(t=>{ byTpl[String(t.id)] = t; });
+  const groups = {};
+  (S.entries||[]).forEach(e=>{
+    if(e.fixedId==null) return;
+    const k = String(e.fixedId)+"|"+fixedOccKey(e);
+    (groups[k]=groups[k]||[]).push(e);
+  });
+  const removeIds = [];
+  Object.keys(groups).forEach(k=>{
+    const g = groups[k];
+    if(g.length < 2) return;
+    const tpl = byTpl[String(g[0].fixedId)];
+    const untouched = e => !!tpl
+      && e.date === fixedOccKey(e)
+      && num(e.amount) === num(tpl.amount)
+      && (e.store||"") === (tpl.store||"");
+    const touched = g.filter(e=>!untouched(e));
+    const keep = touched.length ? touched : [g[0]];
+    g.forEach(e=>{ if(!keep.includes(e)) removeIds.push(e.id); });
+  });
+  if(removeIds.length){
+    S.entries = S.entries.filter(e=>!removeIds.includes(e.id));
+    saveLocal();
+    setTimeout(()=>{ try{ toast("定期の重複"+removeIds.length+"件を自動整理しました"); }catch(e){} }, 600);
+  }
+  return removeIds.length;
+}
 function ensureFixedEntries(){
+  fixedDedupe();
   (S.fixed||[]).forEach(genFixedEntries);
 }
 function fixedSchedLabel(t){
@@ -621,7 +654,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.10";
+const APP_VERSION = "3.11";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -4126,6 +4159,7 @@ async function cloudSync(){
     if(cloud && cloudTs > localTs){
       takeSnap("同期前");       // 上書き前にローカルを退避
       applyData(cloud);         // クラウドが新しい→採用
+      fixedDedupe();            // 受信状態に分身がいたらここで掃除
       saveLocal();
       render();
       toast("クラウドから同期しました");
