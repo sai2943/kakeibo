@@ -187,10 +187,10 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.14 (localStorage保存・完全オフライン)
+   Tally 3.15 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
-const EXPENSE_CATS = ["消費","娯楽"];
+const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
 const INCOME_CATS = ["給与","賞与","副業","臨時"];
 const UNIT_LABEL = {medal:"枚", ball:"玉", yen:"円"};
 const WD = ["日","月","火","水","木","金","土"];
@@ -666,7 +666,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.14";
+const APP_VERSION = "3.15";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -933,7 +933,7 @@ function viewLedger(){
   /* 予算(カテゴリ別・月次上限) */
   h += band("予算");
   h += '<div class="card" style="margin-bottom:14px">';
-  EXPENSE_CATS.forEach((cat,i)=>{
+  EXPENSE_CATS.filter(c=>c!=="承認").forEach((cat,i)=>{  /* 承認は予算バー対象外(承認プロセス自体が統制) */
     const cap = num((S.budgets||{})[cat]);
     const spent = me.filter(e=>e.type==="expense" && e.category===cat && !isNetEntry(e)).reduce((a,e)=>a+e.amount,0);
     const pct = cap>0 ? Math.min(100, spent/cap*100) : 0;
@@ -965,7 +965,7 @@ function viewLedger(){
       list.map((e,i)=>{
         const signedAmt = e.type==="income" ? e.amount : -e.amount;
         const isFuture = e.date > todayS;
-        const cc = e.type==="income" ? "var(--teal)" : (e.category==="娯楽" ? "var(--amber)" : "var(--red)");
+        const cc = e.type==="income" ? "var(--teal)" : (e.category==="娯楽" ? "var(--amber)" : e.category==="承認" ? "var(--blue)" : "var(--red)");
         return '<div class="row" style="padding:10px 14px;cursor:pointer;'+(i?'border-top:1px solid var(--line);':'')+(isFuture?'opacity:.62;':'')+'" data-a="eedit" data-v="'+e.id+'">'+
         '<div style="flex:1;min-width:0"><div class="row" style="gap:5px;align-items:center;flex-wrap:wrap;margin-bottom:4px">'+
         '<span class="tag" style="border:1px solid '+cc+';color:'+cc+'">'+esc(e.category)+'</span>'+
@@ -2495,7 +2495,7 @@ function viewFixed(){
   if(list.length){
     h += band("登録済み");
     list.forEach(t=>{
-      const catC = t.type==="income" ? "var(--teal)" : (t.category==="娯楽"?"var(--amber)":"var(--teal)");
+      const catC = t.type==="income" ? "var(--teal)" : (t.category==="娯楽"?"var(--amber)":t.category==="承認"?"var(--blue)":"var(--teal)");
       const fst=(t.store!=null?String(t.store):"").trim(), fit=(t.item!=null?String(t.item):"").trim();
       const fTitle=fit||fst||t.name||"", fSub=(fit&&fst)?fst:"";
       h += '<div class="card" style="margin-bottom:8px"><div class="row between" style="align-items:center">'+
