@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.15 (localStorage保存・完全オフライン)
+   Tally 3.16 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -425,6 +425,7 @@ function applyData(d){
   S.savings = Object.assign({goals:[],txns:[]}, d.savings||{});
   S.budgets = (d.budgets && typeof d.budgets==="object") ? d.budgets : {};
   S.openAddOnLaunch = !!d.openAddOnLaunch;   /* v3.13: ホワイトリスト漏れでトグルが毎起動リセットされていた */
+  S.genres = (d.genres && typeof d.genres==="object") ? d.genres : {};   /* v3.16: 店→ジャンル辞書 */
   if(!Array.isArray(S.savings.goals) || !S.savings.goals.length){
     S.savings.goals = [{id:uid(),name:"引越し資金",target:"",done:false,doneDate:""},{id:uid(),name:"生活防衛費",target:"500000",done:false,doneDate:""}];
   }
@@ -666,7 +667,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.15";
+const APP_VERSION = "3.16";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -771,6 +772,22 @@ function viewCatDrill(){
     const k = (UI.drillMode==="chain" && ex!=="店名未入力") ? chainKey(ex) : ex;
     (g[k]=g[k]||[]).push(e);
   });
+  /* ジャンル辞書のレンズ: チェーン名単位で引く(1回の割当が全支店・全期間に効く) */
+  const genreOf = ch => (S.genres||{})[ch] || "未分類";
+  let ggroups = [];
+  if(UI.drillMode==="genre"){
+    const gc = {};
+    list.forEach(e=>{
+      const ex=(e.store||"").trim()||"店名未入力";
+      const ch = ex==="店名未入力" ? ex : chainKey(ex);
+      gc[ch]=gc[ch]||{ch:ch, sum:0, n:0}; gc[ch].sum+=e.amount; gc[ch].n++;
+    });
+    const gg = {};
+    Object.values(gc).forEach(c=>{ const gn=genreOf(c.ch); (gg[gn]=gg[gn]||[]).push(c); });
+    ggroups = Object.keys(gg).map(gn=>({gn:gn, chains:gg[gn].sort((a2,b2)=>b2.sum-a2.sum),
+      sum:gg[gn].reduce((s2,c)=>s2+c.sum,0), n:gg[gn].reduce((s2,c)=>s2+c.n,0)}))
+      .sort((a2,b2)=>b2.sum-a2.sum);
+  }
   const groups = Object.keys(g).map(k=>({k:k, sum:g[k].reduce((a,e)=>a+e.amount,0), es:g[k].sort((a,b)=>a.date<b.date?1:-1)})).sort((a,b)=>b.sum-a.sum);
 
   let h = '<div class="row" style="align-items:center;margin-bottom:10px">'+
@@ -790,8 +807,44 @@ function viewCatDrill(){
   h += '</div>';
   h += '<div class="row" style="gap:6px;margin-bottom:8px">'+
     '<button class="btn '+(UI.drillMode==="chain"?"sel":"")+'" data-a="drillmode" data-v="chain" style="flex:1;font-size:11px;padding:7px 0">チェーン集約</button>'+
-    '<button class="btn '+(UI.drillMode!=="chain"?"sel":"")+'" data-a="drillmode" data-v="exact" style="flex:1;font-size:11px;padding:7px 0">店舗別</button></div>';
-  if(!groups.length){
+    '<button class="btn '+(UI.drillMode==="exact"?"sel":"")+'" data-a="drillmode" data-v="exact" style="flex:1;font-size:11px;padding:7px 0">店舗別</button>'+
+    '<button class="btn '+(UI.drillMode==="genre"?"sel":"")+'" data-a="drillmode" data-v="genre" style="flex:1;font-size:11px;padding:7px 0">ジャンル</button></div>';
+  if(UI.drillMode==="genre"){
+    const GEN_STARTER=["食費","日用品","住居","水道光熱","通信","交通","医療","趣味・自己投資"];
+    const GEN_SUGG=[...new Set([...GEN_STARTER, ...Object.values(S.genres||{})])];
+    if(!ggroups.length){
+      h += '<div class="muted" style="text-align:center;font-size:12px;padding:24px 0">この月の'+esc(cat)+'の支出はまだありません</div>';
+    } else {
+      h += '<div class="muted" style="font-size:10px;margin:0 2px 6px">店をタップでジャンルを割当(全期間の記録に即反映)</div>';
+      h += '<div class="card" style="padding:2px 12px">';
+      ggroups.forEach((G,gi)=>{
+        const open = UI.drillOpenStore===("g:"+G.gn);
+        h += '<div class="row" data-a="drillstore" data-v="g:'+esc(G.gn)+'" style="gap:8px;align-items:center;padding:11px 0;cursor:pointer'+(gi>0?';border-top:1px solid var(--line)':'')+'">'+
+          '<span style="flex:none;font-size:11px;color:var(--muted);width:12px">'+(open?"▾":"▸")+'</span>'+
+          '<span class="ellip" style="flex:1;font-size:13px;font-weight:600;min-width:0'+(G.gn==="未分類"?';color:var(--muted)':'')+'">'+esc(G.gn)+'</span>'+
+          '<span class="muted" style="flex:none;font-size:10px">'+G.n+'件</span>'+
+          '<span class="mono" style="flex:none;font-size:14px;font-weight:700">¥'+G.sum.toLocaleString("ja-JP")+'</span></div>';
+        if(open){
+          G.chains.forEach(c=>{
+            const asg = UI.drillAssign===c.ch;
+            h += '<div class="row" data-a="gassign" data-v="'+esc(c.ch)+'" style="gap:8px;align-items:center;padding:6px 0 6px 20px;border-top:1px solid var(--surface2);cursor:pointer">'+
+              '<span class="ellip" style="flex:1;font-size:12px;min-width:0;color:'+(asg?"var(--teal)":"var(--muted)")+'">'+esc(c.ch)+'</span>'+
+              '<span class="muted" style="flex:none;font-size:10px">'+c.n+'件</span>'+
+              '<span class="mono" style="flex:none;font-size:12px">¥'+c.sum.toLocaleString("ja-JP")+'</span></div>';
+            if(asg){
+              const cur=(S.genres||{})[c.ch]||"";
+              h += '<div class="row" style="flex-wrap:wrap;gap:6px;padding:4px 0 10px 20px;border-top:1px solid var(--surface2)">'+
+                GEN_SUGG.map(gn=>'<button class="chip '+(cur===gn?"sel":"")+'" data-a="gset" data-c="'+esc(c.ch)+'" data-v="'+esc(gn)+'">'+esc(gn)+'</button>').join("")+
+                '<button class="chip" style="border-style:dashed;color:var(--muted)" data-a="gnew" data-c="'+esc(c.ch)+'">＋新規</button>'+
+                (cur?'<button class="chip" style="color:var(--muted)" data-a="gclear" data-c="'+esc(c.ch)+'">未分類へ</button>':'')+
+                '</div>';
+            }
+          });
+        }
+      });
+      h += '</div>';
+    }
+  } else if(!groups.length){
     h += '<div class="muted" style="text-align:center;font-size:12px;padding:24px 0">この月の'+esc(cat)+'の支出はまだありません</div>';
   } else {
     h += '<div class="card" style="padding:2px 12px">';
@@ -826,7 +879,11 @@ function bindCatDrill(){
       const a=el.dataset.a, v=el.dataset.v;
       if(a==="drillback"){ UI.screen="main"; UI.drillOpenStore=null; render(); }
       else if(a==="drillstore"){ UI.drillOpenStore = (UI.drillOpenStore===v ? null : v); render(); }
-      else if(a==="drillmode"){ UI.drillMode=v; UI.drillOpenStore=null; render(); }
+      else if(a==="drillmode"){ UI.drillMode=v; UI.drillOpenStore=null; UI.drillAssign=null; render(); }
+      else if(a==="gassign"){ UI.drillAssign = (UI.drillAssign===v ? null : v); render(); }
+      else if(a==="gset"){ const ch=el.dataset.c; S.genres=S.genres||{}; S.genres[ch]=v; UI.drillAssign=null; save(); render(); }
+      else if(a==="gnew"){ const ch=el.dataset.c; const gn=prompt("新しいジャンル名:"); if(gn==null||!gn.trim())return; S.genres=S.genres||{}; S.genres[ch]=gn.trim(); UI.drillAssign=null; save(); render(); }
+      else if(a==="gclear"){ const ch=el.dataset.c; if(S.genres){ delete S.genres[ch]; } UI.drillAssign=null; save(); render(); }
       else if(a==="drilledit"){
         const e=S.entries.find(x=>String(x.id)===String(v)); if(!e) return;
         UI.editEntryId=e.id;
@@ -2915,7 +2972,7 @@ function bindMain(){
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
       else if(a==="togglelaunchadd"){ S.openAddOnLaunch=!S.openAddOnLaunch; save(); render(); }
-      else if(a==="catdrill"){ UI.drillCat=v; UI.drillOpenStore=null; UI.drillMode="chain"; UI.screen="catdrill"; render(); }
+      else if(a==="catdrill"){ UI.drillCat=v; UI.drillOpenStore=null; UI.drillMode="chain"; UI.drillAssign=null; UI.screen="catdrill"; render(); }
       else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
