@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.17 (localStorage保存・完全オフライン)
+   Tally 3.18 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -426,6 +426,7 @@ function applyData(d){
   S.budgets = (d.budgets && typeof d.budgets==="object") ? d.budgets : {};
   S.openAddOnLaunch = !!d.openAddOnLaunch;   /* v3.13: ホワイトリスト漏れでトグルが毎起動リセットされていた */
   S.genres = (d.genres && typeof d.genres==="object") ? d.genres : {};   /* v3.16: 店→ジャンル辞書 */
+  S.invest = (d.invest && typeof d.invest==="object") ? d.invest : {policy:"",holdings:[],bufferTxns:[]};   /* v3.18: 投資台帳 */
   if(!Array.isArray(S.savings.goals) || !S.savings.goals.length){
     S.savings.goals = [{id:uid(),name:"引越し資金",target:"",done:false,doneDate:""},{id:uid(),name:"生活防衛費",target:"500000",done:false,doneDate:""}];
   }
@@ -667,7 +668,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.17";
+const APP_VERSION = "3.18";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -703,6 +704,8 @@ function _renderBody(){
   if(UI.screen==="mahjong-edit"){ app.innerHTML = viewMj(); bindMj(); return; }
   if(UI.screen==="fixed"){ app.innerHTML = viewFixed(); bindFixed(); return; }
   if(UI.screen==="wishlist"){ app.innerHTML = viewWishlist(); bindWishlist(); return; }
+  if(UI.screen==="invest"){ app.innerHTML = viewInvest(); bindInvest(); return; }
+  if(UI.screen==="investdetail"){ app.innerHTML = viewInvestDetail(); bindInvest(); return; }
   if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
   if(UI.screen==="savings"){ app.innerHTML = viewSavings(); bindSavings(); return; }
   document.body.classList.toggle("sheet-light", UI.screen==="mjsheet");
@@ -2269,8 +2272,220 @@ function viewAssets(){
       '<div class="row between" style="font-size:10px;margin-top:4px"><span class="muted">'+(tgt>0&&sBal>=tgt?"達成!":tgt>0?"あと ¥"+Math.max(0,tgt-sBal).toLocaleString("ja-JP"):"目標額 未設定")+'</span><span class="mono muted">'+(tgt>0?Math.floor(pct):0)+'%</span></div>';
   } else h+='<div class="muted" style="font-size:11px">全目標 達成</div>';
   h+='</div>';
-  h+='<div class="muted" style="font-size:10px;text-align:center;margin-top:12px">ポートフォリオは今後ここに追加</div>';
+  const inv=S.invest||{holdings:[]};
+  const invCost=(inv.holdings||[]).reduce((a,x)=>a+num(x.cost),0);
+  const bufBal=((inv.bufferTxns)||[]).reduce((a,t)=>a+num(t.amount),0);
+  const mkNow=monthKey();
+  const boughtThis=(inv.holdings||[]).filter(x=>(x.buys||[]).some(b=>(b.date||"").startsWith(mkNow))).length;
+  h+='<div class="card" style="margin-bottom:12px;cursor:pointer" data-a="invest">'+
+    '<div class="row between" style="align-items:baseline;margin-bottom:6px"><span style="font-size:13px;font-weight:700">投資 <span class="muted" style="font-size:10px;font-weight:400">簿価・時価なし</span></span>'+
+    '<span><span class="mono teal" style="font-size:18px;font-weight:700">¥'+invCost.toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>'+
+    '<div class="row between" style="font-size:11px"><span class="muted">'+((inv.holdings||[]).length)+'銘柄 ・ Buffer ¥'+bufBal.toLocaleString("ja-JP")+'</span>'+
+    '<span class="muted">今月の買付 '+boughtThis+'/'+((inv.holdings||[]).filter(x=>x.frame!=="yutai").length||0)+'銘柄</span></div></div>';
   return h;
+}
+
+/* ---------- 投資台帳(時価を追わない・シナリオ帳つき) ---------- */
+const NISA_CAPS = { tsumitate: 1200000, seicho: 2400000 };
+const FRAME_LABEL = { tsumitate:"つみたて", seicho:"成長", tokutei:"特定", yutai:"優待" };
+function invYearBuys(frame){
+  const y=String(new Date().getFullYear());
+  return ((S.invest||{}).holdings||[]).filter(x=>x.frame===frame)
+    .reduce((a,x)=>a+((x.buys||[]).filter(b=>(b.date||"").startsWith(y)).reduce((s,b)=>s+num(b.amount),0)),0);
+}
+function genInvestAudit(){
+  const inv=S.invest||{}; const today=todayStr();
+  const bufBal=((inv.bufferTxns)||[]).reduce((a,t)=>a+num(t.amount),0);
+  const L=[];
+  L.push("# 投資ポートフォリオ監査資料("+today+")");
+  L.push("");
+  L.push("## 投資方針(本人記述)");
+  L.push(inv.policy && inv.policy.trim() ? inv.policy.trim() : "(未記入)");
+  L.push("");
+  L.push("## 保有一覧(簿価ベース・時価は意図的に不採用)");
+  (inv.holdings||[]).forEach(x=>{
+    L.push("### "+x.name+" ["+(FRAME_LABEL[x.frame]||x.frame)+"枠]");
+    L.push("- 保有: "+num(x.qty).toLocaleString("ja-JP")+(x.unit||"")+" / 累計簿価 ¥"+num(x.cost).toLocaleString("ja-JP"));
+    const yb=(x.buys||[]).filter(b=>(b.date||"").startsWith(String(new Date().getFullYear()))).reduce((s,b)=>s+num(b.amount),0);
+    L.push("- 当年買付額: ¥"+yb.toLocaleString("ja-JP")+" / 買付回数(通算): "+((x.buys||[]).length)+"回");
+    L.push("- 保有理由: "+(x.thesis||"(未記入)"));
+    L.push("- 売却条件: "+(x.exit||"(未記入)"));
+    if(x.note) L.push("- メモ: "+x.note);
+    L.push("");
+  });
+  L.push("## NISA枠の当年消化");
+  L.push("- つみたて枠: ¥"+invYearBuys("tsumitate").toLocaleString("ja-JP")+" / ¥"+NISA_CAPS.tsumitate.toLocaleString("ja-JP"));
+  L.push("- 成長枠: ¥"+invYearBuys("seicho").toLocaleString("ja-JP")+" / ¥"+NISA_CAPS.seicho.toLocaleString("ja-JP"));
+  L.push("");
+  L.push("## 暴落時Buffer(現金)");
+  L.push("- 残高: ¥"+bufBal.toLocaleString("ja-JP"));
+  const recent=((inv.bufferTxns)||[]).slice(-6).reverse();
+  recent.forEach(t=>L.push("- "+t.date+" "+(num(t.amount)>=0?"+":"")+"¥"+num(t.amount).toLocaleString("ja-JP")+(t.memo?" ("+t.memo+")":"")));
+  L.push("");
+  L.push("## 監査依頼");
+  L.push("以下の観点で忌憚なく評価してください:");
+  L.push("1. 方針と保有の整合性(シナリオと実際の銘柄構成のズレ)");
+  L.push("2. 集中リスク・相関(想定シナリオが外れた場合の同時毀損)");
+  L.push("3. 各銘柄の売却条件の明確性・検証可能性");
+  L.push("4. 実行規律(買付頻度・NISA枠の使い方・Bufferの運用)");
+  L.push("5. 見落としているリスクや盲点");
+  return L.join("\n");
+}
+function viewInvest(){
+  const inv=S.invest||{policy:"",holdings:[],bufferTxns:[]};
+  const bufBal=(inv.bufferTxns||[]).reduce((a,t)=>a+num(t.amount),0);
+  let h='<div class="hdr"><button class="navbtn" data-iv="back">‹ 戻る</button><div style="font-size:14px;font-weight:700">投資</div><button class="navbtn" data-iv="audit" style="font-size:12px;color:var(--teal)">AI監査</button></div>';
+  /* 方針 */
+  h+='<div class="card" style="margin-bottom:12px">';
+  if(UI.invPolicyEdit){
+    h+='<div class="muted" style="font-size:10px;margin-bottom:6px">投資方針(監査資料の前文になります)</div>'+
+      '<textarea class="input" id="iv-policy" rows="6" style="width:100%;font-size:13px;line-height:1.6">'+esc(inv.policy||"")+'</textarea>'+
+      '<div class="row" style="gap:8px;margin-top:8px"><button class="btn" style="flex:1;padding:9px 0" data-iv="pcancel">キャンセル</button>'+
+      '<button class="btn tealb" style="flex:1;padding:9px 0;font-weight:700" data-iv="psave">保存</button></div>';
+  } else {
+    h+='<div class="row between" style="margin-bottom:4px"><span class="muted" style="font-size:10px">投資方針</span><button class="chip" style="font-size:10px;padding:3px 10px" data-iv="pedit">編集</button></div>'+
+      '<div style="font-size:12px;line-height:1.7;white-space:pre-wrap">'+(inv.policy&&inv.policy.trim()?esc(inv.policy):'<span class="muted">未記入 — シナリオと出口をここに書いておくと、暴落の夜に過去の自分が答えてくれます</span>')+'</div>';
+  }
+  h+='</div>';
+  /* NISA枠 */
+  const ty=invYearBuys("tsumitate"), sy=invYearBuys("seicho");
+  h+='<div class="card" style="margin-bottom:12px"><div class="muted" style="font-size:10px;margin-bottom:8px">NISA枠 '+new Date().getFullYear()+'年の消化</div>';
+  [["つみたて",ty,NISA_CAPS.tsumitate],["成長",sy,NISA_CAPS.seicho]].forEach(([lb,used,cap])=>{
+    const pct=Math.min(100,cap>0?used/cap*100:0);
+    h+='<div class="row between" style="font-size:11px;margin-bottom:3px"><span class="muted">'+lb+'</span><span class="mono">¥'+used.toLocaleString("ja-JP")+' <span class="muted">/ ¥'+cap.toLocaleString("ja-JP")+'</span></span></div>'+
+      '<div style="height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;margin-bottom:8px"><div style="height:100%;width:'+pct+'%;background:var(--teal)"></div></div>';
+  });
+  h+='</div>';
+  /* Buffer */
+  h+='<div class="card" style="margin-bottom:12px"><div class="row between" style="align-items:baseline;margin-bottom:6px">'+
+    '<span style="font-size:13px;font-weight:700">Buffer <span class="muted" style="font-size:10px;font-weight:400">暴落時の弾</span></span>'+
+    '<span class="mono teal" style="font-size:18px;font-weight:700">¥'+bufBal.toLocaleString("ja-JP")+'</span></div>'+
+    '<div class="row" style="gap:8px"><button class="btn" style="flex:1;font-size:12px;padding:8px 0" data-iv="bufin">＋ 積立を記録</button>'+
+    '<button class="btn" style="flex:1;font-size:12px;padding:8px 0" data-iv="bufout">− 出動を記録</button></div></div>';
+  /* 保有一覧 */
+  h+=band("保有(タップで詳細・買付)");
+  if(!(inv.holdings||[]).length){
+    h+='<div class="muted" style="text-align:center;font-size:12px;padding:16px 0">まだ銘柄がありません</div>';
+  } else {
+    h+='<div class="card" style="padding:2px 12px">';
+    inv.holdings.forEach((x,i)=>{
+      h+='<div class="row" data-iv="open" data-v="'+x.id+'" style="gap:8px;align-items:center;padding:11px 0;cursor:pointer'+(i>0?';border-top:1px solid var(--line)':'')+'">'+
+        '<div style="flex:1;min-width:0"><div class="ellip" style="font-size:13px;font-weight:600">'+esc(x.name)+'</div>'+
+        '<div class="muted" style="font-size:10px;margin-top:2px">'+(FRAME_LABEL[x.frame]||"")+' ・ '+num(x.qty).toLocaleString("ja-JP")+(x.unit||"")+'</div></div>'+
+        '<span class="mono" style="flex:none;font-size:13px;font-weight:700">¥'+num(x.cost).toLocaleString("ja-JP")+'</span>'+
+        '<span class="muted" style="flex:none">›</span></div>';
+    });
+    h+='</div>';
+  }
+  h+='<button class="btn dash full" style="padding:12px 0;margin-top:10px" data-iv="new">＋ 銘柄を追加</button>';
+  h+=saveIndicatorHtml();
+  return h;
+}
+function viewInvestDetail(){
+  const inv=S.invest||{holdings:[]};
+  const x=(inv.holdings||[]).find(z=>String(z.id)===String(UI.invId));
+  if(!x){ UI.screen="invest"; return viewInvest(); }
+  let h='<div class="hdr"><button class="navbtn" data-iv="backlist">‹ 投資</button><div class="ellip" style="font-size:14px;font-weight:700;max-width:56%">'+esc(x.name)+'</div><button class="navbtn" data-iv="del" style="font-size:12px;color:var(--red)">削除</button></div>';
+  h+='<div class="card" style="margin-bottom:12px;padding:6px 12px">'+
+    '<div class="row" style="gap:8px;align-items:center;padding:5px 0"><span class="muted" style="flex:none;width:44px;font-size:12px">名称</span>'+
+    '<input class="input sm" id="iv-name" value="'+esc(x.name)+'" style="flex:1;min-width:0"></div>'+
+    '<div class="row" style="gap:6px;align-items:center;padding:5px 0;border-top:1px solid var(--line)">'+
+    '<span class="muted" style="flex:none;width:44px;font-size:12px">枠</span>'+
+    Object.keys(FRAME_LABEL).map(fr=>'<button class="btn '+(x.frame===fr?"sel":"")+'" style="flex:1;font-size:11px;padding:7px 0" data-iv="frame" data-v="'+fr+'">'+FRAME_LABEL[fr]+'</button>').join("")+'</div>'+
+    '<div class="row" style="gap:8px;align-items:center;padding:5px 0;border-top:1px solid var(--line)"><span class="muted" style="flex:1;font-size:12px">保有 / 累計簿価</span>'+
+    '<span class="mono" style="font-size:14px;font-weight:700">'+num(x.qty).toLocaleString("ja-JP")+(x.unit||"")+' ・ ¥'+num(x.cost).toLocaleString("ja-JP")+'</span></div></div>';
+  /* 買付記録 */
+  h+='<div class="card" style="margin-bottom:12px"><div class="muted" style="font-size:10px;margin-bottom:6px">買付を記録(数量と簿価に加算)</div>'+
+    '<div class="row" style="gap:6px">'+
+    '<input class="input sm mono" type="date" id="iv-bdate" value="'+todayStr()+'" style="width:118px;flex:none">'+
+    '<input class="input sm mono r" type="number" inputmode="decimal" id="iv-bqty" placeholder="数量" style="flex:1;min-width:0">'+
+    '<input class="input sm mono r" type="number" inputmode="numeric" id="iv-bamt" placeholder="金額¥" style="flex:1.2;min-width:0">'+
+    '<button class="btn tealb" style="flex:none;padding:8px 12px;font-weight:700" data-iv="buy">記録</button></div>'+
+    '<div class="row" style="gap:8px;align-items:center;margin-top:8px"><span class="muted" style="font-size:11px;flex:none">単位</span>'+
+    ["株","口"].map(u=>'<button class="btn '+((x.unit||"株")===u?"sel":"")+'" style="flex:none;font-size:11px;padding:5px 14px" data-iv="unit" data-v="'+u+'">'+u+'</button>').join("")+'</div></div>';
+  /* シナリオ帳 */
+  h+='<div class="card" style="margin-bottom:12px"><div class="muted" style="font-size:10px;margin-bottom:4px">保有理由(なぜ持つのか)</div>'+
+    '<textarea class="input" id="iv-thesis" rows="2" style="width:100%;font-size:12px;line-height:1.6">'+esc(x.thesis||"")+'</textarea>'+
+    '<div class="muted" style="font-size:10px;margin:8px 0 4px">売却条件(いつ・何が起きたら手放すか)</div>'+
+    '<textarea class="input" id="iv-exit" rows="2" style="width:100%;font-size:12px;line-height:1.6">'+esc(x.exit||"")+'</textarea>'+
+    '<div class="muted" style="font-size:10px;margin:8px 0 4px">メモ(優待内容・権利月など)</div>'+
+    '<textarea class="input" id="iv-note" rows="2" style="width:100%;font-size:12px;line-height:1.6">'+esc(x.note||"")+'</textarea>'+
+    '<button class="btn tealb full" style="margin-top:8px;padding:9px 0;font-weight:700" data-iv="scsave">シナリオを保存</button></div>';
+  /* 買付履歴 */
+  const buys=(x.buys||[]).slice().reverse();
+  if(buys.length){
+    h+=band("買付履歴");
+    h+='<div class="card" style="padding:2px 12px">';
+    buys.forEach((b,i)=>{
+      h+='<div class="row" style="gap:8px;align-items:center;padding:8px 0'+(i>0?';border-top:1px solid var(--surface2)':'')+'">'+
+        '<span class="mono muted" style="flex:none;font-size:11px">'+esc((b.date||"").slice(5).replace("-","/"))+'</span>'+
+        '<span class="muted" style="flex:1;font-size:11px">'+num(b.qty).toLocaleString("ja-JP")+(x.unit||"")+'</span>'+
+        '<span class="mono" style="flex:none;font-size:12px">¥'+num(b.amount).toLocaleString("ja-JP")+'</span></div>';
+    });
+    h+='</div>';
+  }
+  h+=saveIndicatorHtml();
+  return h;
+}
+function bindInvest(){
+  const inv=S.invest = S.invest||{policy:"",holdings:[],bufferTxns:[]};
+  document.querySelectorAll("[data-iv]").forEach(el=>{
+    el.onclick=()=>{
+      const a=el.dataset.iv, v=el.dataset.v;
+      if(a==="back"){ UI.screen="main"; render(); }
+      else if(a==="backlist"){ UI.screen="invest"; render(); }
+      else if(a==="pedit"){ UI.invPolicyEdit=true; render(); }
+      else if(a==="pcancel"){ UI.invPolicyEdit=false; render(); }
+      else if(a==="psave"){ const t=document.getElementById("iv-policy"); inv.policy=(t?t.value:""); UI.invPolicyEdit=false; save(); render(); }
+      else if(a==="audit"){
+        const md=genInvestAudit();
+        const done=()=>toast("監査資料をコピーしました("+md.length+"字) — Claudeに貼り付けてください");
+        if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(md).then(done,()=>alert(md)); } else alert(md);
+      }
+      else if(a==="bufin"||a==="bufout"){
+        const p=prompt(a==="bufin"?"積立額(円):":"出動額(円):"); if(p==null)return;
+        const amt=num(p); if(!amt)return;
+        const memo=prompt("メモ(任意):")||"";
+        inv.bufferTxns=inv.bufferTxns||[];
+        inv.bufferTxns.push({id:uid(),date:todayStr(),amount:(a==="bufin"?amt:-amt),memo:memo});
+        save(); render();
+      }
+      else if(a==="new"){
+        const nm=prompt("銘柄名(例: S&P500 / URA / 楽天G):"); if(nm==null||!nm.trim())return;
+        const x={id:uid(),name:nm.trim(),frame:"seicho",qty:0,cost:0,unit:"株",thesis:"",exit:"",note:"",buys:[]};
+        inv.holdings=inv.holdings||[]; inv.holdings.push(x);
+        UI.invId=x.id; UI.screen="investdetail"; save(); render();
+      }
+      else if(a==="open"){ UI.invId=v; UI.screen="investdetail"; render(); }
+      else if(a==="frame"){ const x=inv.holdings.find(z=>String(z.id)===String(UI.invId)); if(x){ x.frame=v; save(); render(); } }
+      else if(a==="unit"){ const x=inv.holdings.find(z=>String(z.id)===String(UI.invId)); if(x){ x.unit=v; save(); render(); } }
+      else if(a==="buy"){
+        const x=inv.holdings.find(z=>String(z.id)===String(UI.invId)); if(!x)return;
+        const d=document.getElementById("iv-bdate").value||todayStr();
+        const q=num(document.getElementById("iv-bqty").value);
+        const amt=num(document.getElementById("iv-bamt").value);
+        if(!q&&!amt){ alert("数量か金額を入れてください。"); return; }
+        x.buys=x.buys||[]; x.buys.push({id:uid(),date:d,qty:q,amount:amt});
+        x.qty=num(x.qty)+q; x.cost=num(x.cost)+amt;
+        save(); render(); toast("買付を記録しました");
+      }
+      else if(a==="scsave"){
+        const x=inv.holdings.find(z=>String(z.id)===String(UI.invId)); if(!x)return;
+        const nm=document.getElementById("iv-name");
+        x.name=(nm&&nm.value.trim())||x.name;
+        x.thesis=(document.getElementById("iv-thesis")||{}).value||"";
+        x.exit=(document.getElementById("iv-exit")||{}).value||"";
+        x.note=(document.getElementById("iv-note")||{}).value||"";
+        save(); render(); toast("シナリオを保存しました");
+      }
+      else if(a==="del"){
+        const x=inv.holdings.find(z=>String(z.id)===String(UI.invId)); if(!x)return;
+        if(!confirm("「"+x.name+"」を台帳から削除しますか?\n(買付履歴も消えます)"))return;
+        inv.holdings=inv.holdings.filter(z=>String(z.id)!==String(UI.invId));
+        UI.screen="invest"; save(); render();
+      }
+    };
+  });
 }
 
 /* ---------- 軍資金(バンクロール口座) ---------- */
@@ -2969,6 +3184,7 @@ function bindMain(){
       else if(a==="csv") exportCsv();
       else if(a==="fixed"){ UI.screen="fixed"; UI.fixForm=null; render(); }
       else if(a==="wishlist"){ UI.screen="wishlist"; render(); }
+      else if(a==="invest"){ UI.screen="invest"; render(); }
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
       else if(a==="togglelaunchadd"){ S.openAddOnLaunch=!S.openAddOnLaunch; save(); render(); }
