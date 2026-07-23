@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.18 (localStorage保存・完全オフライン)
+   Tally 3.19 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -668,7 +668,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.18";
+const APP_VERSION = "3.19";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2826,7 +2826,7 @@ function viewFixed(){
       '<div style="flex:1.2"><div class="muted" style="font-size:9px;margin-bottom:2px">金額</div>'+
       '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-amount" placeholder="円" value="'+esc(f.amount)+'"></div></div>'+
       '<div class="row" style="gap:8px;margin-bottom:12px"><div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">終了日(空欄=年内ずっと)</div>'+
-      '<input class="input sm mono" type="date" id="fx-end" value="'+esc(f.end||"")+'"></div><div style="flex:1.2"></div></div>'+
+      '<input class="input sm mono" type="date" id="fx-end" value="'+esc(f.end||"")+'" style="width:100%"></div></div>'+
       (!isWeekly && !isDays ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">引き落とし日が土日祝のとき</div>'+
         '<div class="row" style="gap:6px;margin-bottom:12px">'+
         [["none","変わらず"],["before","前営業日"],["after","翌営業日"]].map(([v,l])=>
@@ -2845,7 +2845,9 @@ function viewFixed(){
 function bindFixed(){
   const f = UI.fixForm;
   if(f){
-    const fs=document.getElementById("fx-store"); if(fs) fs.oninput=e=>f.store=e.target.value;
+    const fs=document.getElementById("fx-store"); if(fs) fs.oninput=e=>{ f.store=e.target.value;
+      const dl=document.getElementById("fx-itemlist");
+      if(dl) dl.innerHTML = entryItemHintsFor(f.store).map(v=>'<option value="'+esc(v)+'"></option>').join(""); };
     const fi=document.getElementById("fx-item"); if(fi) fi.oninput=e=>f.item=e.target.value;
     const d=document.getElementById("fx-day"); if(d) d.oninput=e=>f.day=e.target.value;
     const st=document.getElementById("fx-start"); if(st) st.onchange=e=>f.start=e.target.value;
@@ -3345,6 +3347,7 @@ function viewEntry(){
       : '<div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:12px">'+
         INCOME_CATS.map(c=>'<button class="chip '+(f.category===c?"sel":"")+'" data-a="ecat" data-v="'+esc(c)+'">'+esc(c)+'</button>').join("")+'</div>')+
     chipsHtml + fieldsHtml +
+    (UI.editEntryId!==null?'<button class="btn full" style="margin-bottom:8px;font-size:12px;padding:9px 0;color:var(--teal)" data-a="tofixed">この内容で固定費に登録</button>':'')+
     '<div class="row" style="gap:8px">'+
     (UI.editEntryId!==null?'<button class="btn danger" data-a="edel">削除</button>':'')+
     '<button class="btn primary" style="flex:1" data-a="esave">'+(UI.editEntryId!==null?"更新する":"追加する")+'</button></div>';
@@ -3364,6 +3367,14 @@ function bindEntry(){
       else if(a==="etype"){ f.type=v; f.category = v==="expense"?"消費":"給与"; render(); }
       else if(a==="ecat"){ f.category=v; render(); }
       else if(a==="usual"){ const c=(UI._usualChips||[])[num(el.dataset.i)]; if(c){ f.store=c.store; f.item=c.item; f.category=c.cat; render(); const amt=document.getElementById("e-amount"); if(amt) amt.focus(); } }
+      else if(a==="tofixed"){
+        const day = num((f.date||todayStr()).slice(8,10)) || 1;
+        UI.fixForm = { type:f.type||"expense", name:(f.item||f.memo||"").trim(), store:(f.store||"").trim(),
+          item:(f.item||"").trim(), category:f.category||"消費", freq:"monthly", day:String(day),
+          start: todayStr(), amount:String(num(f.amount)||""), holidayShift:"none", days:[], end:"" };
+        UI.entryReturn=null; UI.screen="fixed"; render();
+        setTimeout(()=>{ try{ toast("内容を引き継ぎました — 頻度と発生日を確認して保存"); }catch(e){} }, 300);
+      }
       else if(a==="edel"){
         const ent = S.entries.find(x=>x.id===UI.editEntryId);
         const isFixed = ent && ent.fixedId;
