@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.21 (localStorage保存・完全オフライン)
+   Tally 3.22 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -668,7 +668,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.21";
+const APP_VERSION = "3.22";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -704,6 +704,7 @@ function _renderBody(){
   if(UI.screen==="mahjong-edit"){ app.innerHTML = viewMj(); bindMj(); return; }
   if(UI.screen==="fixed"){ app.innerHTML = viewFixed(); bindFixed(); return; }
   if(UI.screen==="wishlist"){ app.innerHTML = viewWishlist(); bindWishlist(); return; }
+  if(UI.screen==="leak"){ app.innerHTML = viewLeak(); bindLeak(); return; }
   if(UI.screen==="invest"){ app.innerHTML = viewInvest(); bindInvest(); return; }
   if(UI.screen==="investdetail"){ app.innerHTML = viewInvestDetail(); bindInvest(); return; }
   if(UI.screen==="bank"){ app.innerHTML = viewBank(); bindBank(); return; }
@@ -2289,7 +2290,81 @@ function viewAssets(){
     '<span><span class="mono teal" style="font-size:18px;font-weight:700">¥'+invCost.toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>'+
     '<div class="row between" style="font-size:11px"><span class="muted">'+((inv.holdings||[]).length)+'銘柄 ・ Buffer ¥'+bufBal.toLocaleString("ja-JP")+'</span>'+
     '<span class="muted">今月の買付 '+boughtThis+'/'+((inv.holdings||[]).filter(x=>x.frame!=="yutai").length||0)+'銘柄</span></div></div>';
+  const lm=leakMonths().map(leakAgg);
+  let leakTxt="測定待ち";
+  for(let li=0;li<lm.length-1;li++){
+    const dI=lm[li].salary-lm[li+1].salary, dE=lm[li].spend-lm[li+1].spend;
+    if(lm[li].salary>0&&lm[li+1].salary>0&&dI>=30000){ leakTxt="直近 "+Math.round(dE/dI*100)+"%"; break; }
+  }
+  h+='<div class="card" style="margin-bottom:12px;cursor:pointer" data-a="leak">'+
+    '<div class="row between" style="align-items:baseline"><span style="font-size:13px;font-weight:700">漏れ係数</span>'+
+    '<span><span class="mono" style="font-size:15px;font-weight:700">'+leakTxt+'</span> <span class="muted">›</span></span></div></div>';
   return h;
+}
+
+/* ---------- 漏れ係数(補償消費の計器) ---------- */
+function leakMonths(){
+  const set={};
+  (S.entries||[]).forEach(e=>{ if(e.date&&e.date.length>=7) set[e.date.slice(0,7)]=1; });
+  return Object.keys(set).sort().reverse().slice(0,12);
+}
+function leakAgg(mk){
+  const me=(S.entries||[]).filter(e=>e.date&&e.date.startsWith(mk));
+  const NET=["slot","mahjong"]; const isNet=e=>NET.includes(e.src);
+  const salary=me.filter(e=>e.type==="income"&&!isNet(e)).reduce((a,e)=>a+e.amount,0);
+  const spend=me.filter(e=>e.type==="expense"&&!isNet(e)).reduce((a,e)=>a+e.amount,0);
+  const gnet=me.filter(isNet).reduce((a,e)=>a+(e.type==="income"?e.amount:-e.amount),0);
+  let secured=0;
+  ((S.invest||{}).holdings||[]).forEach(x=>(x.buys||[]).forEach(b=>{ if((b.date||"").startsWith(mk)) secured+=num(b.amount); }));
+  (((S.invest||{}).bufferTxns)||[]).forEach(t=>{ if((t.date||"").startsWith(mk)&&num(t.amount)>0) secured+=num(t.amount); });
+  (((S.savings||{}).txns)||[]).forEach(t=>{ if(t.type==="deposit"&&(t.date||"").startsWith(mk)) secured+=num(t.amount); });
+  (((S.bank||{}).txns)||[]).forEach(t=>{ if(t.type==="sweep"&&(t.date||"").startsWith(mk)) secured+=num(t.amount); });
+  return {mk:mk, salary:salary, spend:spend, gnet:gnet, secured:secured};
+}
+function viewLeak(){
+  const ms=leakMonths().map(leakAgg);
+  let h='<div class="hdr"><button class="navbtn" data-lk="back">‹ 戻る</button><div style="font-size:14px;font-weight:700">漏れ係数</div><div style="width:44px"></div></div>';
+  h+='<div class="muted" style="font-size:11px;line-height:1.7;margin-bottom:12px">増えた収入に、支出がどれだけ連動したかの計器。「稼いでも残らない」の仮説を、感覚ではなく数字で検証します。</div>';
+  let head='';
+  for(let i=0;i<ms.length-1;i++){
+    const cur=ms[i], prev=ms[i+1];
+    const dI=cur.salary-prev.salary, dE=cur.spend-prev.spend;
+    if(cur.salary>0&&prev.salary>0&&dI>=30000){
+      const k=Math.round(dE/dI*100);
+      head='<div class="card" style="margin-bottom:12px;text-align:center;padding:14px">'+
+        '<div class="muted" style="font-size:10px">'+prev.mk.slice(5)+'月 → '+cur.mk.slice(5)+'月(増収 +¥'+dI.toLocaleString("ja-JP")+')</div>'+
+        '<div class="mono" style="font-size:30px;font-weight:700;color:'+(k>=60?"var(--red)":k>=30?"var(--amber)":"var(--teal)")+'">漏れ '+k+'%</div>'+
+        '<div class="muted" style="font-size:11px;margin-top:2px">支出の連動 '+(dE>=0?"+":"−")+'¥'+Math.abs(dE).toLocaleString("ja-JP")+' ・ 残存 '+(100-k)+'%</div></div>';
+      break;
+    }
+  }
+  h+= head || '<div class="card" style="margin-bottom:12px;text-align:center;padding:14px"><div class="muted" style="font-size:12px">増収月(前月比 +3万以上)が来たら、ここに係数が出ます</div></div>';
+  h+=band("月次");
+  h+='<div class="card" style="padding:2px 12px">';
+  ms.forEach((m,i)=>{
+    h+='<div style="padding:9px 0'+(i>0?';border-top:1px solid var(--line)':'')+'">'+
+      '<div class="row between" style="font-size:12px"><span class="mono muted">'+m.mk+'</span>'+
+      '<span><span class="muted" style="font-size:10px">給与</span> <span class="mono">¥'+m.salary.toLocaleString("ja-JP")+'</span>'+
+      '  <span class="muted" style="font-size:10px">支出</span> <span class="mono">¥'+m.spend.toLocaleString("ja-JP")+'</span></span></div>'+
+      '<div class="row between" style="font-size:11px;margin-top:3px"><span><span class="muted" style="font-size:10px">遊技</span> <span class="mono '+clsPM(m.gnet)+'">'+signYen(m.gnet)+'</span></span>'+
+      '<span><span class="muted" style="font-size:10px">確保</span> <span class="mono teal">¥'+m.secured.toLocaleString("ja-JP")+'</span></span></div></div>';
+  });
+  h+='</div>';
+  const posSum=ms.reduce((a,m)=>a+(m.gnet>0?m.gnet:0),0);
+  const sweep=bankSaved();
+  const topup=(((S.bank||{}).txns)||[]).filter(t=>t.type==="topup").reduce((a,t)=>a+num(t.amount),0);
+  h+=band("遊技の漏れ(軍資金の壁)");
+  h+='<div class="card" style="font-size:12px;padding:12px">'+
+    '<div class="row between" style="margin-bottom:5px"><span class="muted">勝ち月の純益 合計</span><span class="mono teal">¥'+posSum.toLocaleString("ja-JP")+'</span></div>'+
+    '<div class="row between" style="margin-bottom:5px"><span class="muted">貯金へ回収(スイープ)</span><span class="mono teal">¥'+sweep.toLocaleString("ja-JP")+'</span></div>'+
+    '<div class="row between" style="margin-bottom:5px"><span class="muted">回収率</span><span class="mono" style="font-weight:700">'+(posSum>0?Math.round(sweep/posSum*100)+"%":"—")+'</span></div>'+
+    '<div class="row between"><span class="muted">外部から補充(生活→遊技の逆流)</span><span class="mono '+(topup>0?"red":"muted")+'">¥'+topup.toLocaleString("ja-JP")+'</span></div></div>';
+  h+='<div class="muted" style="font-size:10px;margin-top:10px;line-height:1.6">読み方: 増収+10万・支出+4万なら漏れ40%=実効6割。壁と先取りの配管が、体感ほぼ100%だった時代からどこまで下げたかの実測です。</div>';
+  h+=saveIndicatorHtml();
+  return h;
+}
+function bindLeak(){
+  document.querySelectorAll("[data-lk]").forEach(el=>{ el.onclick=()=>{ if(el.dataset.lk==="back"){ UI.screen="main"; render(); } }; });
 }
 
 /* ---------- 投資台帳(時価を追わない・シナリオ帳つき) ---------- */
@@ -3193,6 +3268,7 @@ function bindMain(){
       else if(a==="csv") exportCsv();
       else if(a==="fixed"){ UI.screen="fixed"; UI.fixForm=null; render(); }
       else if(a==="wishlist"){ UI.screen="wishlist"; render(); }
+      else if(a==="leak"){ UI.screen="leak"; render(); }
       else if(a==="invest"){ UI.screen="invest"; render(); }
       else if(a==="bank"){ UI.screen="bank"; render(); }
       else if(a==="savings"){ UI.screen="savings"; render(); }
