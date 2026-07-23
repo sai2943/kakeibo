@@ -187,7 +187,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.16 (localStorage保存・完全オフライン)
+   Tally 3.17 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -667,7 +667,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.16";
+const APP_VERSION = "3.17";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2582,7 +2582,7 @@ function viewFixed(){
       '<input class="input" id="fx-store" list="fx-storelist" placeholder="店名(任意 例: iHerb)" value="'+esc(f.store||"")+'" autocomplete="off" style="margin-bottom:8px">'+
       '<datalist id="fx-storelist">'+entryStoreHints().map(v=>'<option value="'+esc(v)+'"></option>').join("")+'</datalist>'+
       '<input class="input" id="fx-item" list="fx-itemlist" placeholder="項目・品目(例: 家賃 / 電気代)" value="'+esc(f.item||"")+'" autocomplete="off" style="margin-bottom:10px">'+
-      '<datalist id="fx-itemlist">'+entryItemHints().map(v=>'<option value="'+esc(v)+'"></option>').join("")+'</datalist>';
+      '<datalist id="fx-itemlist">'+entryItemHintsFor(f.store).map(v=>'<option value="'+esc(v)+'"></option>').join("")+'</datalist>';
     if(f.type==="expense"){
       h += '<div class="muted" style="font-size:11px;margin:0 2px 6px">分類</div>'+
         '<div class="row" style="gap:8px;margin-bottom:10px">'+
@@ -3060,6 +3060,21 @@ function entryItemHints(){
   (S.entries||[]).forEach(e=>{ const v=(e.item!=null?String(e.item):String(e.memo||"")).trim(); if(v) m[v]=(m[v]||0)+1; });
   return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
 }
+/* 店文脈つき品目ヒント: 店名があれば「その店(チェーン単位)で過去に買った品目」だけを頻度順で。
+   未知の店なら空(的外れな全体人気を出さない)。店名が空なら従来の全体人気順。 */
+function chainKeyOf(n){ const t=String(n||"").trim(); const m=t.split(/[\s\u3000]+/).filter(Boolean); return m.length>1 ? m[0] : t; }
+function entryItemHintsFor(store){
+  const st=String(store||"").trim();
+  if(!st) return entryItemHints();
+  const target=chainKeyOf(st);
+  const m={};
+  (S.entries||[]).forEach(e=>{
+    const es=(e.store||"").trim(); if(!es) return;
+    if(chainKeyOf(es)!==target) return;
+    const v=(e.item!=null?String(e.item):String(e.memo||"")).trim(); if(v) m[v]=(m[v]||0)+1;
+  });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]).map(x=>x[0]);
+}
 function entryUsualChips(type){
   const map={};
   (S.entries||[]).filter(e=>e.type===type && e.src!=="slot" && e.src!=="mahjong" && e.src!=="fixed").forEach(e=>{
@@ -3098,7 +3113,7 @@ function viewEntry(){
   const fieldsHtml = '<input class="input" id="e-store" list="e-storelist" placeholder="店名(任意)" value="'+esc(f.store||"")+'" autocomplete="off" style="margin-bottom:8px">'+
     '<datalist id="e-storelist">'+sh.map(v=>'<option value="'+esc(v)+'"></option>').join("")+'</datalist>'+
     '<input class="input" id="e-item" list="e-itemlist" placeholder="品目(任意)" value="'+esc(f.item||"")+'" autocomplete="off" style="margin-bottom:14px">'+
-    '<datalist id="e-itemlist">'+ih.map(v=>'<option value="'+esc(v)+'"></option>').join("")+'</datalist>';
+    '<datalist id="e-itemlist">'+entryItemHintsFor(f.store).map(v=>'<option value="'+esc(v)+'"></option>').join("")+'</datalist>';
   return '<div class="hdr"><button class="navbtn" data-a="back">‹ 戻る</button>'+
     '<div style="font-size:14px;font-weight:700">'+(UI.editEntryId!==null?"記録を編集":"記録を追加")+'</div><div style="width:44px"></div></div>'+
     '<div class="row" style="gap:8px;margin-bottom:12px">'+
@@ -3122,7 +3137,9 @@ function bindEntry(){
   const f = UI.entryForm;
   document.getElementById("e-date").oninput = e=>f.date=e.target.value;
   document.getElementById("e-amount").oninput = e=>f.amount=e.target.value;
-  const es=document.getElementById("e-store"); if(es) es.oninput = e=>f.store=e.target.value;
+  const es=document.getElementById("e-store"); if(es) es.oninput = e=>{ f.store=e.target.value;
+    const dl=document.getElementById("e-itemlist");
+    if(dl) dl.innerHTML = entryItemHintsFor(f.store).map(v=>'<option value="'+esc(v)+'"></option>').join(""); };
   const ei=document.getElementById("e-item"); if(ei) ei.oninput = e=>f.item=e.target.value;
   document.querySelectorAll("[data-a]").forEach(el=>{
     el.onclick = ()=>{
