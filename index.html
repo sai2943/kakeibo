@@ -198,7 +198,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.36 (localStorage保存・完全オフライン)
+   Tally 3.37 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";  /* 歴史的名称のままが正。変更=全データ孤立。リポジトリ改名(tally)とは無関係の内部ID——絶対に触らない */
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -681,7 +681,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.36";
+const APP_VERSION = "3.37";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2351,7 +2351,7 @@ function leakAgg(mk){
 function viewLeak(){
   const ms=leakMonths().map(leakAgg);
   let h='<div class="hdr"><button class="navbtn" data-lk="back">‹ 戻る</button><div style="font-size:14px;font-weight:700">漏れ係数</div><div style="width:44px"></div></div>';
-  h+='<div class="muted" style="font-size:11px;line-height:1.7;margin-bottom:12px">増えた収入に、支出がどれだけ連動したかの計器。「稼いでも残らない」の仮説を、感覚ではなく数字で検証します。</div>';
+  h+='<div class="muted" style="font-size:11px;line-height:1.7;margin-bottom:12px">増えた収入に支出がどれだけ連動したかの計器。<br>「稼いでも残らない」を感覚でなく数字で検証。</div>';
   let head='';
   for(let i=0;i<ms.length-1;i++){
     const cur=ms[i], prev=ms[i+1];
@@ -2386,7 +2386,7 @@ function viewLeak(){
     '<div class="row between" style="margin-bottom:5px"><span class="muted">貯金へ回収(スイープ)</span><span class="mono teal">¥'+sweep.toLocaleString("ja-JP")+'</span></div>'+
     '<div class="row between" style="margin-bottom:5px"><span class="muted">回収率</span><span class="mono" style="font-weight:700">'+(posSum>0?Math.round(sweep/posSum*100)+"%":"—")+'</span></div>'+
     '<div class="row between"><span class="muted">外部から補充(生活→遊技の逆流)</span><span class="mono '+(topup>0?"red":"muted")+'">¥'+topup.toLocaleString("ja-JP")+'</span></div></div>';
-  h+='<div class="muted" style="font-size:10px;margin-top:10px;line-height:1.6">読み方: 増収+10万・支出+4万なら漏れ40%=実効6割。壁と先取りの配管が、体感ほぼ100%だった時代からどこまで下げたかの実測です。</div>';
+  h+='<div class="muted" style="font-size:10px;margin-top:10px;line-height:1.6">読み方: 増収+10万・支出+4万なら漏れ40%=実効6割。<br>体感ほぼ100%だった時代から、壁と先取りの配管で<br>どこまで下げたかの実測です。</div>';
   h+=saveIndicatorHtml();
   return h;
 }
@@ -2680,7 +2680,7 @@ function viewBank(){
   const pct=Math.max(0,Math.min(100, ceil>0? bal/ceil*100 : 0));
   const over=bal-ceil, low=bal<ceil*0.15;
   let h='<div class="hdr"><button class="navbtn" data-ba="back">‹ 戻る</button><div style="font-size:14px;font-weight:700">軍資金</div><div style="width:44px"></div></div>';
-  h+='<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">遊技専用の緩衝プール。勝ち負けはこの中だけで増減し、生活費・貯金には触れません。天井超えは貯金へ回収。負けを外の金で埋める(補充)のが漏れの正体です。</div>';
+  h+='<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">遊技専用の緩衝プール。<br>勝ち負けはこの中だけで増減。生活費・貯金に触れない。<br>天井超えは貯金へ回収。<br>負けを外の金で埋める(補充)が漏れの正体。</div>';
   h+='<div class="card" style="margin-bottom:12px">'+
     '<div class="row between" style="align-items:baseline"><span class="muted" style="font-size:11px">残高</span>'+
     '<span class="mono '+(low?"red":"teal")+'" style="font-size:28px;font-weight:700">¥'+bal.toLocaleString("ja-JP")+'</span></div>'+
@@ -2743,7 +2743,7 @@ function viewSavings(){
   const sv=S.savings, bal=savingsBalance(), goal=savingsCurGoal();
   const swept=bankSaved(), deposited=savingsDeposits();
   let h='<div class="hdr"><button class="navbtn" data-sa="back">‹ 戻る</button><div style="font-size:14px;font-weight:700">貯金</div><div style="width:44px"></div></div>';
-  h+='<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">軍資金の天井超え(+EVの回収)と先取りが積み上がる箱。目標は順番に:まず引越し資金、次に生活防衛費。同じ箱で目標だけ切り替わります。</div>';
+  h+='<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">軍資金の天井超え(+EV回収)と先取りが積み上がる箱。<br>目標は順番に: まず引越し資金、次に生活防衛費。<br>同じ箱で目標だけが切り替わる。</div>';
   h+='<div class="card" style="margin-bottom:12px">';
   h+='<div class="row between" style="align-items:baseline"><span class="muted" style="font-size:11px">残高</span><span class="mono teal" style="font-size:28px;font-weight:700">¥'+bal.toLocaleString("ja-JP")+'</span></div>';
   if(goal){
@@ -2846,7 +2846,7 @@ function viewWishlist(){
   const nw=UI.wishNew||(UI.wishNew={name:"",est:"",url:"",reason:""});
   let h='<div class="hdr"><button class="navbtn" data-wa="back">‹ 戻る</button>'+
     '<div style="font-size:14px;font-weight:700">ほしい物</div><div style="width:44px"></div></div>';
-  h+='<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">登録→PDFで相談→寝かせ日数を入れて寝かせる→承認可能になったら承認→買ったら金額を入れて家計簿に計上。衝動買い防止用。</div>';
+  h+='<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:12px">衝動買い防止のための寝かせリスト。<br>登録→PDFで相談→寝かせ日数を入れて寝かせる<br>→承認可能になったら承認<br>→購入したら金額を入れて家計簿に計上。</div>';
 
   const waiting=list.filter(w=>["consult","cooldown","ready"].includes(wishEff(w))).length;
   const resisted=list.filter(w=>w.status==="rejected").reduce((a,w)=>a+num(w.est),0);
@@ -3750,7 +3750,7 @@ function viewSession(){
     '<span class="muted" style="font-size:12px;width:74px">パチンコ</span>'+
     '<input class="input mono r" type="number" inputmode="numeric" placeholder="例: 250" value="'+esc(s.pExchange||"")+'" style="flex:1" data-in="pexchange">'+
     '<span class="muted" style="font-size:12px">玉=1000円</span></div>'+
-    '<div class="muted" style="font-size:10px">使う方だけ入力。前回値を記憶します。貯玉プッシュのレートは「ツール」タブのボーダー試算で設定します。</div>';
+    '<div class="muted" style="font-size:10px">使う方だけ入力。前回値を記憶します。<br>貯玉プッシュのレートはツールのボーダー試算で設定。</div>';
 
   /* ----- 代打ち: 報酬 ----- */
   if(s.mode==="dai"){
@@ -4511,7 +4511,7 @@ function viewMdb(){
     h += '<button class="btn dash full" style="margin-bottom:12px" data-a="fnew">＋ 機種を登録</button>';
     if(!S.mdb.length)
       h += '<div style="text-align:center;padding:24px 0;font-size:13px;line-height:1.8" class="muted">'+
-        'まだ登録がありません。パチンコは確率分母と理論TYを登録すると、セッションの台に機種名を入れるだけでボーダー分析が自動適用されます。</div>';
+        'まだ登録がありません。<br>パチンコは確率分母と理論TYを登録すると、<br>台に機種名を入れるだけで<br>ボーダー分析が自動適用されます。</div>';
     S.mdb.slice().sort((a,b)=>a.name>b.name?1:-1).forEach(x=>{
       h += '<div class="listitem" data-a="fedit" data-v="'+x.id+'">'+
         '<div style="flex:1;min-width:0">'+
@@ -4850,7 +4850,7 @@ function syncBoxHtml(){
   }
   return '<div class="card">'+
     '<div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">'+
-    'メールとパスワードでログインすると、データが自動でクラウドに保存され、複数端末で同期されます。初めての場合は「新規登録」を押してください(同じメール/パスワードで別端末からログインできます)。</div>'+
+    'ログインするとデータが自動でクラウドに保存され、<br>複数端末で同期されます。<br>初めての場合は「新規登録」を。<br>同じメール/パスワードで別端末からログイン可。</div>'+
     '<input class="input" id="sync-email" type="email" inputmode="email" placeholder="メールアドレス" autocomplete="username" style="margin-bottom:8px">'+
     '<input class="input" id="sync-pw" type="password" placeholder="パスワード(6文字以上)" autocomplete="current-password" style="margin-bottom:10px">'+
     '<div class="row" style="gap:8px">'+
