@@ -197,7 +197,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.29 (localStorage保存・完全オフライン)
+   Tally 3.30 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -680,7 +680,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.29";
+const APP_VERSION = "3.30";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -3498,14 +3498,38 @@ function entryUsualChips(type){
   (S.entries||[]).filter(e=>e.type===type && e.src!=="slot" && e.src!=="mahjong" && e.src!=="fixed").forEach(e=>{
     const store=(e.store||"").trim();
     const item=(e.item!=null?String(e.item):String(e.memo||"")).trim();
-    const label=[store,item].filter(Boolean).join(" "); if(!label) return;
+    if(!store && !item) return;
     const k=store+"\u0001"+item;
-    if(!map[k]) map[k]={store,item,label,count:0,cats:{}};
+    if(!map[k]) map[k]={store,item,count:0,cats:{},amts:{}};
     map[k].count++; map[k].cats[e.category]=(map[k].cats[e.category]||0)+1;
+    const am=num(e.amount); if(am>0) map[k].amts[am]=(map[k].amts[am]||0)+1;
   });
-  return Object.values(map).sort((a,b)=>b.count-a.count).slice(0,6).map(o=>({
-    store:o.store,item:o.item,label:o.label,
-    cat:Object.entries(o.cats).sort((a,b)=>b[1]-a[1])[0][0]
+  /* v3.30: 金額の最頻値がそのペアの8割以上を占めるなら金額もチップに載せる(定額運賃・定期購入の1タップ化)。
+     ばらつく品目(クリーニング等)は従来通り金額なし→空欄+フォーカスで、誤額の静かな混入を防ぐ */
+  const modeAmt=o=>{
+    const es=Object.entries(o.amts); if(!es.length) return null;
+    const tot=es.reduce((a,x)=>a+x[1],0);
+    const top=es.sort((a,b)=>b[1]-a[1])[0];
+    return top[1]/tot>=0.8 ? num(top[0]) : null;
+  };
+  const out=Object.values(map).sort((a,b)=>b.count-a.count).slice(0,6).map(o=>({
+    store:o.store,item:o.item,
+    cat:Object.entries(o.cats).sort((a,b)=>b[1]-a[1])[0][0],
+    amt:modeAmt(o)
+  }));
+  /* v3.30: 経路品目「A→B」は逆方向チップを自動生成(運賃同額前提・同店名同分類)。
+     履歴に逆方向が既在なら生成しない(実績側が自力でランクインする)。上限8 */
+  const have=new Set(Object.keys(map));
+  out.slice().forEach(c=>{
+    if(out.length>=8) return;
+    const m=/^(.+?)→(.+)$/.exec(c.item||""); if(!m) return;
+    const rev=m[2].trim()+"→"+m[1].trim();
+    const rk=c.store+"\u0001"+rev;
+    if(have.has(rk)) return;
+    out.push({store:c.store,item:rev,cat:c.cat,amt:c.amt}); have.add(rk);
+  });
+  return out.map(c=>Object.assign({},c,{
+    label:[c.store,c.item].filter(Boolean).join(" ")+(c.amt!=null?" ¥"+c.amt.toLocaleString("ja-JP"):"")
   }));
 }
 function entryDetailHtml(e){
@@ -3566,7 +3590,7 @@ function bindEntry(){
       if(a==="back"){ UI.screen=(UI.entryReturn||"main"); UI.entryReturn=null; render(); }
       else if(a==="etype"){ f.type=v; f.category = v==="expense"?"消費":"給与"; render(); }
       else if(a==="ecat"){ f.category=v; render(); }
-      else if(a==="usual"){ const c=(UI._usualChips||[])[num(el.dataset.i)]; if(c){ f.store=c.store; f.item=c.item; f.category=c.cat; render(); const amt=document.getElementById("e-amount"); if(amt) amt.focus(); } }
+      else if(a==="usual"){ const c=(UI._usualChips||[])[num(el.dataset.i)]; if(c){ f.store=c.store; f.item=c.item; f.category=c.cat; if(c.amt!=null) f.amount=String(c.amt); render(); if(c.amt==null){ const amt=document.getElementById("e-amount"); if(amt) amt.focus(); } } }
       else if(a==="tofixed"){
         const day = num((f.date||todayStr()).slice(8,10)) || 1;
         UI.fixForm = { type:f.type||"expense", name:(f.item||f.memo||"").trim(), store:(f.store||"").trim(),
