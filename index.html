@@ -197,7 +197,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.33 (localStorage保存・完全オフライン)
+   Tally 3.34 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";  /* 歴史的名称のままが正。変更=全データ孤立。リポジトリ改名(tally)とは無関係の内部ID——絶対に触らない */
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -680,7 +680,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.33";
+const APP_VERSION = "3.34";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -815,7 +815,9 @@ function viewCatDrill(){
     const col = over>0 ? "var(--red)" : (cat==="娯楽" ? "var(--amber)" : "var(--red)");
     h += '<div class="row between" style="align-items:baseline;margin-bottom:6px"><span style="font-size:12px;font-weight:700">合計</span>'+
       '<span><span class="mono '+(over>0?"red":"")+'" style="font-size:16px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:11px"> / ¥'+cap.toLocaleString("ja-JP")+'</span></span></div>'+
-      '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
+      (over>0
+        ? '<div style="height:16px;background:var(--red);border-radius:8px;display:flex;align-items:center;justify-content:center"><span style="font-size:9px;font-weight:700;color:var(--bg);letter-spacing:.12em">予算オーバー</span></div>'
+        : '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>')+
       '<div class="row between" style="font-size:10px;margin-top:5px">'+(over>0?'<span class="red" style="font-weight:700">超過 ¥'+over.toLocaleString("ja-JP")+'</span>':'<span class="muted">残り ¥'+Math.max(0,cap-spent).toLocaleString("ja-JP")+'</span>')+'<span class="mono muted">'+list.length+'件</span></div>';
   } else {
     h += '<div class="row between"><span style="font-size:12px;font-weight:700">合計</span><span class="mono" style="font-size:16px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span></div>';
@@ -1024,7 +1026,9 @@ function viewLedger(){
     if(cap>0){
       h += '<div class="row between" style="align-items:baseline;margin-bottom:6px"><span style="font-size:12px;font-weight:700">'+(cat==="消費"?"変動消費":"今月の"+cat)+'</span>'+
         '<span><span class="mono '+colCls+'" style="font-size:15px;font-weight:700">¥'+spent.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:11px"> / ¥'+cap.toLocaleString("ja-JP")+'</span></span></div>'+
-        '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>'+
+        (over>0
+        ? '<div style="height:16px;background:var(--red);border-radius:8px;display:flex;align-items:center;justify-content:center"><span style="font-size:9px;font-weight:700;color:var(--bg);letter-spacing:.12em">予算オーバー</span></div>'
+        : '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+'"></div></div>')+
         '<div class="row between" style="font-size:10px;margin-top:5px">'+(over>0?'<span class="red" style="font-weight:700">超過 ¥'+over.toLocaleString("ja-JP")+'</span>':'<span class="muted">残り ¥'+Math.max(0,cap-spent).toLocaleString("ja-JP")+'</span>')+'<span class="mono muted">'+Math.floor(pct)+'% ・ 内訳を見る</span></div>';
     } else {
       h += '<div class="row between" style="align-items:center"><span style="font-size:12px"><span style="font-weight:700">'+(cat==="消費"?"変動消費":"今月の"+cat)+'</span> <span class="mono muted">¥'+spent.toLocaleString("ja-JP")+'</span></span><span class="amber" style="font-size:11px">＋ 上限を設定</span></div>';
