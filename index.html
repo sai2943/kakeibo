@@ -198,7 +198,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.49 (localStorage保存・完全オフライン)
+   Tally 3.50 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";  /* 歴史的名称のままが正。変更=全データ孤立。リポジトリ改名(tally)とは無関係の内部ID——絶対に触らない */
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -681,7 +681,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.49";
+const APP_VERSION = "3.50";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -990,9 +990,9 @@ function viewLedger(){
     '<div class="mono '+clsPM(bal)+'" style="font-size:36px;font-weight:700;line-height:1.2">'+signYen(bal)+'</div>'+
     '</div>'+
     '<div class="row" style="border-top:1px solid var(--line);padding-top:10px;margin-top:8px">'+
-    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">収入</div><div class="mono teal" style="font-size:16px">'+yen(normIncome)+'</div>'+(futIncome>0?'<div class="muted" style="font-size:10px;margin-top:3px">予定 '+yen(futIncome)+'</div>':'')+'</div>'+
+    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:11px;margin-bottom:3px">収入</div><div class="mono teal" style="font-size:18px;font-weight:700">'+yen(normIncome)+'</div></div>'+
     '<div style="width:1px;background:var(--line)"></div>'+
-    '<div style="flex:1;text-align:center"><div style="font-size:11px" class="muted">支出</div><div class="mono red" style="font-size:16px">'+yen(normExpense)+'</div>'+(futExpense>0?'<div class="muted" style="font-size:10px;margin-top:3px">予定 '+yen(futExpense)+'</div>':'')+'</div></div>'+
+    '<div style="flex:1;text-align:center"><div class="muted" style="font-size:11px;margin-bottom:3px">支出</div><div class="mono red" style="font-size:18px;font-weight:700">'+yen(normExpense)+'</div></div></div>'+
     '<div style="text-align:center;margin-top:10px;padding-top:8px;border-top:1px solid var(--line)"><span class="muted" style="font-size:11px;cursor:pointer" data-a="bdtoggle">'+(UI.bdOpen?"内訳を隠す ▾":"内訳を見る ▸")+'</span></div></div>';
 
 
@@ -1003,25 +1003,26 @@ function viewLedger(){
       ["変動消費",e=>e.category==="消費"&&e.fixedId==null,"var(--red)"],
       ["娯楽",e=>e.category==="娯楽","var(--amber)"],
       ["承認",e=>e.category==="承認","var(--blue)"]];
-    const exRows=exG.map(([nm,f,col])=>[nm, me.filter(e=>e.type==="expense"&&!isNetEntry(e)&&f(e)).reduce((a,e)=>a+e.amount,0), col]);
+    const exRows=exG.map(([nm,f,col])=>[nm, me.filter(e=>e.type==="expense"&&!isNetEntry(e)&&f(e)).reduce((a,e)=>a+e.amount,0), col, me.filter(e=>e.type==="expense"&&!isNetEntry(e)&&f(e)&&e.date>todayS).reduce((a,e)=>a+e.amount,0)]);
     const exTotal=exRows.reduce((a,x)=>a+x[1],0);
     const fxDone=me.filter(e=>e.type==="expense"&&e.category==="消費"&&e.fixedId!=null&&!isNetEntry(e)&&e.date<=todayS).reduce((a,e)=>a+e.amount,0);
-    const bdRow=(nm,a,col,total,extra,tap)=>'<div style="margin:8px 0'+(tap?';cursor:pointer':'')+'"'+(tap?' data-a="fixed"':'')+'>'+
+    const bdRow=(nm,a,col,total,extra,tap,fut)=>'<div style="margin:8px 0'+(tap?';cursor:pointer':'')+'"'+(tap?' data-a="fixed"':'')+'>'+
       '<div class="row between" style="font-size:12px;margin-bottom:3px"><span>'+nm+'</span>'+
       '<span class="mono">'+yen(a)+' <span class="muted" style="font-size:10px">('+(total>0?Math.round(a/total*100):0)+'%)</span>'+(tap?' <span class="muted">›</span>':'')+'</span></div>'+
-      '<div class="bar"><div style="width:'+(total>0?a/total*100:0)+'%;background:'+col+'"></div></div>'+(extra||'')+'</div>';
+      '<div class="bar"><div style="width:'+(total>0?a/total*100:0)+'%;background:'+col+'"></div></div>'+(extra||'')+((fut||0)>0?'<div class="muted" style="font-size:10px;margin-top:3px">うち予定 ¥'+fut.toLocaleString("ja-JP")+'</div>':'')+'</div>';
     let incHtml='';
     { const incCats={}; me.filter(e=>e.type==="income"&&!isNetEntry(e)).forEach(e=>incCats[e.category]=(incCats[e.category]||0)+e.amount);
+      const incFut={}; me.filter(e=>e.type==="income"&&!isNetEntry(e)&&e.date>todayS).forEach(e=>incFut[e.category]=(incFut[e.category]||0)+e.amount);
       const ict=Object.entries(incCats).sort((a,b)=>b[1]-a[1]); const incTotal=ict.reduce((a,x)=>a+x[1],0);
-      incHtml = incTotal>0 ? ict.map(([c,a])=>bdRow(esc(c),a,"var(--teal)",incTotal,'',false)).join("")
+      incHtml = incTotal>0 ? ict.map(([c,a])=>bdRow(esc(c),a,"var(--teal)",incTotal,'',false,(incFut[c]||0))).join("")
         : '<div class="muted" style="font-size:12px;padding:6px 0">収入の記録がありません。</div>'; }
     h += '<div class="card" style="margin-top:8px">'+
-      '<div class="muted" style="font-size:11px;margin-bottom:2px">今月の支出内訳'+(hasFuture?'(予定込)':'')+'</div>'+
-      exRows.map(([nm,a,col])=> bdRow(nm,a,col,exTotal,
+      '<div class="row between" style="margin-bottom:2px"><span class="muted" style="font-size:11px">今月の支出内訳'+(hasFuture?'(予定込)':'')+'</span>'+(futExpense>0?'<span class="mono muted" style="font-size:10px">予定計 ¥'+futExpense.toLocaleString("ja-JP")+'</span>':'')+'</div>'+
+      exRows.map(([nm,a,col,fut])=> bdRow(nm,a,col,exTotal,
         nm==="固定"?'<div class="muted" style="font-size:10px;margin-top:3px">支払済 ¥'+fxDone.toLocaleString("ja-JP")+' ・ この後の予定 ¥'+Math.max(0,a-fxDone).toLocaleString("ja-JP")+'</div>':'',
-        nm==="固定")).join("")+
+        nm==="固定", nm==="固定"?0:fut)).join("")+
       '<div style="height:1px;background:var(--line);margin:12px 0"></div>'+
-      '<div class="muted" style="font-size:11px;margin-bottom:2px">今月の収入内訳</div>'+incHtml+'</div>';
+      '<div class="row between" style="margin-bottom:2px"><span class="muted" style="font-size:11px">今月の収入内訳</span>'+(futIncome>0?'<span class="mono muted" style="font-size:10px">予定計 ¥'+futIncome.toLocaleString("ja-JP")+'</span>':'')+'</div>'+incHtml+'</div>';
   }
 
   /* 予算(カテゴリ別・月次上限) */
