@@ -197,9 +197,9 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.32 (localStorage保存・完全オフライン)
+   Tally 3.33 (localStorage保存・完全オフライン)
    ============================================================ */
-const KEY = "kakeibo:v1";
+const KEY = "kakeibo:v1";  /* 歴史的名称のままが正。変更=全データ孤立。リポジトリ改名(tally)とは無関係の内部ID——絶対に触らない */
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
 const INCOME_CATS = ["給与","賞与","副業","臨時","家庭内"];  /* 家庭内=配偶者からの生活費等の世帯内移転(v3.32)。salary集計はカテゴリ不問の全収入なので滝原資に乗る——支出側が既に家計混在のため対称で正しい */
 const UNIT_LABEL = {medal:"枚", ball:"玉", yen:"円"};
@@ -680,7 +680,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.32";
+const APP_VERSION = "3.33";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -3455,7 +3455,7 @@ function exportCsv(){
     const signed = e.type==="income" ? e.amount : -e.amount;
     rows.push([e.date, divLabel(e), e.category, signed, (e.memo||"").replace(/,/g,"、")]);
   });
-  dl("\uFEFF"+rows.map(r=>r.join(",")).join("\n"), "kakeibo.csv", "text/csv");
+  dl("\uFEFF"+rows.map(r=>r.join(",")).join("\n"), "tally.csv", "text/csv");
 }
 function dl(content, name, type){
   const blob = new Blob([content],{type});
@@ -4617,7 +4617,7 @@ function bindBackup(){
       else if(a==="csv"){ exportCsv(); }
       else if(a==="bexport"){
         dl(JSON.stringify(Object.assign({exportedAt:new Date().toISOString()},S), null, 1),
-          "kakeibo_backup_"+todayStr()+".json", "application/json");
+          "tally_backup_"+todayStr()+".json", "application/json");
         UI.msg = "書き出しました(記録"+S.entries.length+"件 / 稼働"+S.sessions.length+"件 / 機種"+S.mdb.length+"件)";
         render();
       }
