@@ -53,6 +53,11 @@
   }
   .input.r{text-align:right;}
   input[type="date"].input{ -webkit-appearance:none; appearance:none; }
+  /* 固定費フォームの期日・金額グリッド: 2列均等・ラベル11px(節ラベルと同格)・全欄同高(高さは推測せず明示=v2.91原則) */
+  .fxg{display:flex; gap:8px; margin-bottom:12px;}
+  .fxg>div{flex:1; min-width:0;}
+  .fxl{font-size:11px; color:var(--muted); margin:0 2px 5px;}
+  .fxg .input{height:42px;}
   .btn{border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--muted);
     font-size:13px; padding:9px 12px; cursor:pointer; font-family:inherit;}
   .btn.primary{background:var(--amber); color:#1a1508; border:none; font-weight:700;}
@@ -187,7 +192,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.25 (localStorage保存・完全オフライン)
+   Tally 3.26 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -670,7 +675,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.25";
+const APP_VERSION = "3.26";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2940,18 +2945,22 @@ function viewFixed(){
     h += (isDays ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">発生する曜日(複数選択)</div>'+
       '<div class="row" style="gap:4px;margin-bottom:10px">'+
       [1,2,3,4,5,6,0].map(d=>'<button class="btn '+(((f.days)||[]).includes(d)?"sel":"")+'" style="flex:1;padding:9px 0;font-size:12px" data-fa="fdow" data-v="'+d+'">'+"日月火水木金土"[d]+'</button>').join("")+'</div>' : '');
-    h += '<div class="row" style="gap:8px;margin-bottom:12px">'+
-      ((isWeekly||isDays)
-        ? '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">'+(isDays?"開始日":"起点日("+(freq==="weekly"?"毎週":"2週ごと")+")")+'</div>'+
-          '<input class="input sm mono" type="date" id="fx-start" value="'+esc(f.start||todayStr())+'"></div>'
-        : '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">発生日</div>'+
-          '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-day" placeholder="1-31" value="'+esc(f.day)+'"></div>'+
-          '<div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">周期(ヶ月ごと)</div>'+
-          '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-every" placeholder="1" value="'+esc(f.every||"")+'"></div>')+
-      '<div style="flex:1.2"><div class="muted" style="font-size:9px;margin-bottom:2px">金額</div>'+
-      '<input class="input sm mono r" type="number" inputmode="numeric" id="fx-amount" placeholder="円" value="'+esc(f.amount)+'"></div></div>'+
-      '<div class="row" style="gap:8px;margin-bottom:12px"><div style="flex:1"><div class="muted" style="font-size:9px;margin-bottom:2px">終了日(空欄=年内ずっと)</div>'+
-      '<input class="input sm mono" type="date" id="fx-end" value="'+esc(f.end||"")+'" style="width:100%;min-height:38px;-webkit-appearance:none;appearance:none"></div><div style="flex:1.2"></div></div>'+
+    /* 期日・金額グリッド(v3.26): 旧9pxラベル+sm箱の3列詰め込みと孤立終了日を廃し、標準inputの2列文法に統一。
+       月ごと=[発生日|周期]/[金額|終了日]の2×2、週次・曜日指定=[起点日|終了日]/[金額全幅]。スペーサー全廃。
+       fx-endのappearance:noneは全体則(input[type=date].input)が担い、空欄潰れは.fxg .inputのheight明示が防ぐ */
+    const fxEnd = '<div><div class="fxl">終了日(空欄=年内ずっと)</div>'+
+      '<input class="input mono" type="date" id="fx-end" value="'+esc(f.end||"")+'"></div>';
+    const fxAmt = '<div><div class="fxl">金額</div>'+
+      '<input class="input mono r" type="number" inputmode="numeric" id="fx-amount" placeholder="円" value="'+esc(f.amount)+'"></div>';
+    h += ((isWeekly||isDays)
+      ? '<div class="fxg"><div><div class="fxl">'+(isDays?"開始日":"起点日("+(freq==="weekly"?"毎週":"2週ごと")+")")+'</div>'+
+        '<input class="input mono" type="date" id="fx-start" value="'+esc(f.start||todayStr())+'"></div>'+fxEnd+'</div>'+
+        '<div class="fxg">'+fxAmt+'</div>'
+      : '<div class="fxg"><div><div class="fxl">発生日</div>'+
+        '<input class="input mono r" type="number" inputmode="numeric" id="fx-day" placeholder="1-31" value="'+esc(f.day)+'"></div>'+
+        '<div><div class="fxl">周期(ヶ月ごと)</div>'+
+        '<input class="input mono r" type="number" inputmode="numeric" id="fx-every" placeholder="1" value="'+esc(f.every||"")+'"></div></div>'+
+        '<div class="fxg">'+fxAmt+fxEnd+'</div>')+
       (!isWeekly && !isDays ? '<div class="muted" style="font-size:11px;margin:0 2px 6px">引き落とし日が土日祝のとき</div>'+
         '<div class="row" style="gap:6px;margin-bottom:12px">'+
         [["none","変わらず"],["before","前営業日"],["after","翌営業日"]].map(([v,l])=>
