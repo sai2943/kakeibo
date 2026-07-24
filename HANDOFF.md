@@ -1,6 +1,6 @@
 # Tally PWA — 次チャットへの引き継ぎ (現行 v3.35)
 
-**【次チャットの始め方】** このHANDOFF.mdを新チャットに添付して「Tally開発の続き」と伝えれば全文脈が復元される。作業ファイルは/home/claude/pwa/index.html(消失時は/mnt/user-data/outputs/index.htmlから、それも無ければユーザーにリポジトリの現物添付を依頼)。開発フロー規約(pythonヒアドキュメント編集→node構文check→バージョン2箇所バンプ→outputsへcp→present_files必須)とアンカー教訓は本書後半に記載。デプロイはユーザー側のDeploy Tallyショートカット(index.html専用・ファイル受け取りのみ)。HANDOFF.mdは**Deploy HANDOFFショートカット**(共有シート→Working Copyネイティブアクションで write→commit(message:handoff)→push を原子実行——未コミット衝突ダイアログ問題を根治、2026-07-24運用開始)。
+**【次チャットの始め方】** このHANDOFF.mdを新チャットに添付して「Tally開発の続き」と伝えれば全文脈が復元される。作業ファイルは/home/claude/pwa/index.html(消失時は/mnt/user-data/outputs/index.htmlから、それも無ければユーザーにリポジトリの現物添付を依頼)。開発フロー規約(pythonヒアドキュメント編集→node構文check→バージョン2箇所バンプ→outputsへcp→present_files必須)とアンカー教訓は本書後半に記載。デプロイはユーザー側のDeploy Tallyショートカット(index.html専用・ファイル受け取りのみ)。HANDOFF.mdは**Deploy HANDOFFショートカット**(共有シート→Working Copyネイティブアクションで write→commit(message:handoff)→push を原子実行——未コミット衝突ダイアログ問題を根治、2026-07-24実弾テスト合格・運用開始)。
 
 > リポジトリでは固定名 `HANDOFF.md` で上書き運用(バージョンはこの見出し、履歴はGit)。
 
