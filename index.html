@@ -192,7 +192,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.26 (localStorage保存・完全オフライン)
+   Tally 3.27 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -675,7 +675,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.26";
+const APP_VERSION = "3.27";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -700,7 +700,7 @@ function _renderBody(){
   const navbar = document.getElementById("navbar");
   if(navbar){
     if(UI.screen==="main"){
-      navbar.innerHTML = '<div class="muted" style="font-size:9px;text-align:center;padding:1px 0 4px">✓ 自動保存 <span class="savets mono">'+(LAST_LOCAL_SAVE||"—")+'</span> ・ 通信不要</div>' + tabBar();
+      navbar.innerHTML = tabBar() + '<div class="muted" style="font-size:9px;text-align:center;padding:4px 0 1px">✓ 自動保存 <span class="savets mono">'+(LAST_LOCAL_SAVE||"—")+'</span> ・ 通信不要</div>';
       navbar.style.display="";
     }
     else { navbar.innerHTML = ""; navbar.style.display = "none"; }
