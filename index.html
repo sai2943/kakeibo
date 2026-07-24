@@ -198,7 +198,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.37 (localStorage保存・完全オフライン)
+   Tally 3.38 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";  /* 歴史的名称のままが正。変更=全データ孤立。リポジトリ改名(tally)とは無関係の内部ID——絶対に触らない */
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -681,7 +681,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.37";
+const APP_VERSION = "3.38";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -2317,6 +2317,27 @@ function viewAssets(){
     '<span><span class="mono teal" style="font-size:18px;font-weight:700">¥'+invCost.toLocaleString("ja-JP")+'</span> <span class="muted">›</span></span></div>'+
     '<div class="row between" style="font-size:11px"><span class="muted">'+((inv.holdings||[]).length)+'銘柄 ・ Buffer ¥'+bufBal.toLocaleString("ja-JP")+'</span>'+
     '<span class="muted">今月の買付 '+boughtThis+'/'+((inv.holdings||[]).filter(x=>x.frame!=="yutai").length||0)+'銘柄</span></div></div>';
+  /* v3.38: ふるさと納税 残枠カード。限度額の計算は外部シミュレーター(税制の毎年改正を追わない=時価不追随と同型)。
+     アプリは限度額1個の入力(S.furusato={year,limit})と当年寄付の全導出トラッキングに徹する。
+     記帳規約: 店名「ふるさと納税」固定・分類=承認(バー対象外) */
+  const fsS=S.furusato||{}; const fsY=todayStr().slice(0,4);
+  const fsDon=(S.entries||[]).filter(e=>e.type==="expense"&&e.date&&e.date.startsWith(fsY)&&(e.store||"").trim()==="ふるさと納税").reduce((a,e)=>a+e.amount,0);
+  const fsLimit=(String(fsS.year)===fsY)?num(fsS.limit):0;
+  if(fsLimit>0){
+    const fsPct=Math.min(100,fsDon/fsLimit*100), fsOver=fsDon-fsLimit;
+    h+='<div class="card" style="margin-bottom:12px;cursor:pointer" data-a="furuset">'+
+      '<div class="row between" style="align-items:baseline;margin-bottom:8px"><span style="font-size:13px;font-weight:700">ふるさと納税 <span class="muted" style="font-size:10px;font-weight:400">'+fsY+'年枠</span></span>'+
+      '<span><span class="mono '+(fsOver>0?"red":"teal")+'" style="font-size:18px;font-weight:700">¥'+fsDon.toLocaleString("ja-JP")+'</span><span class="muted" style="font-size:11px"> / ¥'+fsLimit.toLocaleString("ja-JP")+'</span></span></div>'+
+      (fsOver>0
+        ? '<div style="height:16px;background:var(--red);border-radius:8px;display:flex;align-items:center;justify-content:center"><span style="font-size:9px;font-weight:700;color:var(--bg);letter-spacing:.12em">限度額オーバー</span></div>'
+        : '<div style="height:7px;background:var(--surface2);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+fsPct+'%;background:var(--teal)"></div></div>')+
+      '<div class="row between" style="font-size:10px;margin-top:5px">'+(fsOver>0?'<span class="red" style="font-weight:700">超過 ¥'+fsOver.toLocaleString("ja-JP")+'(自己負担)</span>':'<span class="muted">残り ¥'+Math.max(0,fsLimit-fsDon).toLocaleString("ja-JP")+'</span>')+'<span class="mono muted">'+Math.floor(fsPct)+'% ・ タップで限度額変更</span></div></div>';
+  } else {
+    h+='<div class="card" style="margin-bottom:12px;cursor:pointer" data-a="furuset">'+
+      '<div class="row between" style="align-items:center"><span style="font-size:13px"><span style="font-weight:700">ふるさと納税</span> '+(fsDon>0?'<span class="mono muted" style="font-size:11px">寄付済 ¥'+fsDon.toLocaleString("ja-JP")+'</span>':'')+'</span><span class="amber" style="font-size:11px">＋ '+fsY+'年の限度額を設定</span></div>'+
+      (String(fsS.year||"")&&String(fsS.year)!==fsY&&num(fsS.limit)>0?'<div class="muted" style="font-size:10px;margin-top:4px">'+String(fsS.year)+'年の限度額 ¥'+num(fsS.limit).toLocaleString("ja-JP")+' は年替わりで失効。<br>外部シミュレーターで再計算を。</div>':'')+
+      '</div>';
+  }
   const lm=leakMonths().map(leakAgg);
   let leakTxt="測定待ち";
   for(let li=0;li<lm.length-1;li++){
@@ -3399,6 +3420,7 @@ function bindMain(){
       }
       else if(a==="catdrill"){ UI.drillCat=v; UI.drillOpenStore=null; UI.drillMode="chain"; UI.drillAssign=null; UI.drillVarOnly=(v==="消費"); UI.screen="catdrill"; render(); }
       else if(a==="setbudget"){ const cat=v; const p=prompt(cat+"の月間予算(上限・円):", ((S.budgets||{})[cat])||""); if(p===null)return; (S.budgets=S.budgets||{})[cat]=String(num(p)); save(); render(); }
+      else if(a==="furuset"){ const cy=todayStr().slice(0,4); const cur=(S.furusato&&String(S.furusato.year)===cy)?(S.furusato.limit||""):""; const p=prompt(cy+"年のふるさと納税 限度額(円):\n計算は外部シミュレーターで(税制は毎年変わるため)。\n記帳は 店名「ふるさと納税」・分類「承認」で。\n0で枠表示を解除。", cur); if(p===null)return; S.furusato={year:cy, limit:String(num(p))}; save(); render(); }
       else if(a==="mjtnew"){ UI.mjt=newMjTable(); UI.mjtCell=null; saveMjt(false); UI.screen="mjtable"; render(); }
       else if(a==="opentool"){ if(el.dataset.v==="bordertool"){ UI.screen="bordertool"; render(); } }
       else if(a==="mjtopen"){ const t=(S.mjTables||[]).find(x=>String(x.id)===String(v)); if(t){ UI.mjt=t; UI.mjtCell=null; UI.screen="mjtable"; render(); } }
