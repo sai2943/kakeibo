@@ -27,7 +27,12 @@
     display:flex; flex-direction:column; overflow:hidden;
     font-family:'Hiragino Sans','Noto Sans JP',sans-serif; font-size:14px;}
   #app{flex:1 1 auto; overflow-y:auto; -webkit-overflow-scrolling:touch; width:100%; max-width:560px; margin:0 auto; padding:calc(16px + env(safe-area-inset-top,0px)) 16px calc(max(var(--navh,0px), 60px) + 20px);}
-  #navbar{flex:0 0 auto; width:100%; padding:0 16px var(--navpad);}
+  #navbar{flex:0 0 auto; width:100%; padding:6px 16px var(--navpad); position:relative;}
+  /* 描画領域との境界フェード帯(v3.28): navbar上端から上へ24px張り出す透明→bgのグラデ。
+     コンテンツはタブピルに激突せず溶けて消える。透明側はbg同色のalpha0(Safariのtransparent=黒混ざり回避)。
+     navbarはmain画面(常にダーク)でのみ表示されるため色は固定値でよい */
+  #navbar::before{content:""; position:absolute; left:0; right:0; top:-24px; height:24px;
+    background:linear-gradient(rgba(11,31,30,0), var(--bg)); pointer-events:none;}
   .mono{font-family:ui-monospace,'SF Mono',Menlo,monospace; font-variant-numeric:tabular-nums;}
   .muted{color:var(--muted);}
   .teal{color:var(--teal);} .red{color:var(--red);} .amber{color:var(--amber);} .blue{color:var(--blue);}
@@ -192,7 +197,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.27 (localStorage保存・完全オフライン)
+   Tally 3.28 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -675,7 +680,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.27";
+const APP_VERSION = "3.28";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
