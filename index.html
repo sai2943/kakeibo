@@ -197,7 +197,7 @@
 <script>
 "use strict";
 /* ============================================================
-   Tally 3.28 (localStorage保存・完全オフライン)
+   Tally 3.29 (localStorage保存・完全オフライン)
    ============================================================ */
 const KEY = "kakeibo:v1";
 const EXPENSE_CATS = ["消費","娯楽","承認"];  /* 承認=事前承認済みの特別支出。予算バー対象外(承認プロセス自体が統制) */
@@ -680,7 +680,7 @@ function moveMonth(d){ UI.m += d;
 /* ============================================================
    レンダリング
    ============================================================ */
-const APP_VERSION = "3.28";
+const APP_VERSION = "3.29";
 let _renderLoc = "";
 let RENDER_PREV_SCREEN = null;
 function render(){
@@ -1224,7 +1224,7 @@ function mjStatRow(label, val, isYen, raw, unit){
 }
 
 /* ========================= ツール ========================= */
-/* カテゴリ別ツールの受け皿。将来 投資 のツールもここに追加する。 */
+/* カテゴリ別ツールの受け皿。投資はツールでなく資産タブの投資台帳(v3.18)が担当——プレースホルダーはv3.29で廃止済み。 */
 /* ---------- 麻雀スコア表 一覧(専用画面) ---------- */
 function viewMjtList(){
   let h = '<div class="hdr"><button class="navbtn" data-a="mjtlback">‹ 戻る</button><div style="font-size:14px;font-weight:700">麻雀 スコア表</div><div style="width:44px"></div></div>';
@@ -1287,10 +1287,6 @@ function viewTool(){
     '<div class="muted" style="font-size:11px;margin-top:2px">分母・理論TYを登録(ボーダー試算と機種名サジェストで使用)</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
   h += '<div class="card" data-a="stores" style="cursor:pointer;margin-top:8px"><div class="row between" style="align-items:center"><div><div style="font-size:13px;font-weight:600">店舗データ</div>'+
     '<div class="muted" style="font-size:11px;margin-top:2px">換金率・貸出・貯玉レートを店ごとに登録(交換設定/ボーダーで選択)</div></div><span style="font-size:18px;color:var(--muted)">›</span></div></div>';
-  /* 投資 */
-  h += band("投資");
-  h += '<div class="card" style="opacity:.6"><div style="font-size:13px">準備中</div>'+
-    '<div class="muted" style="font-size:11px;margin-top:2px">ポートフォリオ管理は今後追加予定</div></div>';
   h += band("データ");
   h += '<div class="card" style="cursor:pointer" data-a="backup"><div class="row between" style="align-items:center">'+
     '<div><div style="font-size:13px;font-weight:700">バックアップ・同期</div><div class="muted" style="font-size:11px;margin-top:2px">データの書き出し・復元・同期設定</div></div>'+
@@ -2428,6 +2424,41 @@ function genInvestAudit(){
   const recent=((inv.bufferTxns)||[]).slice(-6).reverse();
   recent.forEach(t=>L.push("- "+t.date+" "+(num(t.amount)>=0?"+":"")+"¥"+num(t.amount).toLocaleString("ja-JP")+(t.memo?" ("+t.memo+")":"")));
   L.push("");
+  /* v3.29: 生活防衛資金・現金ポジション(貯金台帳から自動導出・画面のロードマップと同一計算)。
+     防衛資金なき投資=強制売却リスクの購入(v3.24)——現金の守備線を見せずにリスク監査はさせられない */
+  L.push("## 生活防衛資金・現金ポジション(貯金台帳から自動導出)");
+  const sBal=savingsBalance();
+  L.push("- 貯金残高: ¥"+sBal.toLocaleString("ja-JP"));
+  const nowD=new Date(); const spends=[];
+  for(let i=1;i<=3;i++){
+    const d=new Date(nowD.getFullYear(), nowD.getMonth()-i, 1);
+    const mk=d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+    const sp=leakAgg(mk).spend; if(sp>0) spends.push(sp);
+  }
+  if(spends.length){
+    const avgSp=Math.round(spends.reduce((a,b)=>a+b,0)/spends.length);
+    L.push("- 月間支出(直近"+spends.length+"ヶ月平均・遊技収支除く): ¥"+avgSp.toLocaleString("ja-JP")+" → 残高は約"+(sBal/avgSp).toFixed(1)+"ヶ月分");
+  } else {
+    L.push("- 月間支出: 算出不能(支出記録のある完了月が直近3ヶ月にない)");
+  }
+  const svGoals=((S.savings||{}).goals||[]);
+  if(svGoals.length){
+    L.push("- 貯金目標の状況:");
+    const svUndone=svGoals.filter(g=>!g.done); const svCur=svUndone[0]||null;
+    svGoals.forEach(g=>{
+      const tgt=num(g.target);
+      const mark=g.done?"✓ 達成":(g===svCur?"▶ 現在":"○ 待機");
+      let line="  - "+mark+" "+g.name+": "+(tgt>0?"¥"+tgt.toLocaleString("ja-JP"):"目標未設定");
+      if(g===svCur && tgt>0) line+=" (進捗 "+Math.min(100,Math.round(sBal/tgt*100))+"%)";
+      L.push(line);
+    });
+    if(svUndone.length){
+      let remain=0, unknown=false;
+      svUndone.forEach(g=>{ const t=num(g.target); if(t>0) remain+=t; else unknown=true; });
+      L.push("- 投資スタートまで: "+(unknown?"目標額の設定待ち":"あと ¥"+Math.max(0,remain-sBal).toLocaleString("ja-JP")+"(未達成目標合計 − 残高)"));
+    }
+  }
+  L.push("");
   L.push("## 監査依頼");
   L.push("以下の観点で忌憚なく評価してください:");
   L.push("1. 方針と保有の整合性(シナリオと実際の銘柄構成のズレ)");
@@ -2435,6 +2466,7 @@ function genInvestAudit(){
   L.push("3. 各銘柄の売却条件の明確性・検証可能性");
   L.push("4. 実行規律(買付頻度・NISA枠の使い方・Bufferの運用)");
   L.push("5. 見落としているリスクや盲点");
+  L.push("6. 生活防衛資金の十分性(月間支出との比・投資規模とのバランス・暴落時に売らずに耐える態勢か)");
   return L.join("\n");
 }
 function viewInvest(){
