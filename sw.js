@@ -1,7 +1,8 @@
-/* 収支台帳 service worker 1.49
+/* Tally service worker 1.50
    方針: ページ本体はネットワーク優先(更新が即反映)、失敗時キャッシュ(オフライン動作)。
-   アイコン等の静的物はキャッシュ優先。 */
-const CACHE = "kakeibo-1.49";
+   アイコン等の静的物はキャッシュ優先。
+   1.49からの変更はキャッシュ名のみ(kakeibo-1.49→tally-1.50)。旧キャッシュはactivateで自動削除、ロジック不変。 */
+const CACHE = "tally-1.50";
 const ASSETS = ["./", "./index.html", "./manifest.webmanifest",
   "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
